@@ -88,4 +88,15 @@ class AppState extends ChangeNotifier {
     breakDuration = breakMinutes;
     notifyListeners();
   }
+
+   String _selectedMood = '';
+
+  // Getter for the selected mood
+  String get selectedMood => _selectedMood;
+
+  // Set the selected mood and notify listeners
+  void setMood(String mood) {
+    _selectedMood = mood;
+    notifyListeners();
+  }
 }
