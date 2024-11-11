@@ -10,10 +10,13 @@ class AppState extends ChangeNotifier {
 
   // Pomodoro Timer Fields
   bool isTimerRunning = false;
-  int workDuration = 25; // in minutes
-  int breakDuration = 5; // in minutes
-  Timer? _timer;
+  int focusDuration = 25; // Focus mode duration in minutes
+  int shortBreakDuration = 5; // Short break duration in minutes
+  int longBreakDuration = 15; // Long break duration in minutes
+  String currentMode = "Focus"; // Initial mode
   int remainingTime = 0; // in seconds
+  int _currentDuration = 0; 
+  Timer? _timer;
 
   // Mood Tracking Fields
   String _selectedMood = '';
@@ -48,7 +51,7 @@ class AppState extends ChangeNotifier {
     "Irritable": "Irritability is natural. Take a step back and identify what’s bothering you. Gentle self-care can help.",
     "Supported": "You’re not alone. Lean into this support, and remember to appreciate those who uplift you."
   };
-  
+
   // ----------------------------------------
   // Task Management Methods
   // ----------------------------------------
@@ -94,8 +97,27 @@ class AppState extends ChangeNotifier {
   // Pomodoro Timer Methods
   // ----------------------------------------
 
-  void startTimer(bool isWorkSession) {
-    remainingTime = (isWorkSession ? workDuration : breakDuration) * 60;
+  void updateTimerDuration(String mode) {
+    switch (mode) {
+      case "Focus":
+        _currentDuration = focusDuration * 60;
+        break;
+      case "Short Break":
+        _currentDuration = shortBreakDuration * 60;
+        break;
+      case "Long Break":
+        _currentDuration = longBreakDuration * 60;
+        break;
+      default:
+        _currentDuration = focusDuration * 60;
+    }
+    remainingTime = _currentDuration;
+    notifyListeners();
+  }
+
+ void startTimer(bool isFocusMode) {
+    if (isTimerRunning) return;
+
     isTimerRunning = true;
     _timer = Timer.periodic(Duration(seconds: 1), (timer) {
       if (remainingTime > 0) {
@@ -107,24 +129,40 @@ class AppState extends ChangeNotifier {
     });
   }
 
+  void stopTimer() {
+    _timer?.cancel();
+    isTimerRunning = false;
+    remainingTime = _currentDuration;
+    notifyListeners();
+  }
+
   void pauseTimer() {
     _timer?.cancel();
     isTimerRunning = false;
     notifyListeners();
   }
 
-  void stopTimer() {
-    _timer?.cancel();
-    isTimerRunning = false;
-    remainingTime = 0;
-    notifyListeners();
+  int getCurrentDuration() {
+  switch (currentMode) {
+    case "Focus":
+      return focusDuration;
+    case "Short Break":
+      return shortBreakDuration;
+    case "Long Break":
+      return longBreakDuration;
+    default:
+      return focusDuration;
+  }
+}
+  double get progress => _currentDuration == 0 ? 0 : remainingTime / _currentDuration;
+
+
+  String get timerDisplay {
+    final minutes = (remainingTime ~/ 60).toString().padLeft(2, '0');
+    final seconds = (remainingTime % 60).toString().padLeft(2, '0');
+    return "$minutes:$seconds";
   }
 
-  void setDurations(int workMinutes, int breakMinutes) {
-    workDuration = workMinutes;
-    breakDuration = breakMinutes;
-    notifyListeners();
-  }
 
   // ----------------------------------------
   // Mood Tracking Methods
@@ -141,6 +179,11 @@ class AppState extends ChangeNotifier {
       'emoji': emoji,
       'date': DateTime.now().toLocal().toString().split(' ')[0],
     });
+    notifyListeners();
+  }
+
+   void setMode(String mode) {
+    currentMode = mode;
     notifyListeners();
   }
 
