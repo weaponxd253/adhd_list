@@ -132,12 +132,20 @@ void toggleSubtaskCompletion(int taskIndex, int subtaskIndex) {
   String get selectedMood => _selectedMood;
   String get selectedMoodEmoji => _selectedMoodEmoji;
 
-  // Method to set the mood with both emoji and label
+ List<Map<String, String>> moodHistory = []; // Store mood history
+
   void setMood(String mood, String emoji) {
     _selectedMood = mood;
     _selectedMoodEmoji = emoji;
+    moodHistory.add({
+      'mood': mood,
+      'emoji': emoji,
+      'date': DateTime.now().toLocal().toString().split(' ')[0],
+    });
     notifyListeners();
   }
+
+  
 
   // Method to get the message for the selected mood
   String get moodMessage => moodMessages[_selectedMood] ?? '';
