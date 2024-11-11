@@ -1,10 +1,8 @@
 // lib/main.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'providers/app_state.dart'; // App-wide state
-import 'features/task_breakdown/task_screen.dart'; // Import features
-import 'features/dashboard/dashboard_screen.dart';
-import 'features/hyperfocus/hyperfocus_screen.dart';
+import 'providers/app_state.dart';
+import 'features/home/home_screen.dart';
 
 void main() {
   runApp(FocusFlowApp());
@@ -15,18 +13,12 @@ class FocusFlowApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => AppState()), // Global app state
-        // Additional providers for individual features
+        ChangeNotifierProvider(create: (_) => AppState()),
       ],
       child: MaterialApp(
         title: 'FocusFlow',
         theme: ThemeData(primarySwatch: Colors.blue),
-        home: DashboardScreen(), // Main entry screen
-        routes: {
-          '/tasks': (_) => TaskScreen(),
-          '/hyperfocus': (_) => HyperfocusScreen(),
-          // Other routes
-        },
+        home: HomeScreen(), // Set HomeScreen as the entry point
       ),
     );
   }

@@ -9,12 +9,13 @@ class TaskScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Task Breakdown")),
+      appBar: AppBar(
+        title: Text("Task Breakdown"),
+      ),
       body: Column(
         children: [
-          TaskInputSection(controller: taskController),
+          TaskInputSection(taskController: taskController),
           Expanded(child: TaskListSection()),
-          PomodoroTimerSection(),
         ],
       ),
     );
@@ -22,9 +23,9 @@ class TaskScreen extends StatelessWidget {
 }
 
 class TaskInputSection extends StatelessWidget {
-  final TextEditingController controller;
+  final TextEditingController taskController;
 
-  TaskInputSection({required this.controller});
+  TaskInputSection({required this.taskController});
 
   @override
   Widget build(BuildContext context) {
@@ -33,19 +34,30 @@ class TaskInputSection extends StatelessWidget {
       child: Column(
         children: [
           TextField(
-            controller: controller,
-            decoration: InputDecoration(labelText: "Enter Task"),
+            controller: taskController,
+            decoration: InputDecoration(
+              labelText: "Enter Task",
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              filled: true,
+              fillColor: Colors.grey[200],
+            ),
           ),
           SizedBox(height: 10),
-          ElevatedButton(
+          ElevatedButton.icon(
             onPressed: () {
-              if (controller.text.isNotEmpty) {
+              if (taskController.text.isNotEmpty) {
                 Provider.of<AppState>(context, listen: false)
-                    .addTask(controller.text);
-                controller.clear(); // Clear the input after adding the task
+                    .addTask(taskController.text);
+                taskController.clear();
               }
             },
-            child: Text("Add Task"),
+            icon: Icon(Icons.add),
+            label: Text("Add Task"),
+            style: ElevatedButton.styleFrom(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
           ),
         ],
       ),
@@ -56,19 +68,81 @@ class TaskInputSection extends StatelessWidget {
 class TaskListSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final tasks = Provider.of<AppState>(context).tasks; // Get tasks from AppState
+    final appState = Provider.of<AppState>(context);
 
     return ListView.builder(
-      itemCount: tasks.length,
+      padding: EdgeInsets.all(8.0),
+      itemCount: appState.tasks.length,
       itemBuilder: (context, index) {
-        return ListTile(
-          title: Text(tasks[index]),
-          leading: IconButton(
-            icon: Icon(Icons.check_box_outline_blank),
-            onPressed: () {
-              Provider.of<AppState>(context, listen: false)
-                  .removeTask(tasks[index]); // Remove task on tap
-            },
+        final task = appState.tasks[index];
+        double progress = task.subtasks.isEmpty
+            ? 0
+            : task.subtasks.where((subtask) => subtask.isCompleted).length / task.subtasks.length;
+
+        return Card(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          elevation: 3,
+          margin: EdgeInsets.symmetric(vertical: 6),
+          child: ExpansionTile(
+            leading: Checkbox(
+              value: task.isCompleted,
+              onChanged: (_) {
+                appState.toggleTaskCompletion(index);
+              },
+            ),
+            title: Text(
+              task.title,
+              style: TextStyle(
+                fontSize: 18,
+                decoration:
+                    task.isCompleted ? TextDecoration.lineThrough : null,
+              ),
+            ),
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: Column(
+                  children: [
+                    LinearProgressIndicator(
+                      value: progress,
+                      backgroundColor: Colors.grey[300],
+                      color: Colors.blueAccent,
+                      minHeight: 8,
+                    ),
+                    SizedBox(height: 10),
+                    SubtaskInputSection(taskIndex: index),
+                    ListView.builder(
+                      shrinkWrap: true,
+                      physics: NeverScrollableScrollPhysics(),
+                      itemCount: task.subtasks.length,
+                      itemBuilder: (context, subIndex) {
+                        final subtask = task.subtasks[subIndex];
+                        return ListTile(
+                          title: Text(
+                            "- ${subtask.title}",
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: subtask.isCompleted
+                                  ? Colors.grey
+                                  : Colors.black,
+                              decoration: subtask.isCompleted
+                                  ? TextDecoration.lineThrough
+                                  : null,
+                            ),
+                          ),
+                          leading: Checkbox(
+                            value: subtask.isCompleted,
+                            onChanged: (value) {
+                              appState.toggleSubtaskCompletion(index, subIndex);
+                            },
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         );
       },
@@ -76,19 +150,36 @@ class TaskListSection extends StatelessWidget {
   }
 }
 
-class PomodoroTimerSection extends StatelessWidget {
+class SubtaskInputSection extends StatelessWidget {
+  final int taskIndex;
+  final TextEditingController subtaskController = TextEditingController();
+
+  SubtaskInputSection({required this.taskIndex});
+
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return Row(
       children: [
-        Text("Pomodoro Timer: 25:00"),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            IconButton(onPressed: () {}, icon: Icon(Icons.play_arrow)),
-            IconButton(onPressed: () {}, icon: Icon(Icons.pause)),
-            IconButton(onPressed: () {}, icon: Icon(Icons.stop)),
-          ],
+        Expanded(
+          child: TextField(
+            controller: subtaskController,
+            decoration: InputDecoration(
+              labelText: "Enter Subtask",
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              filled: true,
+              fillColor: Colors.grey[100],
+            ),
+          ),
+        ),
+        IconButton(
+          icon: Icon(Icons.add, color: Colors.blueAccent),
+          onPressed: () {
+            if (subtaskController.text.isNotEmpty) {
+              Provider.of<AppState>(context, listen: false)
+                  .addSubtask(taskIndex, subtaskController.text);
+              subtaskController.clear();
+            }
+          },
         ),
       ],
     );
