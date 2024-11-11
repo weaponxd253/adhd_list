@@ -4,102 +4,23 @@ import 'dart:async';
 import '../models/task.dart';
 import '../models/subtask.dart';
 
-
 class AppState extends ChangeNotifier {
+  // Task Management Fields
   List<Task> tasks = [];
+
+  // Pomodoro Timer Fields
   bool isTimerRunning = false;
-  int workDuration = 25; // Default work duration in minutes
-  int breakDuration = 5; // Default break duration in minutes
+  int workDuration = 25; // in minutes
+  int breakDuration = 5; // in minutes
   Timer? _timer;
-  int remainingTime = 0; // Remaining time in seconds
+  int remainingTime = 0; // in seconds
 
-  // Add a new task with an empty List<Subtask>
-  void addTask(String title, DateTime dueDate) {
-    tasks.add(Task(title: title, dueDate: dueDate));
-    notifyListeners();
-  }
-  // Add a subtask to a specific task
-// Add a subtask to a specific task
-void addSubtask(int taskIndex, String subtaskTitle) {
-  if (taskIndex >= 0 && taskIndex < tasks.length) {
-    tasks[taskIndex].subtasks.add(Subtask(title: subtaskTitle));
-    notifyListeners();
-  }
-}
-  // Remove a task
-  void removeTask(int taskIndex) {
-    tasks.removeAt(taskIndex);
-    notifyListeners();
-  }
-
-  // Toggle task completion status
-  void toggleTaskCompletion(int taskIndex) {
-    tasks[taskIndex].isCompleted = !tasks[taskIndex].isCompleted;
-    notifyListeners();
-  }
-
-void toggleSubtaskCompletion(int taskIndex, int subtaskIndex) {
-  if (taskIndex >= 0 && taskIndex < tasks.length) {
-    Task task = tasks[taskIndex];
-    if (subtaskIndex >= 0 && subtaskIndex < task.subtasks.length) {
-      task.subtasks[subtaskIndex].isCompleted = !task.subtasks[subtaskIndex].isCompleted;
-      notifyListeners();
-    }
-  }
-}
-
-  // Pomodoro timer start/pause/stop
-  void startTimer(bool isWorkSession) {
-    remainingTime = (isWorkSession ? workDuration : breakDuration) * 60;
-    isTimerRunning = true;
-    _timer = Timer.periodic(Duration(seconds: 1), (timer) {
-      if (remainingTime > 0) {
-        remainingTime--;
-        notifyListeners();
-      } else {
-        stopTimer();
-      }
-    });
-  }
-
-  void pauseTimer() {
-    _timer?.cancel();
-    isTimerRunning = false;
-    notifyListeners();
-  }
-
-  void stopTimer() {
-    _timer?.cancel();
-    isTimerRunning = false;
-    remainingTime = 0;
-    notifyListeners();
-  }
-
-  // Set custom durations
-  void setDurations(int workMinutes, int breakMinutes) {
-    workDuration = workMinutes;
-    breakDuration = breakMinutes;
-    notifyListeners();
-  }
-
-  
-
-   // Get total task count
-  int get totalTasks => tasks.length;
-
-  // Get count of completed tasks
-  int get completedTasks => tasks.where((task) => task.isCompleted).length;
-
-  // Get count of pending tasks
-  int get pendingTasks => tasks.where((task) => !task.isCompleted).length;
-
-  // Get a list of the first few pending tasks
-  List<Task> get upcomingTasks => tasks.where((task) => !task.isCompleted).take(3).toList();
-
- String _selectedMood = '';
+  // Mood Tracking Fields
+  String _selectedMood = '';
   String _selectedMoodEmoji = '';
+  List<Map<String, String>> moodHistory = []; // History of mood selections
 
-  // Map of mood messages
+  // Utility Fields
   final Map<String, String> moodMessages = {
     "Hopeful": "It’s wonderful to feel hope! Nurture it by thinking of one small step you can take toward your goal today.",
     "Triggered": "Take a deep breath. It's okay to feel this way. Ground yourself by focusing on something you can see, touch, hear, or smell.",
@@ -127,12 +48,90 @@ void toggleSubtaskCompletion(int taskIndex, int subtaskIndex) {
     "Irritable": "Irritability is natural. Take a step back and identify what’s bothering you. Gentle self-care can help.",
     "Supported": "You’re not alone. Lean into this support, and remember to appreciate those who uplift you."
   };
+  
+  // ----------------------------------------
+  // Task Management Methods
+  // ----------------------------------------
 
-  // Getters for mood and emoji
+  void addTask(String title, DateTime dueDate) {
+    tasks.add(Task(title: title, dueDate: dueDate));
+    notifyListeners();
+  }
+
+  void addSubtask(int taskIndex, String subtaskTitle) {
+    if (taskIndex >= 0 && taskIndex < tasks.length) {
+      tasks[taskIndex].subtasks.add(Subtask(title: subtaskTitle));
+      notifyListeners();
+    }
+  }
+
+  void removeTask(int taskIndex) {
+    tasks.removeAt(taskIndex);
+    notifyListeners();
+  }
+
+  void toggleTaskCompletion(int taskIndex) {
+    tasks[taskIndex].isCompleted = !tasks[taskIndex].isCompleted;
+    notifyListeners();
+  }
+
+  void toggleSubtaskCompletion(int taskIndex, int subtaskIndex) {
+    if (taskIndex >= 0 && taskIndex < tasks.length) {
+      Task task = tasks[taskIndex];
+      if (subtaskIndex >= 0 && subtaskIndex < task.subtasks.length) {
+        task.subtasks[subtaskIndex].isCompleted = !task.subtasks[subtaskIndex].isCompleted;
+        notifyListeners();
+      }
+    }
+  }
+
+  int get totalTasks => tasks.length;
+  int get completedTasks => tasks.where((task) => task.isCompleted).length;
+  int get pendingTasks => tasks.where((task) => !task.isCompleted).length;
+  List<Task> get upcomingTasks => tasks.where((task) => !task.isCompleted).take(3).toList();
+
+  // ----------------------------------------
+  // Pomodoro Timer Methods
+  // ----------------------------------------
+
+  void startTimer(bool isWorkSession) {
+    remainingTime = (isWorkSession ? workDuration : breakDuration) * 60;
+    isTimerRunning = true;
+    _timer = Timer.periodic(Duration(seconds: 1), (timer) {
+      if (remainingTime > 0) {
+        remainingTime--;
+        notifyListeners();
+      } else {
+        stopTimer();
+      }
+    });
+  }
+
+  void pauseTimer() {
+    _timer?.cancel();
+    isTimerRunning = false;
+    notifyListeners();
+  }
+
+  void stopTimer() {
+    _timer?.cancel();
+    isTimerRunning = false;
+    remainingTime = 0;
+    notifyListeners();
+  }
+
+  void setDurations(int workMinutes, int breakMinutes) {
+    workDuration = workMinutes;
+    breakDuration = breakMinutes;
+    notifyListeners();
+  }
+
+  // ----------------------------------------
+  // Mood Tracking Methods
+  // ----------------------------------------
+
   String get selectedMood => _selectedMood;
   String get selectedMoodEmoji => _selectedMoodEmoji;
-
- List<Map<String, String>> moodHistory = []; // Store mood history
 
   void setMood(String mood, String emoji) {
     _selectedMood = mood;
@@ -145,9 +144,5 @@ void toggleSubtaskCompletion(int taskIndex, int subtaskIndex) {
     notifyListeners();
   }
 
-  
-
-  // Method to get the message for the selected mood
   String get moodMessage => moodMessages[_selectedMood] ?? '';
-
 }
