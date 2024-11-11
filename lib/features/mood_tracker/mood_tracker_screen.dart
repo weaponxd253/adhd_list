@@ -11,7 +11,6 @@ class MoodTrackerScreen extends StatefulWidget {
 class _MoodTrackerScreenState extends State<MoodTrackerScreen> {
   String selectedMood = '';
 
-  // List of mood options with emoji and label
   final List<Map<String, String>> moodOptions = [
     {"emoji": "🌱", "label": "Hopeful"},
     {"emoji": "⚠️", "label": "Triggered"},
@@ -40,14 +39,15 @@ class _MoodTrackerScreenState extends State<MoodTrackerScreen> {
     {"emoji": "👥", "label": "Supported"},
   ];
 
-  void _selectMood(String mood) {
-    setState(() {
-      selectedMood = mood;
-    });
+void _selectMood(String moodLabel, String moodEmoji) {
+  setState(() {
+    selectedMood = moodLabel;
+  });
 
-    // Optionally, save the selected mood to AppState
-    Provider.of<AppState>(context, listen: false).setMood(mood);
-  }
+  // Save the selected mood and emoji to AppState
+  Provider.of<AppState>(context, listen: false).setMood(moodLabel, moodEmoji);
+}
+
 
   @override
   Widget build(BuildContext context) {
@@ -73,7 +73,7 @@ class _MoodTrackerScreenState extends State<MoodTrackerScreen> {
                   final isSelected = selectedMood == mood["label"];
 
                   return GestureDetector(
-                    onTap: () => _selectMood(mood["label"]!),
+                    onTap: () => _selectMood(mood["label"]!, mood["emoji"]!),
                     child: Container(
                       margin: EdgeInsets.symmetric(vertical: 5),
                       padding: EdgeInsets.all(12),
