@@ -1,7 +1,7 @@
 // lib/features/home/home_screen.dart
 import 'package:adhd_list/features/dashboard/dashboard_screen.dart';
 import 'package:adhd_list/features/mood_tracker/mood_tracker_screen.dart';
-import 'package:adhd_list/features/task_breakdown/task_screen.dart';
+import 'package:adhd_list/features/task_breakdown/task_screen.dart'; // Import TaskScreen
 import 'package:adhd_list/features/timer/timer_screen.dart';
 import 'package:flutter/material.dart';
 
@@ -16,7 +16,7 @@ class _HomeScreenState extends State<HomeScreen> {
   // List of screens to show for each tab
   final List<Widget> _screens = [
     DashboardScreen(),
-    TaskScreen(),
+    TaskScreen(),  // Use TaskScreen in the tabs
     TimerScreen(),
     MoodTrackerScreen(),
   ];

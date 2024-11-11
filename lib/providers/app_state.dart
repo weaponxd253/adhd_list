@@ -1,21 +1,9 @@
 // lib/providers/app_state.dart
 import 'package:flutter/material.dart';
 import 'dart:async';
+import '../models/task.dart';
+import '../models/subtask.dart';
 
-class Subtask {
-  String title;
-  bool isCompleted;
-
-  Subtask({required this.title, this.isCompleted = false});
-}
-
-class Task {
-  final String title;
-  List<Subtask> subtasks; // Ensure this is always List<Subtask>
-  bool isCompleted;
-
-  Task({required this.title, this.subtasks = const [], this.isCompleted = false});
-}
 
 class AppState extends ChangeNotifier {
   List<Task> tasks = [];
@@ -26,17 +14,18 @@ class AppState extends ChangeNotifier {
   int remainingTime = 0; // Remaining time in seconds
 
   // Add a new task with an empty List<Subtask>
-  void addTask(String taskTitle) {
-    tasks.add(Task(title: taskTitle, subtasks: []));
+  void addTask(String title, DateTime dueDate) {
+    tasks.add(Task(title: title, dueDate: dueDate));
     notifyListeners();
   }
-
   // Add a subtask to a specific task
-  void addSubtask(int taskIndex, String subtaskTitle) {
+// Add a subtask to a specific task
+void addSubtask(int taskIndex, String subtaskTitle) {
+  if (taskIndex >= 0 && taskIndex < tasks.length) {
     tasks[taskIndex].subtasks.add(Subtask(title: subtaskTitle));
     notifyListeners();
   }
-
+}
   // Remove a task
   void removeTask(int taskIndex) {
     tasks.removeAt(taskIndex);
@@ -49,11 +38,15 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void toggleSubtaskCompletion(int taskIndex, int subtaskIndex) {
-    tasks[taskIndex].subtasks[subtaskIndex].isCompleted =
-        !tasks[taskIndex].subtasks[subtaskIndex].isCompleted;
-    notifyListeners();
+void toggleSubtaskCompletion(int taskIndex, int subtaskIndex) {
+  if (taskIndex >= 0 && taskIndex < tasks.length) {
+    Task task = tasks[taskIndex];
+    if (subtaskIndex >= 0 && subtaskIndex < task.subtasks.length) {
+      task.subtasks[subtaskIndex].isCompleted = !task.subtasks[subtaskIndex].isCompleted;
+      notifyListeners();
+    }
   }
+}
 
   // Pomodoro timer start/pause/stop
   void startTimer(bool isWorkSession) {
@@ -88,6 +81,20 @@ class AppState extends ChangeNotifier {
     breakDuration = breakMinutes;
     notifyListeners();
   }
+
+  
+
+   // Get total task count
+  int get totalTasks => tasks.length;
+
+  // Get count of completed tasks
+  int get completedTasks => tasks.where((task) => task.isCompleted).length;
+
+  // Get count of pending tasks
+  int get pendingTasks => tasks.where((task) => !task.isCompleted).length;
+
+  // Get a list of the first few pending tasks
+  List<Task> get upcomingTasks => tasks.where((task) => !task.isCompleted).take(3).toList();
 
  String _selectedMood = '';
   String _selectedMoodEmoji = '';

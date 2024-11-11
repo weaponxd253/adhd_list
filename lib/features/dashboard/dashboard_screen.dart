@@ -11,6 +11,12 @@ class DashboardScreen extends StatelessWidget {
     final selectedMoodEmoji = appState.selectedMoodEmoji;
     final moodMessage = appState.moodMessage;
 
+    // Retrieve task overview data
+    final totalTasks = appState.totalTasks;
+    final completedTasks = appState.completedTasks;
+    final pendingTasks = appState.pendingTasks;
+    final upcomingTasks = appState.upcomingTasks;
+
     return Scaffold(
       appBar: AppBar(
         title: Text("FocusFlow Dashboard"),
@@ -21,12 +27,54 @@ class DashboardScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              "Productivity Chart Placeholder",
-              style: TextStyle(fontSize: 18, color: Colors.black54),
+              "Task Overview",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
+            ),
+            SizedBox(height: 10),
+            Text(
+              "Total Tasks: $totalTasks",
+              style: TextStyle(fontSize: 16, color: Colors.black87),
+            ),
+            Text(
+              "Completed Tasks: $completedTasks",
+              style: TextStyle(fontSize: 16, color: Colors.green),
+            ),
+            Text(
+              "Pending Tasks: $pendingTasks",
+              style: TextStyle(fontSize: 16, color: Colors.redAccent),
             ),
             SizedBox(height: 20),
+
+            if (upcomingTasks.isNotEmpty) 
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "Upcoming Tasks",
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  ...upcomingTasks.map((task) => ListTile(
+                    title: Text(
+                      task.title,
+                      style: TextStyle(
+                        fontSize: 16,
+                        decoration: task.isCompleted ? TextDecoration.lineThrough : null,
+                      ),
+                    ),
+                    subtitle: Text("Due soon"),
+                  )),
+                ],
+              )
+            else
+              Text(
+                "No upcoming tasks",
+                style: TextStyle(fontSize: 16, color: Colors.grey),
+              ),
+
+            SizedBox(height: 20),
+            
             Text(
-              "Mood Tracker Placeholder",
+              "Mood Tracker",
               style: TextStyle(fontSize: 18, color: Colors.black54),
             ),
             SizedBox(height: 10),
