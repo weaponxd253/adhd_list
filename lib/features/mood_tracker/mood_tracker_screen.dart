@@ -30,24 +30,47 @@ class _MoodTrackerScreenState extends State<MoodTrackerScreen> {
     {"emoji": "🔥", "label": "Burnt Out"},
     {"emoji": "🛡️", "label": "Resilient"},
     {"emoji": "🔆", "label": "Centered"},
-    {"emoji": "🫣", "label": "Panicked"},
+    {"emoji": "🙀", "label": "Panicked"},
     {"emoji": "💬", "label": "Encouraged"},
     {"emoji": "✨", "label": "Inspired"},
     {"emoji": "🛌", "label": "Exhausted"},
     {"emoji": "☺️", "label": "Content"},
     {"emoji": "🌩️", "label": "Irritable"},
     {"emoji": "👥", "label": "Supported"},
+    {"emoji": "😌", "label": "Relaxed"},
+    {"emoji": "😃", "label": "Joyful"},
+    {"emoji": "😔", "label": "Sad"},
+    {"emoji": "😤", "label": "Frustrated"},
+    {"emoji": "😨", "label": "Anxious"},
+    {"emoji": "🤔", "label": "Thoughtful"},
+    {"emoji": "🤩", "label": "Excited"},
+    {"emoji": "😡", "label": "Angry"},
+    {"emoji": "😟", "label": "Worried"},
+    {"emoji": "🤝", "label": "Connected"},
+    {"emoji": "😶", "label": "Numb"},
+    {"emoji": "😴", "label": "Sleepy"},
+    {"emoji": "😅", "label": "Relieved"},
+    {"emoji": "💡", "label": "Creative"},
+    {"emoji": "🍃", "label": "Peaceful"},
+    {"emoji": "💪", "label": "Strong"},
+    {"emoji": "🎉", "label": "Celebratory"},
+    {"emoji": "🙃", "label": "Confused"},
+    {"emoji": "🤷", "label": "Indifferent"},
+    {"emoji": "💔", "label": "Heartbroken"},
+    {"emoji": "🤯", "label": "Overwhelmed"},
+    {"emoji": "😬", "label": "Tense"},
+    {"emoji": "🔮", "label": "Intuitive"},
+    {"emoji": "🍀", "label": "Grateful"},
   ];
 
-void _selectMood(String moodLabel, String moodEmoji) {
-  setState(() {
-    selectedMood = moodLabel;
-  });
+  void _selectMood(String moodLabel, String moodEmoji) {
+    setState(() {
+      selectedMood = moodLabel;
+    });
 
-  // Save the selected mood and emoji to AppState
-  Provider.of<AppState>(context, listen: false).setMood(moodLabel, moodEmoji);
-}
-
+    // Save the selected mood and emoji to AppState
+    Provider.of<AppState>(context, listen: false).setMood(moodLabel, moodEmoji);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -96,8 +119,11 @@ void _selectMood(String moodLabel, String moodEmoji) {
                             mood["label"]!,
                             style: TextStyle(
                               fontSize: 18,
-                              color: isSelected ? Colors.blueAccent : Colors.black,
-                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                              color:
+                                  isSelected ? Colors.blueAccent : Colors.black,
+                              fontWeight: isSelected
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
                             ),
                           ),
                         ],

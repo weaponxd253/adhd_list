@@ -1,4 +1,3 @@
-// lib/features/timer/timer_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/app_state.dart';
@@ -33,7 +32,7 @@ class _TimerScreenState extends State<TimerScreen> {
               SizedBox(height: 30),
               _buildTimerDisplay(appState),
               SizedBox(height: 30),
-              _buildTimerControlButton(appState),
+              _buildTimerControls(appState), // Enhanced timer controls
             ],
           ),
         ),
@@ -107,19 +106,44 @@ class _TimerScreenState extends State<TimerScreen> {
   }
 
   // ----------------------------------------
-  // Timer Control Button Widget
+  // Enhanced Timer Controls
   // ----------------------------------------
-  Widget _buildTimerControlButton(AppState appState) {
-    return ElevatedButton(
-      onPressed: appState.isTimerRunning
-          ? appState.stopTimer
-          : () => appState.startTimer(_modes[_selectedModeIndex] == "Focus"),
-      child: Text(appState.isTimerRunning ? "Stop Timer" : "Start Timer"),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: _modeColors[_selectedModeIndex],
-        padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-        textStyle: TextStyle(fontSize: 18),
-      ),
+  Widget _buildTimerControls(AppState appState) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        ElevatedButton(
+          onPressed: appState.isTimerRunning
+              ? null // Disable "Start" if already running
+              : () => appState.startTimer(_modes[_selectedModeIndex] == "Focus"),
+          child: Text(appState.isTimerRunning ? "Running" : "Start"),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: _modeColors[_selectedModeIndex],
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            textStyle: TextStyle(fontSize: 16),
+          ),
+        ),
+        SizedBox(width: 10),
+        ElevatedButton(
+          onPressed: appState.isTimerRunning ? appState.pauseTimer : null, // Enable only if running
+          child: Text("Pause"),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.amber,
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            textStyle: TextStyle(fontSize: 16),
+          ),
+        ),
+        SizedBox(width: 10),
+        ElevatedButton(
+          onPressed: appState.resetTimer, // Reset timer
+          child: Text("Reset"),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.red,
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            textStyle: TextStyle(fontSize: 16),
+          ),
+        ),
+      ],
     );
   }
 }
