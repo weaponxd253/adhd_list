@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../providers/app_state.dart';
+import '../../widgets/expandable_text.dart';
 import '../tracker/mood_history_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -19,7 +20,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text("FocusFlow Dashboard"),
+        title: const Text("FocusFlow Dashboard"),
+        actions: [
+          IconButton(
+            icon: Icon(
+              appState.themeMode == ThemeMode.light
+                  ? Icons.dark_mode // Show dark mode icon
+                  : Icons.light_mode, // Show light mode icon
+            ),
+             tooltip: 'Switch between Light and Dark Theme',
+            onPressed: () {
+              appState.toggleTheme(); // Toggle the theme
+            },
+          ),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -29,15 +43,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
             children: [
               // Task Overview Section
               _buildTaskOverview(appState),
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
 
               // Upcoming Tasks Section
               _buildUpcomingTasksSection(appState.upcomingTasks),
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
 
               // Mood Tracker Section
               _buildMoodTrackerSection(appState),
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
               _buildTimerSection(appState),
             ],
           ),
@@ -46,48 +60,70 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
- Widget _buildTimerSection(AppState appState) {
-  return Container(
-    width: double.infinity, // Ensures the card takes full width of the parent
-    height: 200, // Consistent height for visual alignment
-    child: Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center, // Center content vertically
-          children: [
-            Text(
-              "Pomodoro Timer",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            SizedBox(height: 10),
-            Text(
-              "Current Mode: ${appState.currentMode}",
-              style: TextStyle(fontSize: 16, color: Colors.grey[700]),
-            ),
-            SizedBox(height: 10),
-            Text(
-              "Remaining Time: ${appState.timerDisplay}",
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            Spacer(), // Push button to bottom
-            ElevatedButton(
-              onPressed: appState.isTimerRunning
-                  ? appState.stopTimer
-                  : () => appState.startTimer(appState.currentMode == "Focus"),
-              child:
-                  Text(appState.isTimerRunning ? "Stop Timer" : "Start Timer"),
-            ),
-          ],
-        ),
+  Widget _buildTimerSection(AppState appState) {
+  return Card(
+    elevation: 2,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    child: Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Timer Heading
+          Text(
+            "Pomodoro Timer",
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          SizedBox(height: 10),
+
+          // Current Mode
+          Text(
+            "Current Mode: ${appState.currentMode}",
+            style: TextStyle(fontSize: 16, color: Colors.grey[700]),
+          ),
+          SizedBox(height: 10),
+
+          // Timer Display
+          Text(
+            "Remaining Time: ${appState.timerDisplay}",
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
+          SizedBox(height: 20),
+
+          // Timer Controls
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              // Start/Stop Button
+              ElevatedButton(
+                onPressed: appState.isTimerRunning
+                    ? appState.pauseTimer
+                    : () => appState.startTimer(appState.currentMode == "Focus"),
+                child: Text(appState.isTimerRunning ? "Pause" : "Start"),
+              ),
+
+              // Reset Button
+              ElevatedButton(
+                onPressed: () {
+                  appState.resetTimer();
+                },
+                child: const Text("Reset"),
+              ),
+
+              // Mode Switcher Button
+              ElevatedButton(
+                onPressed: () {
+                  appState.switchToNextMode(); // Add logic for mode switching
+                },
+                child: const Text("Switch Mode"),
+              ),
+            ],
+          ),
+        ],
       ),
     ),
   );
 }
-
 
 
   // --- Task Overview Section ---
@@ -99,11 +135,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
+        const Text(
           "Task Overview",
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
-        SizedBox(height: 10),
+        const SizedBox(height: 10),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -115,7 +151,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Icons.pending, "Pending", appState.pendingTasks, Colors.red),
           ],
         ),
-        SizedBox(height: 20),
+        const SizedBox(height: 20),
         _buildProgressBar(progress),
       ],
     );
@@ -126,7 +162,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Column(
       children: [
         Icon(icon, color: color, size: 28.0),
-        SizedBox(height: 4),
+        const SizedBox(height: 4),
         Text(label, style: TextStyle(color: color, fontSize: 14)),
         Text(
           "$count",
@@ -170,7 +206,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
+              const Text(
                 "Upcoming Tasks",
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
@@ -222,27 +258,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   // --- Mood Tracker Section ---
- Widget _buildMoodTrackerSection(AppState appState) {
-  return Container(
-    height: 200, // Consistent height for uniformity
-    child: Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
+Widget _buildMoodTrackerSection(AppState appState) {
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        "Mood Tracker",
+        style: TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+          color: Colors.grey[800],
+        ),
+      ),
+      const SizedBox(height: 10),
+      Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: _getMoodColor(appState.selectedMood),
+          borderRadius: BorderRadius.circular(8),
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center, // Center content vertically
           children: [
-            Text(
-              "Mood Tracker",
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey[800],
-              ),
-            ),
-            SizedBox(height: 10),
             Row(
               children: [
                 const Text(
@@ -251,37 +288,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 Text(
                   "${appState.selectedMoodEmoji} ${appState.selectedMood}",
-                  style: TextStyle(
-                    color: Colors.blueAccent,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: const TextStyle(
+                      color: Colors.blueAccent, fontWeight: FontWeight.bold),
                 ),
               ],
             ),
-            SizedBox(height: 8),
-            Text(
-              appState.moodMessage.isNotEmpty
+            const SizedBox(height: 8),
+            ExpandableText(
+              text: appState.moodMessage.isNotEmpty
                   ? appState.moodMessage
                   : "Select a mood to see a message.",
-              style: TextStyle(fontSize: 14, color: Colors.grey[700]),
             ),
-            Spacer(), // Pushes the button to the bottom
+            const SizedBox(height: 8),
             ElevatedButton(
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(
-                    builder: (context) => MoodHistoryScreen(),
-                  ),
+                  MaterialPageRoute(builder: (context) => MoodHistoryScreen()),
                 );
               },
-              child: Text("View Mood History"),
+              child: const Text("View Mood History"),
               style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent),
             ),
           ],
         ),
       ),
-    ),
+    ],
   );
 }
 

@@ -83,7 +83,7 @@ class _MoodTrackerScreenState extends State<MoodTrackerScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
+            const Text(
               "How are you feeling today?",
               style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
             ),

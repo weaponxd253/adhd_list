@@ -37,22 +37,34 @@ class _HomeScreenState extends State<HomeScreen> {
         onTap: _onItemTapped,
         type: BottomNavigationBarType.fixed, // Allows four or more items
         items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.dashboard),
-            label: 'Dashboard',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.list),
-            label: 'Tasks',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.timer),
-            label: 'Timer',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.mood),
-            label: 'Mood Tracker',
-          ),
+    BottomNavigationBarItem(
+      icon: Tooltip(
+        message: 'Dashboard - View your tasks and progress', // Tooltip for Dashboard
+        child: Icon(Icons.dashboard),
+      ),
+      label: 'Dashboard',
+    ),
+    BottomNavigationBarItem(
+      icon: Tooltip(
+        message: 'Tasks - Manage your tasks here', // Tooltip for Tasks
+        child: Icon(Icons.task),
+      ),
+      label: 'Tasks',
+    ),
+    BottomNavigationBarItem(
+      icon: Tooltip(
+        message: 'Timer - Focus using Pomodoro Timer', // Tooltip for Timer
+        child: Icon(Icons.timer),
+      ),
+      label: 'Timer',
+    ),
+    BottomNavigationBarItem(
+      icon: Tooltip(
+        message: 'Mood Tracker - Track your daily mood', // Tooltip for Mood Tracker
+        child: Icon(Icons.mood),
+      ),
+      label: 'Mood',
+    ),
         ],
       ),
     );

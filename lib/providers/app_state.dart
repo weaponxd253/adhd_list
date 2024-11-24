@@ -9,13 +9,17 @@ class AppState extends ChangeNotifier {
   // Fields
   // ----------------------------------------
 
+  //Theme
+   ThemeMode _themeMode = ThemeMode.light;
   // Task Management
   List<Task> tasks = [];
 
+  //default times for timer
+  
   // Pomodoro Timer
   bool isTimerRunning = false;
   String currentMode = "Focus";
-  int remainingTime = 0; // Remaining time in seconds
+  int remainingTime = 1500; // Remaining time in seconds
   int focusDuration = 25; // in minutes
   int shortBreakDuration = 5; // in minutes
   int longBreakDuration = 15; // in minutes
@@ -77,6 +81,16 @@ final Map<String, String> moodMessages = {
   "Intuitive": "Trust your instincts. Your intuition is guiding you toward what feels right.",
   "Grateful": "Gratitude brings perspective. Reflect on the things you’re thankful for, no matter how small.",
 };
+
+  // ----------------------------------------
+  // Theme Changer
+  // ----------------------------------------
+   ThemeMode get themeMode => _themeMode;
+   
+   void toggleTheme() {
+    _themeMode = _themeMode == ThemeMode.light ? ThemeMode.dark : ThemeMode.light;
+    notifyListeners(); // Notify UI to rebuild
+  }
 
   // ----------------------------------------
   // Task Management Methods
@@ -175,9 +189,22 @@ final Map<String, String> moodMessages = {
   void resetTimer() {
     _timer?.cancel();
     isTimerRunning = false;
-    remainingTime = _currentDuration;
+   updateTimerDuration(currentMode);
     notifyListeners();
   }
+
+  void switchToNextMode() {
+  if (currentMode == "Focus") {
+    currentMode = "Short Break";
+  } else if (currentMode == "Short Break") {
+    currentMode = "Long Break";
+  } else {
+    currentMode = "Focus";
+  }
+  updateTimerDuration(currentMode); // Update the timer for the new mode
+  notifyListeners();
+}
+
 
   String get timerDisplay {
     final minutes = (remainingTime ~/ 60).toString().padLeft(2, '0');
