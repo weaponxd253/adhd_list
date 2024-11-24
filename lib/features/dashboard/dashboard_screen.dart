@@ -13,109 +13,150 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   bool _isUpcomingTasksExpanded = false;
 
-  // Helper to calculate due date countdown
-  String _calculateCountdown(DateTime dueDate) {
-    final now = DateTime.now();
-    final difference = dueDate.difference(now).inDays;
-    if (difference < 0) return "Overdue";
-    if (difference == 0) return "Due Today";
-    if (difference == 1) return "Due Tomorrow";
-    return "Due in $difference days";
-  }
-
-  // Helper to get mood-based color
-  Color _getMoodColor(String mood) {
-    switch (mood) {
-      case "Calm": return Colors.blue[100]!;
-      case "Optimistic": return Colors.yellow[100]!;
-      case "Burnt Out": return Colors.orange[100]!;
-      case "Panicked": return Colors.red[100]!;
-      default: return Colors.grey[200]!;
-    }
-  }
-
-  // Suggested action based on mood
-  String _suggestActionBasedOnMood(String mood) {
-    switch (mood) {
-      case "Burnt Out": return "Take a short break to recharge.";
-      case "Panicked": return "Try some deep breathing exercises.";
-      case "Optimistic": return "Share your positivity with others!";
-      default: return "Keep track of your mood for insights.";
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final appState = Provider.of<AppState>(context);
-    final upcomingTasks = appState.upcomingTasks;
-    upcomingTasks.sort((a, b) => a.dueDate.compareTo(b.dueDate));
 
     return Scaffold(
-      appBar: AppBar(title: Text("FocusFlow Dashboard")),
+      appBar: AppBar(
+        title: Text("FocusFlow Dashboard"),
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Consumer<AppState>(builder: (context, appState, child) {
-                return _buildTaskOverview(appState);
-              },
-            child: _buildTaskOverview(appState)),
-            SizedBox(height: 20),
-            Consumer<AppState>(builder: (context, appState, child) {
-                return _buildUpcomingTasksSection(appState.upcomingTasks);
-              },
-            child: _buildUpcomingTasksSection(upcomingTasks)),
-            SizedBox(height: 20),
-            Consumer<AppState>(builder: (context, appState, child) {
-                return _buildMoodTrackerSection(appState);
-              },
-            child: _buildMoodTrackerSection(appState)),
-          ],
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Task Overview Section
+              _buildTaskOverview(appState),
+              SizedBox(height: 20),
+
+              // Upcoming Tasks Section
+              _buildUpcomingTasksSection(appState.upcomingTasks),
+              SizedBox(height: 20),
+
+              // Mood Tracker Section
+              _buildMoodTrackerSection(appState),
+              SizedBox(height: 20),
+              _buildTimerSection(appState),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  // Task Overview Section
-// In DashboardScreen
-
-Widget _buildTaskOverview(AppState appState) {
-  return Consumer<AppState>(
-    builder: (context, appState, _) {
-      double progress = appState.totalTasks == 0 ? 0 : appState.completedTasks / appState.totalTasks;
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            "Task Overview",
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          SizedBox(height: 10),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _buildTaskStatusIcon(Icons.assignment, "Total", appState.totalTasks, Colors.blue),
-              _buildTaskStatusIcon(Icons.check_circle, "Completed", appState.completedTasks, Colors.green),
-              _buildTaskStatusIcon(Icons.pending, "Pending", appState.pendingTasks, Colors.red),
-            ],
-          ),
-          SizedBox(height: 20),
-          // Updated Progress Bar
-          LinearProgressIndicator(
-            value: progress,
-            backgroundColor: Colors.grey[300],
-            color: Colors.green,
-            minHeight: 8,
-          ),
-        ],
-      );
-    },
+ Widget _buildTimerSection(AppState appState) {
+  return Container(
+    width: double.infinity, // Ensures the card takes full width of the parent
+    height: 200, // Consistent height for visual alignment
+    child: Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center, // Center content vertically
+          children: [
+            Text(
+              "Pomodoro Timer",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 10),
+            Text(
+              "Current Mode: ${appState.currentMode}",
+              style: TextStyle(fontSize: 16, color: Colors.grey[700]),
+            ),
+            SizedBox(height: 10),
+            Text(
+              "Remaining Time: ${appState.timerDisplay}",
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            Spacer(), // Push button to bottom
+            ElevatedButton(
+              onPressed: appState.isTimerRunning
+                  ? appState.stopTimer
+                  : () => appState.startTimer(appState.currentMode == "Focus"),
+              child:
+                  Text(appState.isTimerRunning ? "Stop Timer" : "Start Timer"),
+            ),
+          ],
+        ),
+      ),
+    ),
   );
 }
 
 
-  // Upcoming Tasks Section
+
+  // --- Task Overview Section ---
+  Widget _buildTaskOverview(AppState appState) {
+    double progress = appState.totalTasks == 0
+        ? 0
+        : appState.completedTasks / appState.totalTasks;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          "Task Overview",
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        SizedBox(height: 10),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            _buildTaskStatusIcon(
+                Icons.assignment, "Total", appState.totalTasks, Colors.blue),
+            _buildTaskStatusIcon(Icons.check_circle, "Completed",
+                appState.completedTasks, Colors.green),
+            _buildTaskStatusIcon(
+                Icons.pending, "Pending", appState.pendingTasks, Colors.red),
+          ],
+        ),
+        SizedBox(height: 20),
+        _buildProgressBar(progress),
+      ],
+    );
+  }
+
+  Widget _buildTaskStatusIcon(
+      IconData icon, String label, int count, Color color) {
+    return Column(
+      children: [
+        Icon(icon, color: color, size: 28.0),
+        SizedBox(height: 4),
+        Text(label, style: TextStyle(color: color, fontSize: 14)),
+        Text(
+          "$count",
+          style: TextStyle(
+              color: color, fontWeight: FontWeight.bold, fontSize: 16),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildProgressBar(double progress) {
+    return Container(
+      height: 10,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(5),
+        gradient:
+            LinearGradient(colors: [Colors.green[300]!, Colors.green[800]!]),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(5),
+        child: LinearProgressIndicator(
+          value: progress,
+          backgroundColor: Colors.grey[300],
+          color: Colors.transparent, // Transparent to show gradient
+        ),
+      ),
+    );
+  }
+
+  // --- Upcoming Tasks Section ---
   Widget _buildUpcomingTasksSection(List<dynamic> upcomingTasks) {
     return GestureDetector(
       onTap: () {
@@ -129,28 +170,30 @@ Widget _buildTaskOverview(AppState appState) {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text("Upcoming Tasks", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              Text(
+                "Upcoming Tasks",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
               Icon(
-                _isUpcomingTasksExpanded ? Icons.expand_less : Icons.expand_more,
+                _isUpcomingTasksExpanded
+                    ? Icons.expand_less
+                    : Icons.expand_more,
                 color: Colors.grey,
               ),
             ],
           ),
           if (_isUpcomingTasksExpanded)
-            Column(
-              children: upcomingTasks.isEmpty
-                  ? [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 10.0),
-                        child: Text(
-                          "No upcoming tasks",
-                          style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    ]
-                  : upcomingTasks.map((task) {
-                      final countdownText = _calculateCountdown(task.dueDate);
+            upcomingTasks.isEmpty
+                ? Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 10.0),
+                    child: Text(
+                      "No upcoming tasks",
+                      style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                      textAlign: TextAlign.center,
+                    ),
+                  )
+                : Column(
+                    children: upcomingTasks.map((task) {
                       return ListTile(
                         leading: Icon(
                           Icons.circle,
@@ -158,106 +201,116 @@ Widget _buildTaskOverview(AppState appState) {
                           color: task.isCompleted ? Colors.green : Colors.red,
                         ),
                         title: Text(task.title),
-                        subtitle: Text("Due Date: ${DateFormat.yMMMd().format(task.dueDate)} ($countdownText)"),
+                        subtitle: Text(
+                          "Due Date: ${DateFormat.yMMMd().format(task.dueDate)} (${_calculateCountdown(task.dueDate)})",
+                        ),
                       );
                     }).toList(),
-            ),
+                  ),
         ],
       ),
     );
   }
 
-  // Mood Tracker Section
-  Widget _buildMoodTrackerSection(AppState appState) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text("Mood Tracker", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey[800])),
-        SizedBox(height: 10),
-        Container(
-          padding: EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: _getMoodColor(appState.selectedMood),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Text("Current Mood: ", style: TextStyle(fontWeight: FontWeight.bold)),
-                  Text(
-                    "${appState.selectedMoodEmoji} ${appState.selectedMood}",
-                    style: TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ),
-              SizedBox(height: 8),
-              Text(appState.moodMessage, style: TextStyle(fontSize: 14, color: Colors.grey[700])),
-              SizedBox(height: 8),
-              Text(
-                _suggestActionBasedOnMood(appState.selectedMood),
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.grey[800]),
-              ),
-              SizedBox(height: 8),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => MoodHistoryScreen()),
-                  );
-                },
-                child: Text("View Mood History"),
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
+  String _calculateCountdown(DateTime dueDate) {
+    final now = DateTime.now();
+    final difference = dueDate.difference(now).inDays;
+    if (difference < 0) return "Overdue";
+    if (difference == 0) return "Due Today";
+    if (difference == 1) return "Due Tomorrow";
+    return "Due in $difference days";
   }
 
-  // Task Status Icon Helper
-  Widget _buildTaskStatusIcon(IconData icon, String label, int count, Color color) {
-    const double iconSize = 28.0;
-    const Color iconColor = Colors.blueGrey;
-
-    return Column(
-      children: [
-        Icon(icon, color: iconColor, size: iconSize),
-        SizedBox(height: 4),
-        Text(label, style: TextStyle(color: iconColor, fontSize: 14)),
-        Text("$count", style: TextStyle(color: iconColor, fontWeight: FontWeight.bold, fontSize: 16)),
-      ],
-    );
-  }
-
-  // Progress Bar with Gradient and Shadow
-  Widget _buildProgressBar(double progress) {
+  // --- Mood Tracker Section ---
+ Widget _buildMoodTrackerSection(AppState appState) {
   return Container(
-    height: 10,
-    decoration: BoxDecoration(
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black26,
-          offset: Offset(0, 2),
-          blurRadius: 4.0, // 3D shadow effect
+    height: 200, // Consistent height for uniformity
+    child: Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center, // Center content vertically
+          children: [
+            Text(
+              "Mood Tracker",
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[800],
+              ),
+            ),
+            SizedBox(height: 10),
+            Row(
+              children: [
+                const Text(
+                  "Current Mood: ",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  "${appState.selectedMoodEmoji} ${appState.selectedMood}",
+                  style: TextStyle(
+                    color: Colors.blueAccent,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 8),
+            Text(
+              appState.moodMessage.isNotEmpty
+                  ? appState.moodMessage
+                  : "Select a mood to see a message.",
+              style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+            ),
+            Spacer(), // Pushes the button to the bottom
+            ElevatedButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => MoodHistoryScreen(),
+                  ),
+                );
+              },
+              child: Text("View Mood History"),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent),
+            ),
+          ],
         ),
-      ],
-      borderRadius: BorderRadius.circular(5),
-      gradient: LinearGradient(
-        colors: [Colors.green[300]!, Colors.green[800]!],
-      ),
-    ),
-    child: ClipRRect(
-      borderRadius: BorderRadius.circular(5),
-      child: LinearProgressIndicator(
-        value: progress,
-        backgroundColor: Colors.grey[300],
-        color: Colors.transparent, // Transparent to show gradient
       ),
     ),
   );
 }
 
+
+  Color _getMoodColor(String mood) {
+    switch (mood) {
+      case "Calm":
+        return Colors.blue[100]!;
+      case "Optimistic":
+        return Colors.yellow[100]!;
+      case "Burnt Out":
+        return Colors.orange[100]!;
+      case "Panicked":
+        return Colors.red[100]!;
+      default:
+        return Colors.grey[200]!;
+    }
+  }
+
+  String _suggestActionBasedOnMood(String mood) {
+    switch (mood) {
+      case "Burnt Out":
+        return "Take a short break to recharge.";
+      case "Panicked":
+        return "Try some deep breathing exercises.";
+      case "Optimistic":
+        return "Share your positivity with others!";
+      default:
+        return "Keep track of your mood for insights.";
+    }
+  }
 }
