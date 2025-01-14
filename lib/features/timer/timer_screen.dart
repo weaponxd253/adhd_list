@@ -19,7 +19,7 @@ class _TimerScreenState extends State<TimerScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text("Pomodoro Timer"),
+        title: const Text("Pomodoro Timer"),
       ),
       body: Center(
         child: Padding(
