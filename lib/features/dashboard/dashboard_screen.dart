@@ -30,7 +30,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ? Icons.dark_mode // Show dark mode icon
                   : Icons.light_mode, // Show light mode icon
             ),
-             tooltip: 'Switch between Light and Dark Theme',
+            tooltip: 'Switch between Light and Dark Theme',
             onPressed: () {
               appState.toggleTheme(); // Toggle the theme
             },
@@ -63,70 +63,70 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildTimerSection(AppState appState) {
-  return Card(
-    elevation: 2,
-    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-    child: Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Timer Heading
-          const Text(
-            "Pomodoro Timer",
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 10),
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Timer Heading
+            const Text(
+              "Pomodoro Timer",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 10),
 
-          // Current Mode
-          Text(
-            "Current Mode: ${appState.currentMode}",
-            style: TextStyle(fontSize: 16, color: Colors.grey[700]),
-          ),
-          const SizedBox(height: 10),
+            // Current Mode
+            Text(
+              "Current Mode: ${appState.currentMode}",
+              style: TextStyle(fontSize: 16, color: Colors.grey[700]),
+            ),
+            const SizedBox(height: 10),
 
-          // Timer Display
-          Text(
-            "Remaining Time: ${appState.timerDisplay}",
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 20),
+            // Timer Display
+            Text(
+              "Remaining Time: ${appState.timerDisplay}",
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 20),
 
-          // Timer Controls
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              // Start/Stop Button
-              ElevatedButton(
-                onPressed: appState.isTimerRunning
-                    ? appState.pauseTimer
-                    : () => appState.startTimer(appState.currentMode == "Focus"),
-                child: Text(appState.isTimerRunning ? "Pause" : "Start"),
-              ),
+            // Timer Controls
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                // Start/Stop Button
+                ElevatedButton(
+                  onPressed: appState.isTimerRunning
+                      ? appState.pauseTimer
+                      : () =>
+                          appState.startTimer(appState.currentMode == "Focus"),
+                  child: Text(appState.isTimerRunning ? "Pause" : "Start"),
+                ),
 
-              // Reset Button
-              ElevatedButton(
-                onPressed: () {
-                  appState.resetTimer();
-                },
-                child: const Text("Reset"),
-              ),
+                // Reset Button
+                ElevatedButton(
+                  onPressed: () {
+                    appState.resetTimer();
+                  },
+                  child: const Text("Reset"),
+                ),
 
-              // Mode Switcher Button
-              ElevatedButton(
-                onPressed: () {
-                  appState.switchToNextMode(); // Add logic for mode switching
-                },
-                child: const Text("Switch Mode"),
-              ),
-            ],
-          ),
-        ],
+                // Mode Switcher Button
+                ElevatedButton(
+                  onPressed: () {
+                    appState.switchToNextMode(); // Add logic for mode switching
+                  },
+                  child: const Text("Switch Mode"),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
-    ),
-  );
-}
-
+    );
+  }
 
   // --- Task Overview Section ---
   Widget _buildTaskOverview(AppState appState) {
@@ -260,78 +260,104 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   // --- Mood Tracker Section ---
-Widget _buildMoodTrackerSection(AppState appState) {
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text(
-        "Mood Tracker",
-        style: TextStyle(
-          fontSize: 18,
-          fontWeight: FontWeight.bold,
-          color: Colors.grey[800],
+  Widget _buildMoodTrackerSection(AppState appState) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          "Mood Tracker",
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Colors.grey[800],
+          ),
         ),
-      ),
-      const SizedBox(height: 10),
-      Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: _getMoodColor(appState.selectedMood),
-          borderRadius: BorderRadius.circular(8),
+        const SizedBox(height: 10),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: _getMoodColor(appState.selectedMood, context),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    "Current Mood:",
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.white70 // Light color for dark mode
+                          : Colors.black87, // Darker color for light mode
+                    ),
+                  ),
+                  Text(
+                    "${appState.selectedMoodEmoji} ${appState.selectedMood}",
+                    style: const TextStyle(
+                        color: Colors.blueAccent, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  DefaultTextStyle(
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.white // Brighter for dark mode
+                          : Colors
+                              .black87, // Keep it consistent with the Timer & Task Overview
+                    ),
+                    child: ExpandableText(
+                      text: appState.moodMessage.isNotEmpty
+                          ? appState.moodMessage
+                          : "Select a mood to see a message.",
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => MoodHistoryScreen()),
+                  );
+                },
+                child: const Text("View Mood History"),
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blueAccent),
+              ),
+            ],
+          ),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Text(
-                  "Current Mood: ",
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                Text(
-                  "${appState.selectedMoodEmoji} ${appState.selectedMood}",
-                  style: const TextStyle(
-                      color: Colors.blueAccent, fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            ExpandableText(
-              text: appState.moodMessage.isNotEmpty
-                  ? appState.moodMessage
-                  : "Select a mood to see a message.",
-            ),
-            const SizedBox(height: 8),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => MoodHistoryScreen()),
-                );
-              },
-              child: const Text("View Mood History"),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent),
-            ),
-          ],
-        ),
-      ),
-    ],
-  );
-}
+      ],
+    );
+  }
 
-
-  Color _getMoodColor(String mood) {
+  Color _getMoodColor(String mood, BuildContext context) {
+    bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
     switch (mood) {
       case "Calm":
-        return Colors.blue[100]!;
+        return isDarkMode
+            ? Colors.blue[600]!
+            : Colors.blue[100]!; // Lighter for better contrast
       case "Optimistic":
-        return Colors.yellow[100]!;
+        return isDarkMode ? Colors.yellow[600]! : Colors.yellow[100]!;
       case "Burnt Out":
-        return Colors.orange[100]!;
+        return isDarkMode ? Colors.orange[600]! : Colors.orange[100]!;
       case "Panicked":
-        return Colors.red[100]!;
+        return isDarkMode ? Colors.red[600]! : Colors.red[100]!;
       default:
-        return Colors.grey[200]!;
+        return isDarkMode
+            ? const Color.fromARGB(255, 0, 0, 0)!
+            :Colors.orange[500]!; // Slightly lighter gray
     }
   }
 
