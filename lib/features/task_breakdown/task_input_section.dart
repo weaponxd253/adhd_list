@@ -35,15 +35,21 @@ class _TaskInputSectionState extends State<TaskInputSection> {
       padding: const EdgeInsets.all(16.0),
       child: Column(
         children: [
-          TextField(
-            controller: widget.taskController,
-            decoration: InputDecoration(
-              labelText: "Enter Task",
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-              filled: true,
-              fillColor: Colors.grey[200],
-            ),
-          ),
+    TextField(
+  controller: widget.taskController,
+  style: TextStyle(
+    color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black, // Text color
+  ),
+  decoration: InputDecoration(
+    labelText: "Enter Task",
+    labelStyle: TextStyle(
+      color: Theme.of(context).brightness == Brightness.dark ? Colors.white70 : Colors.black54, // Label color
+    ),
+    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+    filled: true,
+    fillColor: Theme.of(context).brightness == Brightness.dark ? Colors.grey[800] : Colors.grey[200], // Background color
+  ),
+),
           SizedBox(height: 10),
           Row(
             children: [

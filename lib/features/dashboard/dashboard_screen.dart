@@ -7,6 +7,8 @@ import '../../widgets/expandable_text.dart';
 import '../tracker/mood_history_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
+  const DashboardScreen({super.key});
+
   @override
   _DashboardScreenState createState() => _DashboardScreenState();
 }
@@ -70,25 +72,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Timer Heading
-          Text(
+          const Text(
             "Pomodoro Timer",
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
-          SizedBox(height: 10),
+          const SizedBox(height: 10),
 
           // Current Mode
           Text(
             "Current Mode: ${appState.currentMode}",
             style: TextStyle(fontSize: 16, color: Colors.grey[700]),
           ),
-          SizedBox(height: 10),
+          const SizedBox(height: 10),
 
           // Timer Display
           Text(
             "Remaining Time: ${appState.timerDisplay}",
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
-          SizedBox(height: 20),
+          const SizedBox(height: 20),
 
           // Timer Controls
           Row(

@@ -41,7 +41,8 @@ class _TaskListSectionState extends State<TaskListSection> {
         final focusNode = _focusNodes[index]!;
 
         return Card(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           elevation: 3,
           margin: EdgeInsets.symmetric(vertical: 6),
           child: ExpansionTile(
@@ -55,10 +56,15 @@ class _TaskListSectionState extends State<TaskListSection> {
               task.title,
               style: TextStyle(
                 fontSize: 18,
-                decoration: task.isCompleted ? TextDecoration.lineThrough : null,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white
+                    : Colors.black,
+                decoration:
+                    task.isCompleted ? TextDecoration.lineThrough : null,
               ),
             ),
-            subtitle: Text("Due Date: ${task.dueDate.toLocal().toString().split(' ')[0]}"),
+            subtitle: Text(
+                "Due Date: ${task.dueDate.toLocal().toString().split(' ')[0]}"),
             children: [
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -72,7 +78,8 @@ class _TaskListSectionState extends State<TaskListSection> {
                             focusNode: focusNode,
                             decoration: InputDecoration(
                               labelText: "Enter Subtask",
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                              border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8)),
                               filled: true,
                               fillColor: Colors.grey[100],
                             ),
@@ -85,7 +92,8 @@ class _TaskListSectionState extends State<TaskListSection> {
                             if (text.isNotEmpty) {
                               appState.addSubtask(index, text);
                               subtaskController.clear();
-                              focusNode.unfocus(); // Prevents unnecessary focus retention
+                              focusNode
+                                  .unfocus(); // Prevents unnecessary focus retention
                             }
                           },
                         ),
@@ -103,8 +111,12 @@ class _TaskListSectionState extends State<TaskListSection> {
                             "- ${subtask.title}",
                             style: TextStyle(
                               fontSize: 16,
-                              color: subtask.isCompleted ? Colors.grey : Colors.black,
-                              decoration: subtask.isCompleted ? TextDecoration.lineThrough : null,
+                              color: subtask.isCompleted
+                                  ? Colors.grey
+                                  : Colors.black,
+                              decoration: subtask.isCompleted
+                                  ? TextDecoration.lineThrough
+                                  : null,
                             ),
                           ),
                           leading: Checkbox(
@@ -126,100 +138,106 @@ class _TaskListSectionState extends State<TaskListSection> {
     );
   }
 }
-  @override
-  Widget build(BuildContext context) {
-    final appState = Provider.of<AppState>(context);
 
-    return ListView.builder(
-      padding: EdgeInsets.all(8.0),
-      itemCount: appState.tasks.length,
-      itemBuilder: (context, index) {
-        final task = appState.tasks[index];
-        final TextEditingController subtaskController = TextEditingController();
+@override
+Widget build(BuildContext context) {
+  final appState = Provider.of<AppState>(context);
 
-        return Card(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          elevation: 3,
-          margin: EdgeInsets.symmetric(vertical: 6),
-          child: ExpansionTile(
-            leading: Checkbox(
-              value: task.isCompleted,
-              onChanged: (_) {
-                appState.toggleTaskCompletion(index);
-              },
+  return ListView.builder(
+    padding: EdgeInsets.all(8.0),
+    itemCount: appState.tasks.length,
+    itemBuilder: (context, index) {
+      final task = appState.tasks[index];
+      final TextEditingController subtaskController = TextEditingController();
+
+      return Card(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        elevation: 3,
+        margin: EdgeInsets.symmetric(vertical: 6),
+        child: ExpansionTile(
+          leading: Checkbox(
+            value: task.isCompleted,
+            onChanged: (_) {
+              appState.toggleTaskCompletion(index);
+            },
+          ),
+          title: Text(
+            task.title,
+            style: TextStyle(
+              fontSize: 18,
+              decoration: task.isCompleted ? TextDecoration.lineThrough : null,
             ),
-            title: Text(
-              task.title,
-              style: TextStyle(
-                fontSize: 18,
-                decoration: task.isCompleted ? TextDecoration.lineThrough : null,
-              ),
-            ),
-            subtitle: Text("Due Date: ${task.dueDate.toLocal().toString().split(' ')[0]}"),
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: Column(
-                  children: [
-                    // Subtask Input Section
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: subtaskController,
-                            decoration: InputDecoration(
-                              labelText: "Enter Subtask",
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                              filled: true,
-                              fillColor: Colors.grey[100],
-                            ),
+          ),
+          subtitle: Text(
+              "Due Date: ${task.dueDate.toLocal().toString().split(' ')[0]}"),
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Column(
+                children: [
+                  // Subtask Input Section
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: subtaskController,
+                          decoration: InputDecoration(
+                            labelText: "Enter Subtask",
+                            border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8)),
+                            filled: true,
+                            fillColor: Colors.grey[100],
                           ),
                         ),
-                        IconButton(
-                          icon: Icon(Icons.add, color: Colors.blueAccent),
-                          onPressed: () {
-                            final text = subtaskController.text.trim();
-                            if (text.isNotEmpty) {
-                              appState.addSubtask(index, text);
-                              subtaskController.clear();
-                            }
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.add, color: Colors.blueAccent),
+                        onPressed: () {
+                          final text = subtaskController.text.trim();
+                          if (text.isNotEmpty) {
+                            appState.addSubtask(index, text);
+                            subtaskController.clear();
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 10),
+                  // Subtask List Section
+                  ListView.builder(
+                    shrinkWrap: true,
+                    physics: NeverScrollableScrollPhysics(),
+                    itemCount: task.subtasks.length,
+                    itemBuilder: (context, subIndex) {
+                      final subtask = task.subtasks[subIndex];
+                      return ListTile(
+                        title: Text(
+                          "- ${subtask.title}",
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: subtask.isCompleted
+                                ? Colors.grey
+                                : Colors.black,
+                            decoration: subtask.isCompleted
+                                ? TextDecoration.lineThrough
+                                : null,
+                          ),
+                        ),
+                        leading: Checkbox(
+                          value: subtask.isCompleted,
+                          onChanged: (value) {
+                            appState.toggleSubtaskCompletion(index, subIndex);
                           },
                         ),
-                      ],
-                    ),
-                    SizedBox(height: 10),
-                    // Subtask List Section
-                    ListView.builder(
-                      shrinkWrap: true,
-                      physics: NeverScrollableScrollPhysics(),
-                      itemCount: task.subtasks.length,
-                      itemBuilder: (context, subIndex) {
-                        final subtask = task.subtasks[subIndex];
-                        return ListTile(
-                          title: Text(
-                            "- ${subtask.title}",
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: subtask.isCompleted ? Colors.grey : Colors.black,
-                              decoration: subtask.isCompleted ? TextDecoration.lineThrough : null,
-                            ),
-                          ),
-                          leading: Checkbox(
-                            value: subtask.isCompleted,
-                            onChanged: (value) {
-                              appState.toggleSubtaskCompletion(index, subIndex);
-                            },
-                          ),
-                        );
-                      },
-                    ),
-                  ],
-                ),
+                      );
+                    },
+                  ),
+                ],
               ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
+            ),
+          ],
+        ),
+      );
+    },
+  );
+}
