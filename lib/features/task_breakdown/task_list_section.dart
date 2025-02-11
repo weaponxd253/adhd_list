@@ -74,16 +74,20 @@ class _TaskListSectionState extends State<TaskListSection> {
                       children: [
                         Expanded(
                           child: TextField(
-                            controller: subtaskController,
-                            focusNode: focusNode,
-                            decoration: InputDecoration(
-                              labelText: "Enter Subtask",
-                              border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8)),
-                              filled: true,
-                              fillColor: Colors.grey[100],
-                            ),
-                          ),
+  controller: subtaskController,
+  style: TextStyle(
+    color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black, // Text color
+  ),
+  decoration: InputDecoration(
+    labelText: "Enter Subtask",
+    labelStyle: TextStyle(
+      color: Theme.of(context).brightness == Brightness.dark ? Colors.white70 : Colors.black54, // Label color
+    ),
+    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+    filled: true,
+    fillColor: Theme.of(context).brightness == Brightness.dark ? Colors.grey[800] : Colors.grey[200], // Background color
+  ),
+),
                         ),
                         IconButton(
                           icon: Icon(Icons.add, color: Colors.blueAccent),
