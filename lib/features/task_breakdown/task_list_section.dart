@@ -1,7 +1,5 @@
-// lib/features/task_breakdown/task_list_section.dart
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../../providers/app_state.dart';
+import '../../database/task_database.dart';
 
 class TaskListSection extends StatefulWidget {
   @override
@@ -9,8 +7,34 @@ class TaskListSection extends StatefulWidget {
 }
 
 class _TaskListSectionState extends State<TaskListSection> {
+  final TaskDatabase taskDb = TaskDatabase();
+  List<Map<String, dynamic>> _tasks = [];
   final Map<int, TextEditingController> _controllers = {};
   final Map<int, FocusNode> _focusNodes = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTasks();
+  }
+
+  Future<void> _loadTasks() async {
+    final tasks = await taskDb.fetchTasks();
+    setState(() {
+      _tasks = tasks;
+    });
+  }
+
+  Future<void> _toggleTaskCompletion(int id, bool isCompleted) async {
+    await taskDb.updateTask(id, isCompleted ? 1 : 0);
+    _loadTasks(); // Refresh tasks after update
+  }
+
+  Future<void> _addSubtask(int taskId, String subtaskTitle) async {
+    // This assumes you have a subtask table, you need to implement its database logic separately
+    // await taskDb.insertSubtask(taskId, subtaskTitle);
+    _loadTasks(); // Refresh tasks after adding subtask
+  }
 
   @override
   void dispose() {
@@ -21,15 +45,12 @@ class _TaskListSectionState extends State<TaskListSection> {
 
   @override
   Widget build(BuildContext context) {
-    final appState = Provider.of<AppState>(context);
-
     return ListView.builder(
       padding: EdgeInsets.all(8.0),
-      itemCount: appState.tasks.length,
+      itemCount: _tasks.length,
       itemBuilder: (context, index) {
-        final task = appState.tasks[index];
+        final task = _tasks[index];
 
-        // Initialize controllers and focus nodes if not already done
         if (!_controllers.containsKey(index)) {
           _controllers[index] = TextEditingController();
         }
@@ -41,30 +62,24 @@ class _TaskListSectionState extends State<TaskListSection> {
         final focusNode = _focusNodes[index]!;
 
         return Card(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           elevation: 3,
           margin: EdgeInsets.symmetric(vertical: 6),
           child: ExpansionTile(
             leading: Checkbox(
-              value: task.isCompleted,
-              onChanged: (_) {
-                appState.toggleTaskCompletion(index);
+              value: task['is_completed'] == 1,
+              onChanged: (value) {
+                _toggleTaskCompletion(task['id'], value!);
               },
             ),
             title: Text(
-              task.title,
+              task['title'],
               style: TextStyle(
                 fontSize: 18,
-                color: Theme.of(context).brightness == Brightness.dark
-                    ? Colors.white
-                    : Colors.black,
-                decoration:
-                    task.isCompleted ? TextDecoration.lineThrough : null,
+                decoration: task['is_completed'] == 1 ? TextDecoration.lineThrough : null,
               ),
             ),
-            subtitle: Text(
-                "Due Date: ${task.dueDate.toLocal().toString().split(' ')[0]}"),
+            subtitle: Text("Due Date: ${task['due_date']}"),
             children: [
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -75,27 +90,13 @@ class _TaskListSectionState extends State<TaskListSection> {
                         Expanded(
                           child: TextField(
                             controller: subtaskController,
-                            style: TextStyle(
-                              color: Theme.of(context).brightness ==
-                                      Brightness.dark
-                                  ? Colors.white
-                                  : Colors.black, // Text color
-                            ),
                             decoration: InputDecoration(
                               labelText: "Enter Subtask",
-                              labelStyle: TextStyle(
-                                color: Theme.of(context).brightness ==
-                                        Brightness.dark
-                                    ? Colors.white70
-                                    : Colors.black54, // Label color
-                              ),
                               border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8)),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
                               filled: true,
-                              fillColor: Theme.of(context).brightness ==
-                                      Brightness.dark
-                                  ? Colors.grey[800]
-                                  : Colors.grey[200], // Background color
+                              fillColor: Colors.grey[100],
                             ),
                           ),
                         ),
@@ -104,48 +105,13 @@ class _TaskListSectionState extends State<TaskListSection> {
                           onPressed: () {
                             final text = subtaskController.text.trim();
                             if (text.isNotEmpty) {
-                              appState.addSubtask(index, text);
+                              _addSubtask(task['id'], text);
                               subtaskController.clear();
-                              focusNode
-                                  .unfocus(); // Prevents unnecessary focus retention
+                              focusNode.unfocus();
                             }
                           },
                         ),
                       ],
-                    ),
-                    SizedBox(height: 10),
-                    ListView.builder(
-                      shrinkWrap: true,
-                      physics: NeverScrollableScrollPhysics(),
-                      itemCount: task.subtasks.length,
-                      itemBuilder: (context, subIndex) {
-                        final subtask = task.subtasks[subIndex];
-                        return ListTile(
-                          title: Text(
-                            "- ${subtask.title}",
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Theme.of(context).brightness ==
-                                      Brightness.dark
-                                  ? (subtask.isCompleted
-                                      ? Colors.grey[400]
-                                      : Colors.white)
-                                  : (subtask.isCompleted
-                                      ? Colors.grey
-                                      : Colors.black),
-                              decoration: subtask.isCompleted
-                                  ? TextDecoration.lineThrough
-                                  : null,
-                            ),
-                          ),
-                          leading: Checkbox(
-                            value: subtask.isCompleted,
-                            onChanged: (value) {
-                              appState.toggleSubtaskCompletion(index, subIndex);
-                            },
-                          ),
-                        );
-                      },
                     ),
                   ],
                 ),
@@ -156,107 +122,4 @@ class _TaskListSectionState extends State<TaskListSection> {
       },
     );
   }
-}
-
-@override
-Widget build(BuildContext context) {
-  final appState = Provider.of<AppState>(context);
-
-  return ListView.builder(
-    padding: EdgeInsets.all(8.0),
-    itemCount: appState.tasks.length,
-    itemBuilder: (context, index) {
-      final task = appState.tasks[index];
-      final TextEditingController subtaskController = TextEditingController();
-
-      return Card(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        elevation: 3,
-        margin: EdgeInsets.symmetric(vertical: 6),
-        child: ExpansionTile(
-          leading: Checkbox(
-            value: task.isCompleted,
-            onChanged: (_) {
-              appState.toggleTaskCompletion(index);
-            },
-          ),
-          title: Text(
-            task.title,
-            style: TextStyle(
-              fontSize: 18,
-              decoration: task.isCompleted ? TextDecoration.lineThrough : null,
-            ),
-          ),
-          subtitle: Text(
-              "Due Date: ${task.dueDate.toLocal().toString().split(' ')[0]}"),
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: Column(
-                children: [
-                  // Subtask Input Section
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: subtaskController,
-                          decoration: InputDecoration(
-                            labelText: "Enter Subtask",
-                            border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8)),
-                            filled: true,
-                            fillColor: Colors.grey[100],
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        icon: Icon(Icons.add, color: Colors.blueAccent),
-                        onPressed: () {
-                          final text = subtaskController.text.trim();
-                          if (text.isNotEmpty) {
-                            appState.addSubtask(index, text);
-                            subtaskController.clear();
-                          }
-                        },
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 10),
-                  // Subtask List Section
-                  ListView.builder(
-                    shrinkWrap: true,
-                    physics: NeverScrollableScrollPhysics(),
-                    itemCount: task.subtasks.length,
-                    itemBuilder: (context, subIndex) {
-                      final subtask = task.subtasks[subIndex];
-                      return ListTile(
-                        title: Text(
-                          "- ${subtask.title}",
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: subtask.isCompleted
-                                ? Colors.grey
-                                : Colors.black,
-                            decoration: subtask.isCompleted
-                                ? TextDecoration.lineThrough
-                                : null,
-                          ),
-                        ),
-                        leading: Checkbox(
-                          value: subtask.isCompleted,
-                          onChanged: (value) {
-                            appState.toggleSubtaskCompletion(index, subIndex);
-                          },
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      );
-    },
-  );
 }

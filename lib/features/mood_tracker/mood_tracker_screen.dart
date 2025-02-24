@@ -1,7 +1,5 @@
-// lib/features/mood_tracker/mood_tracker_screen.dart
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../../providers/app_state.dart';
+import '../../database/mood_database.dart';
 
 class MoodTrackerScreen extends StatefulWidget {
   @override
@@ -9,7 +7,9 @@ class MoodTrackerScreen extends StatefulWidget {
 }
 
 class _MoodTrackerScreenState extends State<MoodTrackerScreen> {
+  final MoodDatabase moodDb = MoodDatabase.instance;
   String selectedMood = '';
+  List<Map<String, dynamic>> moodHistory = [];
 
   final List<Map<String, String>> moodOptions = [
     {"emoji": "🌱", "label": "Hopeful"},
@@ -26,50 +26,40 @@ class _MoodTrackerScreenState extends State<MoodTrackerScreen> {
     {"emoji": "🖤", "label": "Grieving"},
     {"emoji": "🚫", "label": "Rejected"},
     {"emoji": "💖", "label": "Accepted"},
-    {"emoji": "🌌", "label": "Lonely"},
     {"emoji": "🔥", "label": "Burnt Out"},
-    {"emoji": "🛡️", "label": "Resilient"},
-    {"emoji": "🔆", "label": "Centered"},
-    {"emoji": "🙀", "label": "Panicked"},
     {"emoji": "💬", "label": "Encouraged"},
     {"emoji": "✨", "label": "Inspired"},
-    {"emoji": "🛌", "label": "Exhausted"},
-    {"emoji": "☺️", "label": "Content"},
-    {"emoji": "🌩️", "label": "Irritable"},
-    {"emoji": "👥", "label": "Supported"},
     {"emoji": "😌", "label": "Relaxed"},
     {"emoji": "😃", "label": "Joyful"},
     {"emoji": "😔", "label": "Sad"},
     {"emoji": "😤", "label": "Frustrated"},
     {"emoji": "😨", "label": "Anxious"},
-    {"emoji": "🤔", "label": "Thoughtful"},
     {"emoji": "🤩", "label": "Excited"},
     {"emoji": "😡", "label": "Angry"},
     {"emoji": "😟", "label": "Worried"},
-    {"emoji": "🤝", "label": "Connected"},
-    {"emoji": "😶", "label": "Numb"},
-    {"emoji": "😴", "label": "Sleepy"},
-    {"emoji": "😅", "label": "Relieved"},
-    {"emoji": "💡", "label": "Creative"},
-    {"emoji": "🍃", "label": "Peaceful"},
-    {"emoji": "💪", "label": "Strong"},
-    {"emoji": "🎉", "label": "Celebratory"},
-    {"emoji": "🙃", "label": "Confused"},
-    {"emoji": "🤷", "label": "Indifferent"},
-    {"emoji": "💔", "label": "Heartbroken"},
-    {"emoji": "🤯", "label": "Overwhelmed"},
-    {"emoji": "😬", "label": "Tense"},
-    {"emoji": "🔮", "label": "Intuitive"},
     {"emoji": "🍀", "label": "Grateful"},
   ];
 
-  void _selectMood(String moodLabel, String moodEmoji) {
+  @override
+  void initState() {
+    super.initState();
+    _loadMoodHistory();
+  }
+
+  Future<void> _loadMoodHistory() async {
+    final moods = await moodDb.fetchMoods();
+    setState(() {
+      moodHistory = moods;
+    });
+  }
+
+  Future<void> _selectMood(String moodLabel, String moodEmoji) async {
     setState(() {
       selectedMood = moodLabel;
     });
 
-    // Save the selected mood and emoji to AppState
-    Provider.of<AppState>(context, listen: false).setMood(moodLabel, moodEmoji);
+    await moodDb.insertMood(moodLabel, moodEmoji);
+    _loadMoodHistory(); // Refresh mood history after saving
   }
 
   @override
@@ -119,11 +109,8 @@ class _MoodTrackerScreenState extends State<MoodTrackerScreen> {
                             mood["label"]!,
                             style: TextStyle(
                               fontSize: 18,
-                              color:
-                                  isSelected ? Colors.blueAccent : Colors.black,
-                              fontWeight: isSelected
-                                  ? FontWeight.bold
-                                  : FontWeight.normal,
+                              color: isSelected ? Colors.blueAccent : Colors.black,
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                             ),
                           ),
                         ],
@@ -141,6 +128,27 @@ class _MoodTrackerScreenState extends State<MoodTrackerScreen> {
                   style: TextStyle(fontSize: 18, color: Colors.blueAccent),
                 ),
               ),
+            SizedBox(height: 20),
+            const Text(
+              "Mood History",
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            ),
+            Expanded(
+              child: ListView.builder(
+                itemCount: moodHistory.length,
+                itemBuilder: (context, index) {
+                  final moodEntry = moodHistory[index];
+                  return ListTile(
+                    leading: Text(
+                      moodEntry['emoji'],
+                      style: TextStyle(fontSize: 30),
+                    ),
+                    title: Text(moodEntry['mood']),
+                    subtitle: Text("Date: ${moodEntry['date'].split('T')[0]}"),
+                  );
+                },
+              ),
+            ),
           ],
         ),
       ),

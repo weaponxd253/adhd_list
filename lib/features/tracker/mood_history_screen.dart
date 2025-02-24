@@ -1,36 +1,55 @@
-// lib/features/tracker/mood_history_screen.dart
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../../providers/app_state.dart';
+import '../../database/mood_database.dart';
 
-class MoodHistoryScreen extends StatelessWidget {
+class MoodHistoryScreen extends StatefulWidget {
+  @override
+  _MoodHistoryScreenState createState() => _MoodHistoryScreenState();
+}
+
+class _MoodHistoryScreenState extends State<MoodHistoryScreen> {
+  final MoodDatabase moodDb = MoodDatabase.instance;
+  List<Map<String, dynamic>> _moodHistory = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMoodHistory();
+  }
+
+  Future<void> _loadMoodHistory() async {
+    final moods = await moodDb.fetchMoods();
+    setState(() {
+      _moodHistory = moods;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    final appState = Provider.of<AppState>(context);
-    final moodHistory = appState.moodHistory; // Assuming moodHistory is stored in AppState
-
     return Scaffold(
       appBar: AppBar(
         title: Text("Mood History"),
       ),
-      body: ListView.builder(
-        itemCount: moodHistory.length,
-        itemBuilder: (context, index) {
-          final moodEntry = moodHistory[index];
-          return ListTile(
-            leading: Text(
-              moodEntry['emoji'] ?? '😊', // Provide a default emoji if null
-              style: TextStyle(fontSize: 24),
+      body: _moodHistory.isEmpty
+          ? Center(child: Text("No mood history yet."))
+          : ListView.builder(
+              itemCount: _moodHistory.length,
+              itemBuilder: (context, index) {
+                final moodEntry = _moodHistory[index];
+                return ListTile(
+                  leading: Text(
+                    moodEntry['emoji'] ?? '😊',
+                    style: TextStyle(fontSize: 24),
+                  ),
+                  title: Text(
+                    moodEntry['mood'] ?? 'Unknown mood',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  subtitle: Text(
+                    "Date: ${moodEntry['date'].split('T')[0]}",
+                  ),
+                );
+              },
             ),
-            title: Text(
-              moodEntry['mood'] ?? 'Unknown mood', // Default text if null
-            ),
-            subtitle: Text(
-              "Date: ${moodEntry['date'] ?? 'Unknown date'}", // Default text if null
-            ),
-          );
-        },
-      ),
     );
   }
 }
