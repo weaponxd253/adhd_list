@@ -1,16 +1,19 @@
-// lib/models/task.dart
 import 'subtask.dart';
 
 class Task {
+  final int id;
   final String title;
   final DateTime dueDate;
-  bool isCompleted;
-  List<Subtask> subtasks; // Make sure this is a modifiable list
+  String status; // "pending", "in_progress", "completed"
+  List<Subtask> subtasks; // ✅ Add subtasks list
 
   Task({
+    required this.id,
     required this.title,
     required this.dueDate,
-    this.isCompleted = false,
-    List<Subtask>? subtasks,
-  }) : subtasks = subtasks ?? []; // Initialize as a modifiable empty list if null
+    this.status = "pending",
+    List<Subtask>? subtasks, // ✅ Initialize subtasks as optional
+  }) : subtasks = subtasks ?? []; // Ensure it's always a list
+
+  bool get isCompleted => status == "completed"; // ✅ Fix isCompleted reference
 }

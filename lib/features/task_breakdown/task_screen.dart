@@ -10,15 +10,20 @@ class TaskScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text("Task Breakdown"),
-      ),
+      appBar: AppBar(title: Text("Task Breakdown")),
       body: Column(
         children: [
-          TaskInputSection(taskController: taskController), // Task input section for adding tasks
-          Expanded(child: TaskListSection()), // Task list section for viewing tasks
+          TaskInputSection(taskController: taskController),
+          Expanded(
+            child: Consumer<AppState>( // 👈 Add this to listen for changes
+              builder: (context, appState, child) {
+                return TaskListSection(tasks: appState.tasks); // Pass updated tasks
+              },
+            ),
+          ),
         ],
       ),
     );
   }
 }
+

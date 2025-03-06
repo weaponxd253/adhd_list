@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import '../models/task.dart';
 import '../models/subtask.dart';
+import '../database/task_database.dart';
+
 
 class AppState extends ChangeNotifier {
   // ----------------------------------------
@@ -14,7 +16,7 @@ class AppState extends ChangeNotifier {
   // Task Management
   List<Task> tasks = [];
 
-  //default times for timer
+  final TaskDatabase _taskDb = TaskDatabase();
   
   // Pomodoro Timer
   bool isTimerRunning = false;
@@ -96,10 +98,26 @@ final Map<String, String> moodMessages = {
   // Task Management Methods
   // ----------------------------------------
 
-  void addTask(String title, DateTime dueDate) {
-    tasks.add(Task(title: title, dueDate: dueDate));
-    notifyListeners();
-  }
+void addTask(String title, DateTime dueDate) async {
+  await _taskDb.insertTask(title, dueDate.toIso8601String()); // Save to DB
+  _loadTasksFromDatabase(); // Reload from DB
+}
+
+
+void _loadTasksFromDatabase() async {
+  final fetchedTasks = await _taskDb.fetchTasks();
+  tasks = fetchedTasks.map((t) => Task(
+    id: t['id'],
+    title: t['title'],
+    dueDate: DateTime.parse(t['due_date']),
+    status: t['is_completed'] == 1 ? "completed" : "pending", // ✅ Convert boolean to status
+  )).toList();
+  notifyListeners();
+}
+
+
+
+
 
   void removeTask(int taskIndex) {
     if (taskIndex >= 0 && taskIndex < tasks.length) {
@@ -108,12 +126,25 @@ final Map<String, String> moodMessages = {
     }
   }
 
-  void toggleTaskCompletion(int taskIndex) {
-    if (taskIndex >= 0 && taskIndex < tasks.length) {
-      tasks[taskIndex].isCompleted = !tasks[taskIndex].isCompleted;
-      notifyListeners();
-    }
+ void toggleTaskCompletion(int taskIndex) async {
+  if (taskIndex >= 0 && taskIndex < tasks.length) {
+    Task task = tasks[taskIndex];
+
+    String newStatus = task.status == "completed" ? "pending" : "completed";  // Toggle status
+
+    await _taskDb.updateTaskStatus(task.id, newStatus); //  Update in DB
+
+    task.status = newStatus; // Update in memory
+    notifyListeners();
   }
+}
+
+void updateTaskStatus(int taskId, String newStatus) async {
+  await _taskDb.updateTaskStatus(taskId, newStatus); //  Update in database
+  _loadTasksFromDatabase(); // Refresh task list
+}
+
+
 
   void addSubtask(int taskIndex, String subtaskTitle) {
     if (taskIndex >= 0 && taskIndex < tasks.length) {
@@ -122,15 +153,16 @@ final Map<String, String> moodMessages = {
     }
   }
 
-  void toggleSubtaskCompletion(int taskIndex, int subtaskIndex) {
-    if (taskIndex >= 0 && taskIndex < tasks.length) {
-      Task task = tasks[taskIndex];
-      if (subtaskIndex >= 0 && subtaskIndex < task.subtasks.length) {
-        task.subtasks[subtaskIndex].isCompleted = !task.subtasks[subtaskIndex].isCompleted;
-        notifyListeners();
-      }
+void toggleSubtaskCompletion(int taskIndex, int subtaskIndex) {
+  if (taskIndex >= 0 && taskIndex < tasks.length) {
+    Task task = tasks[taskIndex];
+    if (subtaskIndex >= 0 && subtaskIndex < task.subtasks.length) {
+      task.subtasks[subtaskIndex].isCompleted = !task.subtasks[subtaskIndex].isCompleted; // ✅ Toggle subtask completion
+      notifyListeners();
     }
   }
+}
+
 
   int get totalTasks => tasks.length;
   int get completedTasks => tasks.where((task) => task.isCompleted).length;

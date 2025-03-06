@@ -27,6 +27,17 @@ class TaskDatabase {
     );
   }
 
+  Future<void> updateTaskStatus(int taskId, String newStatus) async {
+  final db = await dbHelper.database;
+  await db.update(
+    'tasks',  // Make sure this matches your database table name
+    {'status': newStatus},
+    where: 'id = ?',
+    whereArgs: [taskId],
+  );
+}
+
+
   Future<int> deleteTask(int id) async {
     Database db = await dbHelper.database;
     return await db.delete('tasks', where: 'id = ?', whereArgs: [id]);
