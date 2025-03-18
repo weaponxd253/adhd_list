@@ -44,7 +44,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Task Overview Section
-              _buildTaskOverview(appState),
+              _buildTaskOverview(),
               const SizedBox(height: 20),
 
               // Upcoming Tasks Section
@@ -52,9 +52,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
               const SizedBox(height: 20),
 
               // Mood Tracker Section
-              _buildMoodTrackerSection(appState),
+              _buildMoodTrackerSection(),
               const SizedBox(height: 20),
               _buildTimerSection(appState),
+
+              ElevatedButton(
+                onPressed: () { 
+                  appState.clearTaskHistory();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("All task history cleared")),
+                );},
+                 child: const Text("Clear Task History"),
+                 ),
+            const SizedBox(height: 10),
+            ElevatedButton(
+              onPressed: () {
+                appState.clearMoodHistory();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text("All mood history cleared")),
+                );
+              },
+              child: Text("Clear Mood History"),
+            ),
             ],
           ),
         ),
@@ -129,35 +148,39 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   // --- Task Overview Section ---
-  Widget _buildTaskOverview(AppState appState) {
-    double progress = appState.totalTasks == 0
-        ? 0
-        : appState.completedTasks / appState.totalTasks;
+Widget _buildTaskOverview() {
+  return Consumer<AppState>(
+    builder: (context, appState, child) {
+      double progress = appState.totalTasks == 0
+          ? 0
+          : appState.completedTasks / appState.totalTasks;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          "Task Overview",
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 10),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            _buildTaskStatusIcon(
-                Icons.assignment, "Total", appState.totalTasks, Colors.blue),
-            _buildTaskStatusIcon(Icons.check_circle, "Completed",
-                appState.completedTasks, Colors.green),
-            _buildTaskStatusIcon(
-                Icons.pending, "Pending", appState.pendingTasks, Colors.red),
-          ],
-        ),
-        const SizedBox(height: 20),
-        _buildProgressBar(progress),
-      ],
-    );
-  }
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            "Task Overview",
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _buildTaskStatusIcon(
+                  Icons.assignment, "Total", appState.totalTasks, Colors.blue),
+              _buildTaskStatusIcon(Icons.check_circle, "Completed",
+                  appState.completedTasks, Colors.green),
+              _buildTaskStatusIcon(
+                  Icons.pending, "Pending", appState.pendingTasks, Colors.red),
+            ],
+          ),
+          const SizedBox(height: 20),
+          _buildProgressBar(progress),
+        ],
+      );
+    },
+  );
+}
 
   Widget _buildTaskStatusIcon(
       IconData icon, String label, int count, Color color) {
@@ -175,24 +198,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildProgressBar(double progress) {
-    return Container(
-      height: 10,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(5),
-        gradient:
-            LinearGradient(colors: [Colors.green[300]!, Colors.green[800]!]),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(5),
-        child: LinearProgressIndicator(
-          value: progress,
-          backgroundColor: Colors.grey[300],
-          color: Colors.transparent, // Transparent to show gradient
+Widget _buildProgressBar(double progress) {
+  return Container(
+    height: 10,
+    width: double.infinity, // Ensure it spans the full width
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(5),
+      color: Colors.grey[300], // Background color
+    ),
+    child: Stack(
+      children: [
+        Container(
+          width: progress * MediaQuery.of(context).size.width, // Scale dynamically
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(5),
+            gradient: LinearGradient(colors: [Colors.green[300]!, Colors.green[800]!]),
+          ),
         ),
-      ),
-    );
-  }
+      ],
+    ),
+  );
+}
+
 
   // --- Upcoming Tasks Section ---
   Widget _buildUpcomingTasksSection(List<dynamic> upcomingTasks) {
@@ -260,86 +287,53 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   // --- Mood Tracker Section ---
-  Widget _buildMoodTrackerSection(AppState appState) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          "Mood Tracker",
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: Colors.grey[800],
+Widget _buildMoodTrackerSection() {
+  return Consumer<AppState>(
+    builder: (context, appState, child) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            "Mood Tracker",
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
-        ),
-        const SizedBox(height: 10),
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: _getMoodColor(appState.selectedMood, context),
-            borderRadius: BorderRadius.circular(8),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: _getMoodColor(appState.selectedMood, context),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Text(
+                      "Current Mood: ",
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      "${appState.selectedMoodEmoji} ${appState.selectedMood.isEmpty ? "No mood selected." : appState.selectedMood}",
+                      style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blueAccent),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  appState.moodMessage,
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                ),
+              ],
+            ),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Text(
-                    "Current Mood:",
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).brightness == Brightness.dark
-                          ? Colors.white70 // Light color for dark mode
-                          : Colors.black87, // Darker color for light mode
-                    ),
-                  ),
-                  Text(
-                    "${appState.selectedMoodEmoji} ${appState.selectedMood}",
-                    style: const TextStyle(
-                        color: Colors.blueAccent, fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  DefaultTextStyle(
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                      color: Theme.of(context).brightness == Brightness.dark
-                          ? Colors.white // Brighter for dark mode
-                          : Colors
-                              .black87, // Keep it consistent with the Timer & Task Overview
-                    ),
-                    child: ExpandableText(
-                      text: appState.moodMessage.isNotEmpty
-                          ? appState.moodMessage
-                          : "Select a mood to see a message.",
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => MoodHistoryScreen()),
-                  );
-                },
-                child: const Text("View Mood History"),
-                style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blueAccent),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
+        ],
+      );
+    },
+  );
+}
+
+
 
   Color _getMoodColor(String mood, BuildContext context) {
     bool isDarkMode = Theme.of(context).brightness == Brightness.dark;

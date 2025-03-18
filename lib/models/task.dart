@@ -5,15 +5,14 @@ class Task {
   final String title;
   final DateTime dueDate;
   String status; // "pending", "in_progress", "completed"
-  List<Subtask> subtasks; // ✅ Add subtasks list
-
+  List<Subtask> subtasks; // 
   Task({
     required this.id,
     required this.title,
     required this.dueDate,
     this.status = "pending",
-    List<Subtask>? subtasks, // ✅ Initialize subtasks as optional
+    List<Subtask>? subtasks, // 
   }) : subtasks = subtasks ?? []; // Ensure it's always a list
 
-  bool get isCompleted => status == "completed"; // ✅ Fix isCompleted reference
+  bool get isCompleted => status == "completed"; // 
 }

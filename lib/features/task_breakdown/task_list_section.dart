@@ -22,7 +22,7 @@ class _TaskListSectionState extends State<TaskListSection> {
   @override
   Widget build(BuildContext context) {
     return ListView.builder(
-      padding: EdgeInsets.all(8.0),
+      padding: const EdgeInsets.all(8.0),
       itemCount: widget.tasks.length,
       itemBuilder: (context, index) {
         final task = widget.tasks[index];
@@ -40,16 +40,15 @@ class _TaskListSectionState extends State<TaskListSection> {
         return Card(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           elevation: 3,
-          margin: EdgeInsets.symmetric(vertical: 6),
+          margin: const EdgeInsets.symmetric(vertical: 6),
           child: ExpansionTile(
-            leading: Checkbox(
-              value: task.status == "completed", // ✅ Fix: Use status instead of isCompleted
-              onChanged: (value) {
-                String newStatus = value! ? "completed" : "pending";
-                Provider.of<AppState>(context, listen: false)
-                    .updateTaskStatus(task.id, newStatus);
-              },
-            ),
+            leading:Checkbox(
+  value: task.isCompleted,
+  onChanged: (bool? value) {
+    Provider.of<AppState>(context, listen: false).toggleTaskCompletion(index);
+  },
+),
+
             title: Text(
               task.title,
               style: TextStyle(
@@ -59,7 +58,6 @@ class _TaskListSectionState extends State<TaskListSection> {
             ),
             subtitle: Text("Due Date: ${task.dueDate.toLocal().toString().split(' ')[0]}"),
             children: [
-              // ✅ Display Subtasks
               Column(
                 children: (task.subtasks ?? []).asMap().entries.map((entry) {
                   int subtaskIndex = entry.key;
@@ -84,7 +82,7 @@ class _TaskListSectionState extends State<TaskListSection> {
                 }).toList(),
               ),
 
-              // ✅ Subtask Input Section
+              //  Subtask Input Section
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
                 child: Row(

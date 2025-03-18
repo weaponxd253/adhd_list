@@ -27,15 +27,36 @@ class TaskDatabase {
     );
   }
 
-  Future<void> updateTaskStatus(int taskId, String newStatus) async {
+  Future<void> updateTaskCompletion(int taskId, bool isCompleted) async {
   final db = await dbHelper.database;
   await db.update(
-    'tasks',  // Make sure this matches your database table name
-    {'status': newStatus},
+    'tasks',
+    {'is_completed': isCompleted ? 1 : 0}, // Update completion status
     where: 'id = ?',
     whereArgs: [taskId],
   );
 }
+
+
+Future<void> updateTaskStatus(int taskId, String newStatus) async {
+  final db = await dbHelper.database;
+  await db.update(
+    'tasks',  
+    {'status': newStatus}, // Update the status instead of isCompleted
+    where: 'id = ?',
+    whereArgs: [taskId],
+  );
+}
+
+
+Future<void> clearTasks() async {
+  final db = await dbHelper.database; // Use dbHelper.database to access the DB
+  await db.delete('tasks'); // Assuming the table name is 'tasks'
+}
+
+
+
+
 
 
   Future<int> deleteTask(int id) async {

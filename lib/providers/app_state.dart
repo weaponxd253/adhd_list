@@ -1,12 +1,17 @@
 // lib/providers/app_state.dart
 import 'package:flutter/material.dart';
 import 'dart:async';
+import '../database/mood_database.dart';
 import '../models/task.dart';
 import '../models/subtask.dart';
 import '../database/task_database.dart';
 
 
 class AppState extends ChangeNotifier {
+    AppState() {
+    loadLastMood();
+    _loadTasksFromDatabase();
+  }
   // ----------------------------------------
   // Fields
   // ----------------------------------------
@@ -103,6 +108,19 @@ void addTask(String title, DateTime dueDate) async {
   _loadTasksFromDatabase(); // Reload from DB
 }
 
+void clearTaskHistory() async {
+  await _taskDb.clearTasks(); // Ensure this method exists in TaskDatabase
+  tasks.clear();
+  notifyListeners();
+}
+
+void clearMoodHistory() async {
+  await MoodDatabase.instance.clearMoods(); // Ensure this method exists in MoodDatabase
+  moodHistory.clear();
+  notifyListeners();
+}
+
+
 
 void _loadTasksFromDatabase() async {
   final fetchedTasks = await _taskDb.fetchTasks();
@@ -116,9 +134,6 @@ void _loadTasksFromDatabase() async {
 }
 
 
-
-
-
   void removeTask(int taskIndex) {
     if (taskIndex >= 0 && taskIndex < tasks.length) {
       tasks.removeAt(taskIndex);
@@ -126,18 +141,20 @@ void _loadTasksFromDatabase() async {
     }
   }
 
- void toggleTaskCompletion(int taskIndex) async {
+void toggleTaskCompletion(int taskIndex) async {
   if (taskIndex >= 0 && taskIndex < tasks.length) {
     Task task = tasks[taskIndex];
+    
+    // Toggle between "completed" and "pending"
+    String newStatus = task.isCompleted ? "pending" : "completed";
 
-    String newStatus = task.status == "completed" ? "pending" : "completed";  // Toggle status
+    await _taskDb.updateTaskStatus(task.id, newStatus); // Update database
 
-    await _taskDb.updateTaskStatus(task.id, newStatus); //  Update in DB
-
-    task.status = newStatus; // Update in memory
-    notifyListeners();
+    task.status = newStatus; // Update local task object
+    notifyListeners(); // Refresh UI
   }
 }
+
 
 void updateTaskStatus(int taskId, String newStatus) async {
   await _taskDb.updateTaskStatus(taskId, newStatus); //  Update in database
@@ -254,16 +271,34 @@ void toggleSubtaskCompletion(int taskIndex, int subtaskIndex) {
   String get selectedMood => _selectedMood;
   String get selectedMoodEmoji => _selectedMoodEmoji;
 
-  void setMood(String mood, String emoji) {
+void setMood(String mood, String emoji) async {
   _selectedMood = mood;
   _selectedMoodEmoji = emoji;
-  moodHistory.add({
-    'mood': mood,
-    'emoji': emoji,
-    'date': DateTime.now().toLocal().toString().split(' ')[0],
-  });
+
+  await MoodDatabase.instance.updateLastMood(mood, emoji);
+  
+  // Fetch the latest mood from the database to ensure it's current
+  await loadLastMood();
+
   notifyListeners(); // Notify UI of state changes
 }
+
+
+Future<void> loadLastMood() async {
+  final lastMood = await MoodDatabase.instance.fetchLastMood();
+
+  if (lastMood != null) {
+    _selectedMood = lastMood['mood'];
+    _selectedMoodEmoji = lastMood['emoji'];
+  } else {
+    _selectedMood = '';
+    _selectedMoodEmoji = '';
+  }
+
+  notifyListeners(); 
+}
+
+
 
 
 String get moodMessage => moodMessages[_selectedMood] ?? 'No mood selected.';

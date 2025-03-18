@@ -5,6 +5,7 @@ class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._privateConstructor();
   static Database? _database;
 
+
   DatabaseHelper._privateConstructor();
 
   Future<Database> get database async {
@@ -17,10 +18,18 @@ class DatabaseHelper {
     String path = join(await getDatabasesPath(), 'focusflow.db');
     return await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
     );
   }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+  if (oldVersion < 2) { // Ensure you're handling version updates
+    await db.execute("ALTER TABLE tasks ADD COLUMN status TEXT DEFAULT 'pending'");
+  }
+}
+
 
   Future<void> _onCreate(Database db, int version) async {
     await db.execute('''
@@ -28,7 +37,8 @@ class DatabaseHelper {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT NOT NULL,
         due_date TEXT,
-        is_completed INTEGER DEFAULT 0
+        is_completed INTEGER DEFAULT 0,
+        status TEXT DEFAULT 'pending'
       )
     ''');
 

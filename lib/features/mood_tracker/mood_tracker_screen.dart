@@ -1,4 +1,6 @@
+import 'package:adhd_list/providers/app_state.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../database/mood_database.dart';
 
 class MoodTrackerScreen extends StatefulWidget {
@@ -43,7 +45,8 @@ class _MoodTrackerScreenState extends State<MoodTrackerScreen> {
   @override
   void initState() {
     super.initState();
-    _loadMoodHistory();
+     Provider.of<AppState>(context, listen: false).loadLastMood();
+      _loadMoodHistory();
   }
 
   Future<void> _loadMoodHistory() async {
@@ -53,14 +56,13 @@ class _MoodTrackerScreenState extends State<MoodTrackerScreen> {
     });
   }
 
-  Future<void> _selectMood(String moodLabel, String moodEmoji) async {
-    setState(() {
-      selectedMood = moodLabel;
-    });
+void _selectMood(String moodLabel, String moodEmoji) async {
+  Provider.of<AppState>(context, listen: false).setMood(moodLabel, moodEmoji);
+  
+  // Pop the screen and send a signal to refresh the dashboard
+  Navigator.pop(context, true);
+}
 
-    await moodDb.insertMood(moodLabel, moodEmoji);
-    _loadMoodHistory(); // Refresh mood history after saving
-  }
 
   @override
   Widget build(BuildContext context) {

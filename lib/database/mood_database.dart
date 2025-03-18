@@ -34,6 +34,33 @@ class MoodDatabase {
     );
   }
 
+  // Fetch the last mood entry
+Future<Map<String, dynamic>?> fetchLastMood() async {
+  Database db = await database;
+  List<Map<String, dynamic>> results = await db.query(
+    'moods',
+    orderBy: 'date DESC',
+    limit: 1, // Fetch the most recent mood entry
+  );
+  return results.isNotEmpty ? results.first : null;
+}
+
+// Insert or update the last mood
+Future<void> updateLastMood(String mood, String emoji) async {
+  Database db = await database;
+
+  // Delete the old mood (if any)
+  await db.delete('moods');
+
+  // Insert the new mood
+  await db.insert('moods', {
+    'mood': mood,
+    'emoji': emoji,
+    'date': DateTime.now().toIso8601String(),
+  });
+}
+
+
   Future<int> insertMood(String mood, String emoji) async {
     Database db = await database;
     String date = DateTime.now().toIso8601String();
@@ -44,4 +71,11 @@ class MoodDatabase {
     Database db = await database;
     return await db.query('moods', orderBy: 'date DESC');
   }
+  
+  Future<void> clearMoods() async {
+  final db = await database;
+  await db.delete('moods'); // Assuming the table name is 'moods'
 }
+
+}
+
