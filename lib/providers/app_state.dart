@@ -120,6 +120,17 @@ void clearMoodHistory() async {
   notifyListeners();
 }
 
+void editTask(int taskId, String newTitle, DateTime newDueDate) async {
+  await _taskDb.editTask(taskId, newTitle, newDueDate.toIso8601String());
+  _loadTasksFromDatabase(); // Reload tasks after updating
+}
+
+void deleteTask(int taskId) async {
+  await _taskDb.deleteTask(taskId);
+  _loadTasksFromDatabase(); // Reload tasks after deleting
+}
+
+
 
 
 void _loadTasksFromDatabase() async {
@@ -274,13 +285,16 @@ void toggleSubtaskCompletion(int taskIndex, int subtaskIndex) {
 void setMood(String mood, String emoji) async {
   _selectedMood = mood;
   _selectedMoodEmoji = emoji;
-
+  notifyListeners(); // Notify UI of state changes  
   await MoodDatabase.instance.updateLastMood(mood, emoji);
+
+    await MoodDatabase.instance.insertMood(mood, emoji);
+
   
   // Fetch the latest mood from the database to ensure it's current
   await loadLastMood();
 
-  notifyListeners(); // Notify UI of state changes
+  
 }
 
 

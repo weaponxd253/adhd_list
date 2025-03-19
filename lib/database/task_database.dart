@@ -37,6 +37,20 @@ class TaskDatabase {
   );
 }
 
+Future<int> editTask(int id, String newTitle, String newDueDate) async {
+  Database db = await dbHelper.database;
+  return await db.update(
+    'tasks',
+    {
+      'title': newTitle,
+      'due_date': newDueDate,
+    },
+    where: 'id = ?',
+    whereArgs: [id],
+  );
+}
+
+
 
 Future<void> updateTaskStatus(int taskId, String newStatus) async {
   final db = await dbHelper.database;

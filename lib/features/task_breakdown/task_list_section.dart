@@ -3,8 +3,7 @@ import 'package:provider/provider.dart';
 import '../../providers/app_state.dart';
 import '../../database/task_database.dart';
 import '../../models/task.dart';
-import '../../models/subtask.dart'; 
-
+import '../../models/subtask.dart';
 
 class TaskListSection extends StatefulWidget {
   final List<Task> tasks;
@@ -42,21 +41,46 @@ class _TaskListSectionState extends State<TaskListSection> {
           elevation: 3,
           margin: const EdgeInsets.symmetric(vertical: 6),
           child: ExpansionTile(
-            leading:Checkbox(
-  value: task.isCompleted,
-  onChanged: (bool? value) {
-    Provider.of<AppState>(context, listen: false).toggleTaskCompletion(index);
-  },
-),
-
+            leading: Checkbox(
+              value: task.isCompleted,
+              onChanged: (bool? value) {
+                Provider.of<AppState>(context, listen: false)
+                    .toggleTaskCompletion(index);
+              },
+            ),
             title: Text(
               task.title,
               style: TextStyle(
                 fontSize: 18,
-                decoration: task.status == "completed" ? TextDecoration.lineThrough : null,
+                decoration: task.status == "completed"
+                    ? TextDecoration.lineThrough
+                    : null,
               ),
             ),
-            subtitle: Text("Due Date: ${task.dueDate.toLocal().toString().split(' ')[0]}"),
+            subtitle: Text(
+                "Due Date: ${task.dueDate.toLocal().toString().split(' ')[0]}"),
+            
+            // ADD EDIT AND DELETE BUTTONS HERE
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: Icon(Icons.edit, color: Colors.blue),
+                  onPressed: () => _showEditDialog(context, task),
+                ),
+                IconButton(
+                  icon: Icon(Icons.delete, color: Colors.red),
+                  onPressed: () {
+                    Provider.of<AppState>(context, listen: false)
+                        .deleteTask(task.id);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text("Task deleted")),
+                    );
+                  },
+                ),
+              ],
+            ),
+
             children: [
               Column(
                 children: (task.subtasks ?? []).asMap().entries.map((entry) {
@@ -75,7 +99,9 @@ class _TaskListSectionState extends State<TaskListSection> {
                       subtask.title,
                       style: TextStyle(
                         fontSize: 16,
-                        decoration: subtask.isCompleted ? TextDecoration.lineThrough : null,
+                        decoration: subtask.isCompleted
+                            ? TextDecoration.lineThrough
+                            : null,
                       ),
                     ),
                   );
@@ -117,6 +143,63 @@ class _TaskListSectionState extends State<TaskListSection> {
               ),
             ],
           ),
+        );
+      },
+    );
+  }
+
+  /// Show a dialog to edit the task title and due date
+  void _showEditDialog(BuildContext context, Task task) {
+    TextEditingController titleController =
+        TextEditingController(text: task.title);
+    DateTime selectedDate = task.dueDate;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text("Edit Task"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: titleController,
+                decoration: InputDecoration(labelText: "Task Title"),
+              ),
+              SizedBox(height: 10),
+              Text("Due Date: ${selectedDate.toLocal().toString().split(' ')[0]}"),
+              TextButton(
+                child: Text("Change Date"),
+                onPressed: () async {
+                  DateTime? pickedDate = await showDatePicker(
+                    context: context,
+                    initialDate: selectedDate,
+                    firstDate: DateTime.now(),
+                    lastDate: DateTime(2100),
+                  );
+                  if (pickedDate != null) {
+                    setState(() {
+                      selectedDate = pickedDate;
+                    });
+                  }
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text("Cancel"),
+            ),
+            TextButton(
+              onPressed: () {
+                Provider.of<AppState>(context, listen: false)
+                    .editTask(task.id, titleController.text, selectedDate);
+                Navigator.pop(context);
+              },
+              child: Text("Save"),
+            ),
+          ],
         );
       },
     );

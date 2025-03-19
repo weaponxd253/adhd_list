@@ -49,18 +49,30 @@ class _MoodTrackerScreenState extends State<MoodTrackerScreen> {
       _loadMoodHistory();
   }
 
-  Future<void> _loadMoodHistory() async {
+ Future<void> _loadMoodHistory() async {
+  try {
     final moods = await moodDb.fetchMoods();
     setState(() {
       moodHistory = moods;
     });
+  } catch (e) {
+    print("Error loading mood history: $e"); // Debugging
+    setState(() {
+      moodHistory = [];
+    });
   }
+}
+
 
 void _selectMood(String moodLabel, String moodEmoji) async {
+   setState(() {
+    selectedMood = moodLabel;
+  });
   Provider.of<AppState>(context, listen: false).setMood(moodLabel, moodEmoji);
   
-  // Pop the screen and send a signal to refresh the dashboard
-  Navigator.pop(context, true);
+ if (Navigator.canPop(context)) {
+    Navigator.pop(context, true); // Send update signal only if possible
+  }
 }
 
 
