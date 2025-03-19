@@ -84,28 +84,45 @@ class _TaskListSectionState extends State<TaskListSection> {
             children: [
               Column(
                 children: (task.subtasks ?? []).asMap().entries.map((entry) {
-                  int subtaskIndex = entry.key;
-                  Subtask subtask = entry.value;
+  int subtaskIndex = entry.key;
+  Subtask subtask = entry.value;
 
-                  return ListTile(
-                    leading: Checkbox(
-                      value: subtask.isCompleted,
-                      onChanged: (value) {
-                        Provider.of<AppState>(context, listen: false)
-                            .toggleSubtaskCompletion(index, subtaskIndex);
-                      },
-                    ),
-                    title: Text(
-                      subtask.title,
-                      style: TextStyle(
-                        fontSize: 16,
-                        decoration: subtask.isCompleted
-                            ? TextDecoration.lineThrough
-                            : null,
-                      ),
-                    ),
-                  );
-                }).toList(),
+  return ListTile(
+    leading: Checkbox(
+      value: subtask.isCompleted,
+      onChanged: (value) {
+        Provider.of<AppState>(context, listen: false)
+            .toggleSubtaskCompletion(index, subtaskIndex);
+      },
+    ),
+    title: Text(
+      subtask.title,
+      style: TextStyle(
+        fontSize: 16,
+        decoration: subtask.isCompleted ? TextDecoration.lineThrough : null,
+      ),
+    ),
+
+    // ADD Edit & Delete Buttons
+    trailing: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          icon: Icon(Icons.edit, color: Colors.blue),
+          onPressed: () => _showEditSubtaskDialog(context, index, subtaskIndex, subtask.title),
+        ),
+        IconButton(
+          icon: Icon(Icons.delete, color: Colors.red),
+          onPressed: () {
+            Provider.of<AppState>(context, listen: false)
+                .deleteSubtask(index, subtaskIndex);
+          },
+        ),
+      ],
+    ),
+  );
+}).toList(),
+
               ),
 
               //  Subtask Input Section
@@ -147,6 +164,40 @@ class _TaskListSectionState extends State<TaskListSection> {
       },
     );
   }
+
+  
+
+void _showEditSubtaskDialog(BuildContext context, int taskIndex, int subtaskIndex, String currentTitle) {
+  TextEditingController subtaskController = TextEditingController(text: currentTitle);
+
+  showDialog(
+    context: context,
+    builder: (context) {
+      return AlertDialog(
+        title: Text("Edit Subtask"),
+        content: TextField(
+          controller: subtaskController,
+          decoration: InputDecoration(labelText: "Subtask Title"),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () {
+              Provider.of<AppState>(context, listen: false)
+                  .editSubtask(taskIndex, subtaskIndex, subtaskController.text);
+              Navigator.pop(context);
+            },
+            child: Text("Save"),
+          ),
+        ],
+      );
+    },
+  );
+}
+
 
   /// Show a dialog to edit the task title and due date
   void _showEditDialog(BuildContext context, Task task) {

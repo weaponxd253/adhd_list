@@ -50,6 +50,51 @@ Future<int> editTask(int id, String newTitle, String newDueDate) async {
   );
 }
 
+Future<int> insertSubtask(int taskId, String title) async {
+  Database db = await dbHelper.database;
+  return await db.insert(
+    'subtasks',
+    {'task_id': taskId, 'title': title, 'is_completed': 0},
+  );
+}
+
+Future<List<Map<String, dynamic>>> fetchSubtasks(int taskId) async {
+  Database db = await dbHelper.database;
+  
+  print("Fetching subtasks for task ID: $taskId");  //  Debugging log
+  
+  try {
+    final result = await db.query(
+      'subtasks',
+      columns: ['id', 'task_id', 'title', 'is_completed'],  //  Ensure task_id is included
+      where: 'task_id = ?',
+      whereArgs: [taskId],
+    );
+
+    print("Fetched subtasks: $result");  //  Debugging log
+    return result;
+  } catch (e) {
+    print("Error fetching subtasks: $e");  // Catch error
+    return [];
+  }
+}
+
+
+Future<int> updateSubtask(int subtaskId, String newTitle) async {
+  Database db = await dbHelper.database;
+  return await db.update(
+    'subtasks',
+    {'title': newTitle},
+    where: 'id = ?',
+    whereArgs: [subtaskId],
+  );
+}
+
+Future<int> deleteSubtask(int subtaskId) async {
+  Database db = await dbHelper.database;
+  return await db.delete('subtasks', where: 'id = ?', whereArgs: [subtaskId]);
+}
+
 
 
 Future<void> updateTaskStatus(int taskId, String newStatus) async {

@@ -45,36 +45,35 @@ class _MoodTrackerScreenState extends State<MoodTrackerScreen> {
   @override
   void initState() {
     super.initState();
-     Provider.of<AppState>(context, listen: false).loadLastMood();
-      _loadMoodHistory();
+    Provider.of<AppState>(context, listen: false).loadLastMood();
+    _loadMoodHistory();
   }
 
- Future<void> _loadMoodHistory() async {
-  try {
-    final moods = await moodDb.fetchMoods();
+  Future<void> _loadMoodHistory() async {
+    try {
+      final moods = await moodDb.fetchMoods();
+      setState(() {
+        moodHistory = moods;
+      });
+    } catch (e) {
+      print("Error loading mood history: $e"); // Debugging
+      setState(() {
+        moodHistory = [];
+      });
+    }
+  }
+
+  void _selectMood(String moodLabel, String moodEmoji) async {
     setState(() {
-      moodHistory = moods;
+      selectedMood = moodLabel;
     });
-  } catch (e) {
-    print("Error loading mood history: $e"); // Debugging
-    setState(() {
-      moodHistory = [];
-    });
+    await moodDb.insertMood(moodLabel, moodEmoji);
+    _loadMoodHistory();
+
+    if (Navigator.canPop(context)) {
+      Navigator.pop(context, true); // Send update signal only if possible
+    }
   }
-}
-
-
-void _selectMood(String moodLabel, String moodEmoji) async {
-   setState(() {
-    selectedMood = moodLabel;
-  });
-  Provider.of<AppState>(context, listen: false).setMood(moodLabel, moodEmoji);
-  
- if (Navigator.canPop(context)) {
-    Navigator.pop(context, true); // Send update signal only if possible
-  }
-}
-
 
   @override
   Widget build(BuildContext context) {
@@ -123,8 +122,11 @@ void _selectMood(String moodLabel, String moodEmoji) async {
                             mood["label"]!,
                             style: TextStyle(
                               fontSize: 18,
-                              color: isSelected ? Colors.blueAccent : Colors.black,
-                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                              color:
+                                  isSelected ? Colors.blueAccent : Colors.black,
+                              fontWeight: isSelected
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
                             ),
                           ),
                         ],

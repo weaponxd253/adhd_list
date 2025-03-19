@@ -21,6 +21,8 @@ class _MoodHistoryScreenState extends State<MoodHistoryScreen> {
     setState(() {
       _moodHistory = moods;
     });
+
+    print("Mood history loaded: $_moodHistory");
   }
 
   @override
