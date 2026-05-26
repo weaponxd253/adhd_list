@@ -215,6 +215,9 @@ class AppState extends ChangeNotifier {
         dueDate: DateTime.parse(t['due_date']),
         // is_completed is always in sync with status (fixed in TaskDatabase)
         status: t['is_completed'] == 1 ? 'completed' : 'pending',
+        completedAt: t['completed_at'] != null
+            ? DateTime.tryParse(t['completed_at'] as String)
+            : null,
         subtasks: subtasks,
       ));
     }
@@ -234,6 +237,9 @@ class AppState extends ChangeNotifier {
       final newStatus = task.isCompleted ? 'pending' : 'completed';
       await _taskDb.updateTaskStatus(task.id, newStatus);
       task.status = newStatus;
+      // Mirror completed_at in memory so currentStreak is accurate immediately
+      // without waiting for a full DB reload.
+      task.completedAt = newStatus == 'completed' ? DateTime.now() : null;
       notifyListeners();
     }
   }
@@ -252,12 +258,15 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  void toggleSubtaskCompletion(int taskIndex, int subtaskIndex) {
+  // Fixed: now persists to DB so the state survives app restarts.
+  void toggleSubtaskCompletion(int taskIndex, int subtaskIndex) async {
     if (taskIndex >= 0 && taskIndex < tasks.length) {
       final task = tasks[taskIndex];
       if (subtaskIndex >= 0 && subtaskIndex < task.subtasks.length) {
-        task.subtasks[subtaskIndex].isCompleted =
-            !task.subtasks[subtaskIndex].isCompleted;
+        final subtask = task.subtasks[subtaskIndex];
+        final newValue = !subtask.isCompleted;
+        subtask.isCompleted = newValue;
+        await _taskDb.updateSubtaskStatus(subtask.id, newValue);
         notifyListeners();
       }
     }
@@ -268,6 +277,54 @@ class AppState extends ChangeNotifier {
   int get pendingTasks => tasks.where((t) => !t.isCompleted).length;
   List<Task> get upcomingTasks =>
       tasks.where((t) => !t.isCompleted).take(3).toList();
+  List<Task> get completedTaskList =>
+      tasks.where((t) => t.isCompleted).toList();
+
+  // Total subtasks completed across all tasks — used by TrackerScreen for points.
+  int get completedSubtasks => tasks.fold(
+        0,
+        (sum, t) => sum + t.subtasks.where((s) => s.isCompleted).length,
+      );
+
+  // Points: 10 per completed task, 5 per completed subtask.
+  int get totalPoints => (completedTasks * 10) + (completedSubtasks * 5);
+
+  // Consecutive-day streak based on completed_at timestamps.
+  // A day counts if at least one task was completed on it.
+  // The streak is alive if a task was completed today or yesterday;
+  // if the most recent completion was 2+ days ago, the streak is 0.
+  int get currentStreak {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    // Collect the unique calendar dates on which tasks were completed.
+    final completionDays = tasks
+        .where((t) => t.isCompleted && t.completedAt != null)
+        .map((t) {
+          final d = t.completedAt!;
+          return DateTime(d.year, d.month, d.day);
+        })
+        .toSet()
+        .toList()
+      ..sort((a, b) => b.compareTo(a)); // most-recent first
+
+    if (completionDays.isEmpty) return 0;
+
+    // Streak is broken if the last active day was more than 1 day ago.
+    final daysSinceLast = today.difference(completionDays.first).inDays;
+    if (daysSinceLast > 1) return 0;
+
+    int streak = 1;
+    for (int i = 1; i < completionDays.length; i++) {
+      final gap = completionDays[i - 1].difference(completionDays[i]).inDays;
+      if (gap == 1) {
+        streak++;
+      } else {
+        break;
+      }
+    }
+    return streak;
+  }
 
   // ----------------------------------------
   // Pomodoro Timer

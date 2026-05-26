@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/app_state.dart';
+import '../mood_tracker/mood_history_screen.dart';
 
 class MoodTrackerScreen extends StatelessWidget {
   const MoodTrackerScreen({super.key});
@@ -39,7 +40,23 @@ class MoodTrackerScreen extends StatelessWidget {
     return Consumer<AppState>(
       builder: (context, appState, _) {
         return Scaffold(
-          appBar: AppBar(title: const Text("Mood Tracker")),
+          appBar: AppBar(
+            title: const Text("Mood Tracker"),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.history),
+                tooltip: 'Mood History',
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const MoodHistoryScreen(),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
           body: Padding(
             padding: const EdgeInsets.all(16.0),
             child: Column(
@@ -115,35 +132,6 @@ class MoodTrackerScreen extends StatelessWidget {
                           fontSize: 18, color: Colors.blueAccent),
                     ),
                   ),
-
-                const SizedBox(height: 20),
-                const Text(
-                  "Mood History",
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-
-                // History sourced from AppState — always in sync
-                Expanded(
-                  child: appState.moodHistoryList.isEmpty
-                      ? const Center(child: Text("No mood history yet."))
-                      : ListView.builder(
-                          itemCount: appState.moodHistoryList.length,
-                          itemBuilder: (context, index) {
-                            final entry = appState.moodHistoryList[index];
-                            return ListTile(
-                              leading: Text(
-                                entry['emoji'] as String,
-                                style: const TextStyle(fontSize: 30),
-                              ),
-                              title: Text(entry['mood'] as String),
-                              subtitle: Text(
-                                "Date: ${(entry['date'] as String).split('T')[0]}",
-                              ),
-                            );
-                          },
-                        ),
-                ),
               ],
             ),
           ),

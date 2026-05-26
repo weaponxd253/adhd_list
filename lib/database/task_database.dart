@@ -8,7 +8,13 @@ class TaskDatabase {
     final db = await dbHelper.database;
     return await db.insert(
       'tasks',
-      {'title': title, 'due_date': dueDate, 'is_completed': 0, 'status': 'pending'},
+      {
+        'title': title,
+        'due_date': dueDate,
+        'is_completed': 0,
+        'status': 'pending',
+        'completed_at': null,
+      },
     );
   }
 
@@ -27,7 +33,9 @@ class TaskDatabase {
     );
   }
 
-  // Keeps is_completed and status in sync so reads after restart are correct.
+  // Keeps is_completed, status, and completed_at in sync.
+  // completed_at is stamped when the task is first marked done and cleared
+  // if the task is un-completed, so the streak reflects actual completion days.
   Future<void> updateTaskStatus(int taskId, String newStatus) async {
     final db = await dbHelper.database;
     await db.update(
@@ -35,6 +43,9 @@ class TaskDatabase {
       {
         'status': newStatus,
         'is_completed': newStatus == 'completed' ? 1 : 0,
+        'completed_at': newStatus == 'completed'
+            ? DateTime.now().toIso8601String()
+            : null,
       },
       where: 'id = ?',
       whereArgs: [taskId],
@@ -74,6 +85,17 @@ class TaskDatabase {
     return await db.update(
       'subtasks',
       {'title': newTitle},
+      where: 'id = ?',
+      whereArgs: [subtaskId],
+    );
+  }
+
+  // Persists subtask completion state. Called by AppState.toggleSubtaskCompletion.
+  Future<int> updateSubtaskStatus(int subtaskId, bool isCompleted) async {
+    final db = await dbHelper.database;
+    return await db.update(
+      'subtasks',
+      {'is_completed': isCompleted ? 1 : 0},
       where: 'id = ?',
       whereArgs: [subtaskId],
     );

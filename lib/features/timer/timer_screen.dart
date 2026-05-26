@@ -8,10 +8,20 @@ class TimerScreen extends StatefulWidget {
 }
 
 class _TimerScreenState extends State<TimerScreen> {
-  int _selectedModeIndex = 0; // 0: Focus, 1: Short Break, 2: Long Break
   final List<String> _modes = ["Focus", "Short Break", "Long Break"];
   final List<IconData> _modeIcons = [Icons.work, Icons.coffee, Icons.bed];
   final List<Color> _modeColors = [Colors.green, Colors.blue, Colors.orange];
+
+  // Initialised from AppState so switching tabs doesn't reset the mode display.
+  late int _selectedModeIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    final appState = Provider.of<AppState>(context, listen: false);
+    final idx = _modes.indexOf(appState.currentMode);
+    _selectedModeIndex = idx >= 0 ? idx : 0;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -25,14 +35,14 @@ class _TimerScreenState extends State<TimerScreen> {
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center, // Center content vertically
-            crossAxisAlignment: CrossAxisAlignment.center, // Center content horizontally
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               _buildModeSelector(appState),
-              SizedBox(height: 30),
+              const SizedBox(height: 30),
               _buildTimerDisplay(appState),
-              SizedBox(height: 30),
-              _buildTimerControls(appState), // Enhanced timer controls
+              const SizedBox(height: 30),
+              _buildTimerControls(appState),
             ],
           ),
         ),
@@ -46,19 +56,19 @@ class _TimerScreenState extends State<TimerScreen> {
   Widget _buildModeSelector(AppState appState) {
     return Column(
       children: [
-        Text(
+        const Text(
           "Select Mode",
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
-        SizedBox(height: 10),
+        const SizedBox(height: 10),
         ToggleButtons(
           isSelected: List.generate(3, (index) => index == _selectedModeIndex),
           onPressed: (index) {
             setState(() {
               _selectedModeIndex = index;
-              appState.setMode(_modes[index]); // Update mode in app state
-              appState.updateTimerDuration(_modes[index]);
             });
+            appState.setMode(_modes[index]);
+            appState.updateTimerDuration(_modes[index]);
           },
           borderRadius: BorderRadius.circular(8),
           selectedColor: Colors.white,
@@ -70,7 +80,7 @@ class _TimerScreenState extends State<TimerScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(_modeIcons[index]),
-                  SizedBox(height: 4),
+                  const SizedBox(height: 4),
                   Text(_modes[index]),
                 ],
               ),
@@ -95,7 +105,7 @@ class _TimerScreenState extends State<TimerScreen> {
             color: _modeColors[_selectedModeIndex],
           ),
         ),
-        SizedBox(height: 10),
+        const SizedBox(height: 10),
         CircularProgressIndicator(
           value: appState.progress,
           strokeWidth: 8,
@@ -114,34 +124,34 @@ class _TimerScreenState extends State<TimerScreen> {
       children: [
         ElevatedButton(
           onPressed: appState.isTimerRunning
-              ? null // Disable "Start" if already running
+              ? null
               : () => appState.startTimer(_modes[_selectedModeIndex] == "Focus"),
-          child: Text(appState.isTimerRunning ? "Running" : "Start"),
           style: ElevatedButton.styleFrom(
             backgroundColor: _modeColors[_selectedModeIndex],
-            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            textStyle: TextStyle(fontSize: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            textStyle: const TextStyle(fontSize: 16),
           ),
+          child: Text(appState.isTimerRunning ? "Running" : "Start"),
         ),
-        SizedBox(width: 10),
+        const SizedBox(width: 10),
         ElevatedButton(
-          onPressed: appState.isTimerRunning ? appState.pauseTimer : null, // Enable only if running
-          child: Text("Pause"),
+          onPressed: appState.isTimerRunning ? appState.pauseTimer : null,
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.amber,
-            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            textStyle: TextStyle(fontSize: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            textStyle: const TextStyle(fontSize: 16),
           ),
+          child: const Text("Pause"),
         ),
-        SizedBox(width: 10),
+        const SizedBox(width: 10),
         ElevatedButton(
-          onPressed: appState.resetTimer, // Reset timer
-          child: Text("Reset"),
+          onPressed: appState.resetTimer,
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.red,
-            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            textStyle: TextStyle(fontSize: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            textStyle: const TextStyle(fontSize: 16),
           ),
+          child: const Text("Reset"),
         ),
       ],
     );

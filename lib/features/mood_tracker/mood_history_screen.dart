@@ -1,57 +1,47 @@
 import 'package:flutter/material.dart';
-import '../../database/mood_database.dart';
+import 'package:provider/provider.dart';
+import '../../providers/app_state.dart';
 
-class MoodHistoryScreen extends StatefulWidget {
-  @override
-  _MoodHistoryScreenState createState() => _MoodHistoryScreenState();
-}
-
-class _MoodHistoryScreenState extends State<MoodHistoryScreen> {
-  final MoodDatabase moodDb = MoodDatabase.instance;
-  List<Map<String, dynamic>> _moodHistory = [];
-
-  @override
-  void initState() {
-    super.initState();
-    _loadMoodHistory();
-  }
-
-  Future<void> _loadMoodHistory() async {
-    final moods = await moodDb.fetchMoods();
-    setState(() {
-      _moodHistory = moods;
-    });
-
-    print("Mood history loaded: $_moodHistory");
-  }
+// Refactored to read from AppState.moodHistoryList instead of querying
+// MoodDatabase directly. This keeps it consistent with the rest of the app
+// and means it automatically reflects any mood logged in the same session.
+class MoodHistoryScreen extends StatelessWidget {
+  const MoodHistoryScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text("Mood History"),
-      ),
-      body: _moodHistory.isEmpty
-          ? Center(child: Text("No mood history yet."))
-          : ListView.builder(
-              itemCount: _moodHistory.length,
-              itemBuilder: (context, index) {
-                final moodEntry = _moodHistory[index];
-                return ListTile(
-                  leading: Text(
-                    moodEntry['emoji'] ?? '😊',
-                    style: TextStyle(fontSize: 24),
-                  ),
-                  title: Text(
-                    moodEntry['mood'] ?? 'Unknown mood',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  subtitle: Text(
-                    "Date: ${moodEntry['date'].split('T')[0]}",
-                  ),
-                );
-              },
-            ),
+    return Consumer<AppState>(
+      builder: (context, appState, _) {
+        final history = appState.moodHistoryList;
+
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text("Mood History"),
+          ),
+          body: history.isEmpty
+              ? const Center(child: Text("No mood history yet."))
+              : ListView.builder(
+                  itemCount: history.length,
+                  itemBuilder: (context, index) {
+                    final entry = history[index];
+                    final rawDate = entry['date'] as String;
+                    final datePart = rawDate.split('T')[0];
+
+                    return ListTile(
+                      leading: Text(
+                        entry['emoji'] as String? ?? '😊',
+                        style: const TextStyle(fontSize: 24),
+                      ),
+                      title: Text(
+                        entry['mood'] as String? ?? 'Unknown mood',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      subtitle: Text("Date: $datePart"),
+                    );
+                  },
+                ),
+        );
+      },
     );
   }
 }

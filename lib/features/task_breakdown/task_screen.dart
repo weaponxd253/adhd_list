@@ -4,20 +4,42 @@ import '../../providers/app_state.dart';
 import 'task_input_section.dart';
 import 'task_list_section.dart';
 
-class TaskScreen extends StatelessWidget {
-  final TextEditingController taskController = TextEditingController();
+// Changed to StatefulWidget so _taskController is properly disposed.
+// The previous StatelessWidget version created a controller that was never
+// disposed, leaking resources on every rebuild.
+class TaskScreen extends StatefulWidget {
+  const TaskScreen({super.key});
+
+  @override
+  _TaskScreenState createState() => _TaskScreenState();
+}
+
+class _TaskScreenState extends State<TaskScreen> {
+  late final TextEditingController _taskController;
+
+  @override
+  void initState() {
+    super.initState();
+    _taskController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _taskController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Task Breakdown")),
+      appBar: AppBar(title: const Text("Task Breakdown")),
       body: Column(
         children: [
-          TaskInputSection(taskController: taskController),
+          TaskInputSection(taskController: _taskController),
           Expanded(
-            child: Consumer<AppState>( // 👈 Add this to listen for changes
+            child: Consumer<AppState>(
               builder: (context, appState, child) {
-                return TaskListSection(tasks: appState.tasks); // Pass updated tasks
+                return TaskListSection(tasks: appState.tasks);
               },
             ),
           ),
@@ -26,4 +48,3 @@ class TaskScreen extends StatelessWidget {
     );
   }
 }
-
