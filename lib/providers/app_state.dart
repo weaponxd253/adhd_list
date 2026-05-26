@@ -10,35 +10,40 @@ class AppState extends ChangeNotifier {
   AppState() {
     loadLastMood();
     _loadTasksFromDatabase();
+    loadMoodHistory();
   }
+
   // ----------------------------------------
   // Fields
   // ----------------------------------------
 
-  //Theme
+  // Theme
   ThemeMode _themeMode = ThemeMode.light;
+
   // Task Management
   List<Task> tasks = [];
-
   final TaskDatabase _taskDb = TaskDatabase();
 
   // Pomodoro Timer
   bool isTimerRunning = false;
   String currentMode = "Focus";
-  int remainingTime = 1500; // Remaining time in seconds
-  int focusDuration = 25; // in minutes
-  int shortBreakDuration = 5; // in minutes
-  int longBreakDuration = 15; // in minutes
+  int remainingTime = 1500;
+  int focusDuration = 25;
+  int shortBreakDuration = 5;
+  int longBreakDuration = 15;
   int _currentDuration = 0;
   Timer? _timer;
 
   // Mood Tracking
   String _selectedMood = '';
   String _selectedMoodEmoji = '';
-  List<Map<String, String>> moodHistory = [];
+  List<Map<String, dynamic>> _moodHistory = [];
+
+  List<Map<String, dynamic>> get moodHistoryList => _moodHistory;
+
   final Map<String, String> moodMessages = {
     "Hopeful":
-        "It’s wonderful to feel hope! Nurture it by thinking of one small step you can take toward your goal today.",
+        "It's wonderful to feel hope! Nurture it by thinking of one small step you can take toward your goal today.",
     "Triggered":
         "Take a deep breath. It's okay to feel this way. Ground yourself by focusing on something you can see, touch, hear, or smell.",
     "Calm":
@@ -46,9 +51,9 @@ class AppState extends ChangeNotifier {
     "Mindful":
         "Notice the details around you. How does your body feel? Mindfulness can be powerful for well-being.",
     "Empowered":
-        "You’ve got this! Use this energy to take a step forward. What will you accomplish today?",
+        "You've got this! Use this energy to take a step forward. What will you accomplish today?",
     "Vulnerable":
-        "Being vulnerable takes courage. Remember, it’s okay to lean on others for support when you need it.",
+        "Being vulnerable takes courage. Remember, it's okay to lean on others for support when you need it.",
     "Validated":
         "Feeling seen and understood can be incredibly comforting. Take a moment to appreciate this.",
     "Grounded":
@@ -58,11 +63,11 @@ class AppState extends ChangeNotifier {
     "Optimistic":
         "Optimism lights the way forward! Keep this positive outlook and share it with others when you can.",
     "Distracted":
-        "It’s okay to feel scattered. Try a quick reset: close your eyes, breathe deeply, and focus on one small task.",
+        "It's okay to feel scattered. Try a quick reset: close your eyes, breathe deeply, and focus on one small task.",
     "Grieving":
         "Grief takes time. Allow yourself to feel it without judgment. Reach out to loved ones or take a gentle step toward healing.",
     "Rejected":
-        "Rejection hurts, but remember: it doesn’t define you. You are worthy and valued just as you are.",
+        "Rejection hurts, but remember: it doesn't define you. You are worthy and valued just as you are.",
     "Accepted":
         "Acceptance is a beautiful thing. Celebrate who you are and the journey that brought you here.",
     "Lonely":
@@ -70,9 +75,9 @@ class AppState extends ChangeNotifier {
     "Burnt Out":
         "Burnout is a sign to slow down. Prioritize rest and ask for help where you can. Your well-being matters.",
     "Resilient":
-        "You’ve come through so much. Honor your resilience and think about what’s helped you stay strong.",
+        "You've come through so much. Honor your resilience and think about what's helped you stay strong.",
     "Centered":
-        "Being centered helps us weather life’s storms. Carry this feeling with you as a reminder of your strength.",
+        "Being centered helps us weather life's storms. Carry this feeling with you as a reminder of your strength.",
     "Panicked":
         "Panic can feel overwhelming. Try to breathe deeply and ground yourself by counting backward from ten.",
     "Encouraged":
@@ -84,9 +89,9 @@ class AppState extends ChangeNotifier {
     "Content":
         "Contentment brings balance. Take a deep breath and appreciate the small things that bring you joy.",
     "Irritable":
-        "Irritability is natural. Take a step back and identify what’s bothering you. Gentle self-care can help.",
+        "Irritability is natural. Take a step back and identify what's bothering you. Gentle self-care can help.",
     "Supported":
-        "You’re not alone. Lean into this support, and remember to appreciate those who uplift you.",
+        "You're not alone. Lean into this support, and remember to appreciate those who uplift you.",
     "Relaxed":
         "Take this moment to enjoy the calm. Let yourself unwind and recharge for what's ahead.",
     "Joyful":
@@ -104,7 +109,7 @@ class AppState extends ChangeNotifier {
     "Angry":
         "Anger can be powerful if directed positively. Pause, breathe, and think about how you can act constructively.",
     "Worried":
-        "Worry is natural. Focus on what you can control and remind yourself that you’re capable of overcoming challenges.",
+        "Worry is natural. Focus on what you can control and remind yourself that you're capable of overcoming challenges.",
     "Connected":
         "Connection is a gift. Cherish the moments you share with those around you.",
     "Numb":
@@ -118,7 +123,7 @@ class AppState extends ChangeNotifier {
     "Peaceful":
         "Peace brings clarity. Take a moment to bask in this state and appreciate the serenity around you.",
     "Strong":
-        "You’ve got this! Strength is not just physical but mental and emotional too. Keep pushing forward.",
+        "You've got this! Strength is not just physical but mental and emotional too. Keep pushing forward.",
     "Celebratory":
         "Celebrate your wins, big or small. Every step forward deserves recognition and joy.",
     "Confused":
@@ -134,100 +139,86 @@ class AppState extends ChangeNotifier {
     "Intuitive":
         "Trust your instincts. Your intuition is guiding you toward what feels right.",
     "Grateful":
-        "Gratitude brings perspective. Reflect on the things you’re thankful for, no matter how small.",
+        "Gratitude brings perspective. Reflect on the things you're thankful for, no matter how small.",
   };
 
   // ----------------------------------------
-  // Theme Changer
+  // Theme
   // ----------------------------------------
+
   ThemeMode get themeMode => _themeMode;
 
   void toggleTheme() {
     _themeMode =
         _themeMode == ThemeMode.light ? ThemeMode.dark : ThemeMode.light;
-    notifyListeners(); // Notify UI to rebuild
-  }
-
-  // ----------------------------------------
-  // Task Management Methods
-  // ----------------------------------------
-
-  void addTask(String title, DateTime dueDate) async {
-    await _taskDb.insertTask(title, dueDate.toIso8601String()); // Save to DB
-    _loadTasksFromDatabase(); // Reload from DB
-  }
-
-  void clearTaskHistory() async {
-    await _taskDb.clearTasks(); // Ensure this method exists in TaskDatabase
-    tasks.clear();
     notifyListeners();
   }
 
-  void clearMoodHistory() async {
-    await MoodDatabase.instance
-        .clearMoods(); // Ensure this method exists in MoodDatabase
-    moodHistory.clear();
+  // ----------------------------------------
+  // Task Management
+  // ----------------------------------------
+
+  void addTask(String title, DateTime dueDate) async {
+    await _taskDb.insertTask(title, dueDate.toIso8601String());
+    _loadTasksFromDatabase();
+  }
+
+  void clearTaskHistory() async {
+    await _taskDb.clearTasks();
+    tasks.clear();
     notifyListeners();
   }
 
   void editTask(int taskId, String newTitle, DateTime newDueDate) async {
     await _taskDb.editTask(taskId, newTitle, newDueDate.toIso8601String());
-    _loadTasksFromDatabase(); // Reload tasks after updating
+    _loadTasksFromDatabase();
   }
 
   void deleteTask(int taskId) async {
     await _taskDb.deleteTask(taskId);
-    _loadTasksFromDatabase(); // Reload tasks after deleting
+    _loadTasksFromDatabase();
   }
 
   void editSubtask(int taskIndex, int subtaskIndex, String newTitle) async {
     if (taskIndex >= 0 && taskIndex < tasks.length) {
-      Task task = tasks[taskIndex];
+      final task = tasks[taskIndex];
       if (subtaskIndex >= 0 && subtaskIndex < task.subtasks.length) {
-        Subtask subtask = task.subtasks[subtaskIndex];
-
-        await _taskDb.updateSubtask(subtask.id, newTitle); //  Update in DB
-        subtask.title = newTitle; //  Update locally
-        notifyListeners(); // Refresh UI
+        final subtask = task.subtasks[subtaskIndex];
+        await _taskDb.updateSubtask(subtask.id, newTitle);
+        subtask.title = newTitle;
+        notifyListeners();
       }
     }
   }
 
   void deleteSubtask(int taskIndex, int subtaskIndex) async {
     if (taskIndex >= 0 && taskIndex < tasks.length) {
-      Task task = tasks[taskIndex];
+      final task = tasks[taskIndex];
       if (subtaskIndex >= 0 && subtaskIndex < task.subtasks.length) {
-        Subtask subtask = task.subtasks[subtaskIndex];
-
-        await _taskDb.deleteSubtask(subtask.id); // Delete from DB
-        task.subtasks.removeAt(subtaskIndex); //  Remove from local list
-
-        notifyListeners(); // Refresh UI
+        final subtask = task.subtasks[subtaskIndex];
+        await _taskDb.deleteSubtask(subtask.id);
+        task.subtasks.removeAt(subtaskIndex);
+        notifyListeners();
       }
     }
   }
 
   void _loadTasksFromDatabase() async {
     final fetchedTasks = await _taskDb.fetchTasks();
-
     tasks = [];
-    for (var t in fetchedTasks) {
-      List<Map<String, dynamic>> subtaskData =
-          await _taskDb.fetchSubtasks(t['id']);
-
-      List<Subtask> subtasks =
-          subtaskData.map((s) => Subtask.fromMap(s)).toList();
-
+    for (final t in fetchedTasks) {
+      final subtaskData = await _taskDb.fetchSubtasks(t['id']);
+      final subtasks = subtaskData.map((s) => Subtask.fromMap(s)).toList();
       tasks.add(Task(
         id: t['id'],
         title: t['title'],
         dueDate: DateTime.parse(t['due_date']),
-        status: t['is_completed'] == 1 ? "completed" : "pending",
+        // is_completed is always in sync with status (fixed in TaskDatabase)
+        status: t['is_completed'] == 1 ? 'completed' : 'pending',
         subtasks: subtasks,
       ));
     }
-
-    notifyListeners(); // Refresh UI
+    notifyListeners();
   }
 
   void removeTask(int taskIndex) {
@@ -239,66 +230,58 @@ class AppState extends ChangeNotifier {
 
   void toggleTaskCompletion(int taskIndex) async {
     if (taskIndex >= 0 && taskIndex < tasks.length) {
-      Task task = tasks[taskIndex];
-
-      // Toggle between "completed" and "pending"
-      String newStatus = task.isCompleted ? "pending" : "completed";
-
-      await _taskDb.updateTaskStatus(task.id, newStatus); // Update database
-
-      task.status = newStatus; // Update local task object
-      notifyListeners(); // Refresh UI
+      final task = tasks[taskIndex];
+      final newStatus = task.isCompleted ? 'pending' : 'completed';
+      await _taskDb.updateTaskStatus(task.id, newStatus);
+      task.status = newStatus;
+      notifyListeners();
     }
   }
 
   void updateTaskStatus(int taskId, String newStatus) async {
-    await _taskDb.updateTaskStatus(taskId, newStatus); //  Update in database
-    _loadTasksFromDatabase(); // Refresh task list
+    await _taskDb.updateTaskStatus(taskId, newStatus);
+    _loadTasksFromDatabase();
   }
 
   void addSubtask(int taskIndex, String subtaskTitle) async {
     if (taskIndex >= 0 && taskIndex < tasks.length) {
-      Task task = tasks[taskIndex];
-
-      int subtaskId =
-          await _taskDb.insertSubtask(task.id, subtaskTitle); // ✅ Save in DB
-      task.subtasks.add(
-          Subtask(id: subtaskId, title: subtaskTitle)); // ✅ Add to local list
-
-      notifyListeners(); // Refresh UI
+      final task = tasks[taskIndex];
+      final subtaskId = await _taskDb.insertSubtask(task.id, subtaskTitle);
+      task.subtasks.add(Subtask(id: subtaskId, title: subtaskTitle));
+      notifyListeners();
     }
   }
 
   void toggleSubtaskCompletion(int taskIndex, int subtaskIndex) {
     if (taskIndex >= 0 && taskIndex < tasks.length) {
-      Task task = tasks[taskIndex];
+      final task = tasks[taskIndex];
       if (subtaskIndex >= 0 && subtaskIndex < task.subtasks.length) {
-        task.subtasks[subtaskIndex].isCompleted = !task
-            .subtasks[subtaskIndex].isCompleted; // ✅ Toggle subtask completion
+        task.subtasks[subtaskIndex].isCompleted =
+            !task.subtasks[subtaskIndex].isCompleted;
         notifyListeners();
       }
     }
   }
 
   int get totalTasks => tasks.length;
-  int get completedTasks => tasks.where((task) => task.isCompleted).length;
-  int get pendingTasks => tasks.where((task) => !task.isCompleted).length;
+  int get completedTasks => tasks.where((t) => t.isCompleted).length;
+  int get pendingTasks => tasks.where((t) => !t.isCompleted).length;
   List<Task> get upcomingTasks =>
-      tasks.where((task) => !task.isCompleted).take(3).toList();
+      tasks.where((t) => !t.isCompleted).take(3).toList();
 
   // ----------------------------------------
-  // Pomodoro Timer Methods
+  // Pomodoro Timer
   // ----------------------------------------
 
   void updateTimerDuration(String mode) {
     switch (mode) {
-      case "Focus":
+      case 'Focus':
         _currentDuration = focusDuration * 60;
         break;
-      case "Short Break":
+      case 'Short Break':
         _currentDuration = shortBreakDuration * 60;
         break;
-      case "Long Break":
+      case 'Long Break':
         _currentDuration = longBreakDuration * 60;
         break;
       default:
@@ -308,11 +291,10 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void startTimer([bool? bool]) {
+  void startTimer([bool? isFocus]) {
     if (isTimerRunning) return;
-
     isTimerRunning = true;
-    _timer = Timer.periodic(Duration(seconds: 1), (timer) {
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (remainingTime > 0) {
         remainingTime--;
         notifyListeners();
@@ -343,64 +325,25 @@ class AppState extends ChangeNotifier {
   }
 
   void switchToNextMode() {
-    if (currentMode == "Focus") {
-      currentMode = "Short Break";
-    } else if (currentMode == "Short Break") {
-      currentMode = "Long Break";
+    if (currentMode == 'Focus') {
+      currentMode = 'Short Break';
+    } else if (currentMode == 'Short Break') {
+      currentMode = 'Long Break';
     } else {
-      currentMode = "Focus";
+      currentMode = 'Focus';
     }
-    updateTimerDuration(currentMode); // Update the timer for the new mode
+    updateTimerDuration(currentMode);
     notifyListeners();
   }
 
   String get timerDisplay {
     final minutes = (remainingTime ~/ 60).toString().padLeft(2, '0');
     final seconds = (remainingTime % 60).toString().padLeft(2, '0');
-    return "$minutes:$seconds";
+    return '$minutes:$seconds';
   }
 
   double get progress =>
       _currentDuration == 0 ? 0 : remainingTime / _currentDuration;
-
-  // ----------------------------------------
-  // Mood Tracking Methods
-  // ----------------------------------------
-
-  String get selectedMood => _selectedMood;
-  String get selectedMoodEmoji => _selectedMoodEmoji;
-
-  void setMood(String mood, String emoji) async {
-    _selectedMood = mood;
-    _selectedMoodEmoji = emoji;
-    notifyListeners(); // Notify UI of state changes
-    await MoodDatabase.instance.updateLastMood(mood, emoji);
-
-    await MoodDatabase.instance.insertMood(mood, emoji);
-
-    // Fetch the latest mood from the database to ensure it's current
-    await loadLastMood();
-  }
-
-  Future<void> loadLastMood() async {
-    final lastMood = await MoodDatabase.instance.fetchLastMood();
-
-    if (lastMood != null) {
-      _selectedMood = lastMood['mood'];
-      _selectedMoodEmoji = lastMood['emoji'];
-    } else {
-      _selectedMood = '';
-      _selectedMoodEmoji = '';
-    }
-
-    notifyListeners();
-  }
-
-  String get moodMessage => moodMessages[_selectedMood] ?? 'No mood selected.';
-
-  // ----------------------------------------
-  // Utility Methods
-  // ----------------------------------------
 
   void setMode(String mode) {
     currentMode = mode;
@@ -409,14 +352,57 @@ class AppState extends ChangeNotifier {
 
   int getCurrentDuration() {
     switch (currentMode) {
-      case "Focus":
+      case 'Focus':
         return focusDuration;
-      case "Short Break":
+      case 'Short Break':
         return shortBreakDuration;
-      case "Long Break":
+      case 'Long Break':
         return longBreakDuration;
       default:
         return focusDuration;
     }
+  }
+
+  // ----------------------------------------
+  // Mood Tracking
+  // ----------------------------------------
+
+  String get selectedMood => _selectedMood;
+  String get selectedMoodEmoji => _selectedMoodEmoji;
+  String get moodMessage => moodMessages[_selectedMood] ?? 'No mood selected.';
+
+  /// Saves a mood entry and refreshes the in-memory history.
+  /// Single insert — no delete-all/re-insert race condition.
+  void setMood(String mood, String emoji) async {
+    _selectedMood = mood;
+    _selectedMoodEmoji = emoji;
+    notifyListeners();
+    await MoodDatabase.instance.insertMood(mood, emoji);
+    await loadMoodHistory();
+  }
+
+  Future<void> loadLastMood() async {
+    final lastMood = await MoodDatabase.instance.fetchLastMood();
+    if (lastMood != null) {
+      _selectedMood = lastMood['mood'] as String;
+      _selectedMoodEmoji = lastMood['emoji'] as String;
+    } else {
+      _selectedMood = '';
+      _selectedMoodEmoji = '';
+    }
+    notifyListeners();
+  }
+
+  Future<void> loadMoodHistory() async {
+    _moodHistory = await MoodDatabase.instance.fetchMoods();
+    notifyListeners();
+  }
+
+  void clearMoodHistory() async {
+    await MoodDatabase.instance.clearMoods();
+    _moodHistory = [];
+    _selectedMood = '';
+    _selectedMoodEmoji = '';
+    notifyListeners();
   }
 }
