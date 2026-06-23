@@ -6,137 +6,189 @@ import '../mood_tracker/mood_history_screen.dart';
 class MoodTrackerScreen extends StatelessWidget {
   const MoodTrackerScreen({super.key});
 
-  static const List<Map<String, String>> _moodOptions = [
-    {"emoji": "🌱", "label": "Hopeful"},
-    {"emoji": "⚠️", "label": "Triggered"},
-    {"emoji": "🧘", "label": "Calm"},
-    {"emoji": "🧠", "label": "Mindful"},
-    {"emoji": "✊", "label": "Empowered"},
-    {"emoji": "💧", "label": "Vulnerable"},
-    {"emoji": "🤗", "label": "Validated"},
-    {"emoji": "🌍", "label": "Grounded"},
-    {"emoji": "❄️", "label": "Disconnected"},
-    {"emoji": "🌞", "label": "Optimistic"},
-    {"emoji": "🌀", "label": "Distracted"},
-    {"emoji": "🖤", "label": "Grieving"},
-    {"emoji": "🚫", "label": "Rejected"},
-    {"emoji": "💖", "label": "Accepted"},
-    {"emoji": "🔥", "label": "Burnt Out"},
-    {"emoji": "💬", "label": "Encouraged"},
-    {"emoji": "✨", "label": "Inspired"},
-    {"emoji": "😌", "label": "Relaxed"},
-    {"emoji": "😃", "label": "Joyful"},
-    {"emoji": "😔", "label": "Sad"},
-    {"emoji": "😤", "label": "Frustrated"},
-    {"emoji": "😨", "label": "Anxious"},
-    {"emoji": "🤩", "label": "Excited"},
-    {"emoji": "😡", "label": "Angry"},
-    {"emoji": "😟", "label": "Worried"},
-    {"emoji": "🍀", "label": "Grateful"},
+  static const _moods = [
+    {'e': '🌱', 'l': 'Hopeful'},
+    {'e': '🧘', 'l': 'Calm'},
+    {'e': '🌞', 'l': 'Optimistic'},
+    {'e': '😃', 'l': 'Joyful'},
+    {'e': '🤩', 'l': 'Excited'},
+    {'e': '✨', 'l': 'Inspired'},
+    {'e': '✊', 'l': 'Empowered'},
+    {'e': '🍀', 'l': 'Grateful'},
+    {'e': '😌', 'l': 'Relaxed'},
+    {'e': '🧠', 'l': 'Mindful'},
+    {'e': '🌍', 'l': 'Grounded'},
+    {'e': '🤗', 'l': 'Validated'},
+    {'e': '💬', 'l': 'Encouraged'},
+    {'e': '💖', 'l': 'Accepted'},
+    {'e': '😔', 'l': 'Sad'},
+    {'e': '😟', 'l': 'Worried'},
+    {'e': '😨', 'l': 'Anxious'},
+    {'e': '😤', 'l': 'Frustrated'},
+    {'e': '😡', 'l': 'Angry'},
+    {'e': '💧', 'l': 'Vulnerable'},
+    {'e': '❄️', 'l': 'Disconnected'},
+    {'e': '🌀', 'l': 'Distracted'},
+    {'e': '🔥', 'l': 'Burnt Out'},
+    {'e': '⚠️', 'l': 'Triggered'},
+    {'e': '🚫', 'l': 'Rejected'},
+    {'e': '🖤', 'l': 'Grieving'},
   ];
 
   @override
   Widget build(BuildContext context) {
     return Consumer<AppState>(
       builder: (context, appState, _) {
+        final cs = Theme.of(context).colorScheme;
+        final selected = appState.selectedMood;
+
         return Scaffold(
           appBar: AppBar(
-            title: const Text("Mood Tracker"),
+            title: const Text('Mood'),
             actions: [
               IconButton(
-                icon: const Icon(Icons.history),
-                tooltip: 'Mood History',
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const MoodHistoryScreen(),
-                    ),
-                  );
-                },
+                icon: const Icon(Icons.history_rounded),
+                tooltip: 'Mood history',
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const MoodHistoryScreen()),
+                ),
               ),
             ],
           ),
-          body: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  "How are you feeling today?",
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 20),
-
-                // Mood picker
-                Expanded(
-                  child: ListView.builder(
-                    itemCount: _moodOptions.length,
-                    itemBuilder: (context, index) {
-                      final mood = _moodOptions[index];
-                      final isSelected =
-                          appState.selectedMood == mood["label"];
-                      return GestureDetector(
-                        onTap: () {
-                          appState.setMood(mood["label"]!, mood["emoji"]!);
-                          if (Navigator.canPop(context)) {
-                            Navigator.pop(context, true);
-                          }
-                        },
-                        child: Container(
-                          margin: const EdgeInsets.symmetric(vertical: 5),
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? Colors.blue[100]
-                                : Colors.grey[200],
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                              color: isSelected
-                                  ? Colors.blueAccent
-                                  : Colors.grey,
-                              width: 2,
+          body: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Current mood banner
+              if (selected.isNotEmpty)
+                Container(
+                  margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: cs.primary.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: cs.primary.withOpacity(0.2)),
+                  ),
+                  child: Row(
+                    children: [
+                      Text(appState.selectedMoodEmoji,
+                          style: const TextStyle(fontSize: 28)),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              selected,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleMedium
+                                  ?.copyWith(color: cs.primary),
                             ),
-                          ),
-                          child: Row(
-                            children: [
-                              Text(mood["emoji"]!,
-                                  style: const TextStyle(fontSize: 30)),
-                              const SizedBox(width: 10),
-                              Text(
-                                mood["label"]!,
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  color: isSelected
-                                      ? Colors.blueAccent
-                                      : Colors.black,
-                                  fontWeight: isSelected
-                                      ? FontWeight.bold
-                                      : FontWeight.normal,
-                                ),
-                              ),
-                            ],
-                          ),
+                            Text(
+                              appState.moodMessage,
+                              style: Theme.of(context).textTheme.bodySmall,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
                         ),
-                      );
-                    },
+                      ),
+                    ],
                   ),
                 ),
 
-                if (appState.selectedMood.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 16.0),
-                    child: Text(
-                      "Selected Mood: ${appState.selectedMoodEmoji} ${appState.selectedMood}",
-                      style: const TextStyle(
-                          fontSize: 18, color: Colors.blueAccent),
-                    ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: Text(
+                  'How are you feeling?',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
+
+              // 3-column grid
+              Expanded(
+                child: GridView.builder(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    childAspectRatio: 1.1,
+                    crossAxisSpacing: 10,
+                    mainAxisSpacing: 10,
                   ),
-              ],
-            ),
+                  itemCount: _moods.length,
+                  itemBuilder: (context, i) {
+                    final mood = _moods[i];
+                    final isSelected = selected == mood['l'];
+                    return _MoodCell(
+                      emoji: mood['e']!,
+                      label: mood['l']!,
+                      isSelected: isSelected,
+                      onTap: () => appState.setMood(mood['l']!, mood['e']!),
+                    );
+                  },
+                ),
+              ),
+            ],
           ),
         );
       },
+    );
+  }
+}
+
+class _MoodCell extends StatelessWidget {
+  final String emoji;
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+  const _MoodCell({
+    required this.emoji,
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? cs.primary.withOpacity(0.12)
+              : (isDark ? const Color(0xFF1A1A2E) : Colors.white),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isSelected ? cs.primary : (isDark ? const Color(0xFF2D2D44) : const Color(0xFFE4E4F0)),
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(emoji, style: const TextStyle(fontSize: 28)),
+            const SizedBox(height: 5),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                color: isSelected
+                    ? cs.primary
+                    : Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

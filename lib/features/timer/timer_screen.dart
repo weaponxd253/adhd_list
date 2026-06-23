@@ -1,159 +1,346 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/app_state.dart';
 
 class TimerScreen extends StatefulWidget {
+  const TimerScreen({super.key});
   @override
   _TimerScreenState createState() => _TimerScreenState();
 }
 
-class _TimerScreenState extends State<TimerScreen> {
-  final List<String> _modes = ["Focus", "Short Break", "Long Break"];
-  final List<IconData> _modeIcons = [Icons.work, Icons.coffee, Icons.bed];
-  final List<Color> _modeColors = [Colors.green, Colors.blue, Colors.orange];
+class _TimerScreenState extends State<TimerScreen> with SingleTickerProviderStateMixin {
+  static const _modes = ['Focus', 'Short Break', 'Long Break'];
+  static const _modeEmojis = ['🎯', '☕', '😴'];
+  static const _modeColors = [
+    Color(0xFF5B5BD6),
+    Color(0xFF0EA5E9),
+    Color(0xFF8B5CF6),
+  ];
 
-  // Initialised from AppState so switching tabs doesn't reset the mode display.
-  late int _selectedModeIndex;
+  late int _modeIndex;
+  late AnimationController _pulseController;
 
   @override
   void initState() {
     super.initState();
     final appState = Provider.of<AppState>(context, listen: false);
     final idx = _modes.indexOf(appState.currentMode);
-    _selectedModeIndex = idx >= 0 ? idx : 0;
+    _modeIndex = idx >= 0 ? idx : 0;
+
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final appState = Provider.of<AppState>(context);
+    final color = _modeColors[_modeIndex];
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Pomodoro Timer"),
-      ),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              _buildModeSelector(appState),
-              const SizedBox(height: 30),
-              _buildTimerDisplay(appState),
-              const SizedBox(height: 30),
-              _buildTimerControls(appState),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+      appBar: AppBar(title: const Text('Timer')),
+      body: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Column(
+          children: [
+            const SizedBox(height: 24),
 
-  // ----------------------------------------
-  // Mode Selector Widget
-  // ----------------------------------------
-  Widget _buildModeSelector(AppState appState) {
-    return Column(
-      children: [
-        const Text(
-          "Select Mode",
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 10),
-        ToggleButtons(
-          isSelected: List.generate(3, (index) => index == _selectedModeIndex),
-          onPressed: (index) {
-            setState(() {
-              _selectedModeIndex = index;
-            });
-            appState.setMode(_modes[index]);
-            appState.updateTimerDuration(_modes[index]);
-          },
-          borderRadius: BorderRadius.circular(8),
-          selectedColor: Colors.white,
-          fillColor: _modeColors[_selectedModeIndex],
-          children: List.generate(3, (index) {
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
+            // ── Mode selector ────────────────────────────────────────
+            Container(
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1A1A2E) : const Color(0xFFF0F0FA),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              padding: const EdgeInsets.all(4),
+              child: Row(
+                children: List.generate(_modes.length, (i) {
+                  final sel = i == _modeIndex;
+                  return Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        setState(() => _modeIndex = i);
+                        appState.setMode(_modes[i]);
+                        appState.updateTimerDuration(_modes[i]);
+                      },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        decoration: BoxDecoration(
+                          color: sel ? _modeColors[i] : Colors.transparent,
+                          borderRadius: BorderRadius.circular(10),
+                          boxShadow: sel
+                              ? [BoxShadow(color: _modeColors[i].withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 2))]
+                              : [],
+                        ),
+                        child: Column(
+                          children: [
+                            Text(_modeEmojis[i], style: const TextStyle(fontSize: 16)),
+                            const SizedBox(height: 2),
+                            Text(
+                              _modes[i],
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: sel ? Colors.white : Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+              ),
+            ),
+
+            const SizedBox(height: 48),
+
+            // ── Circular timer ───────────────────────────────────────
+            SizedBox(
+              width: 240,
+              height: 240,
+              child: Stack(
+                alignment: Alignment.center,
                 children: [
-                  Icon(_modeIcons[index]),
-                  const SizedBox(height: 4),
-                  Text(_modes[index]),
+                  // Outer glow (pulse when running)
+                  if (appState.isTimerRunning)
+                    AnimatedBuilder(
+                      animation: _pulseController,
+                      builder: (_, __) => Container(
+                        width: 240 + _pulseController.value * 16,
+                        height: 240 + _pulseController.value * 16,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: color.withOpacity(0.06 * _pulseController.value),
+                        ),
+                      ),
+                    ),
+
+                  // Ring
+                  CustomPaint(
+                    size: const Size(240, 240),
+                    painter: _RingPainter(
+                      progress: appState.progress,
+                      color: color,
+                      trackColor: color.withOpacity(0.1),
+                    ),
+                  ),
+
+                  // Center content
+                  Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        _modeEmojis[_modeIndex],
+                        style: const TextStyle(fontSize: 28),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        appState.timerDisplay,
+                        style: TextStyle(
+                          fontSize: 48,
+                          fontWeight: FontWeight.w800,
+                          color: color,
+                          letterSpacing: -2,
+                        ),
+                      ),
+                      Text(
+                        _modes[_modeIndex],
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: color.withOpacity(0.7),
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
-            );
-          }),
+            ),
+
+            const SizedBox(height: 48),
+
+            // ── Controls ─────────────────────────────────────────────
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Reset
+                _CircleButton(
+                  icon: Icons.refresh_rounded,
+                  onTap: appState.resetTimer,
+                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.08),
+                  iconColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                  size: 52,
+                ),
+                const SizedBox(width: 20),
+
+                // Play / Pause (primary)
+                GestureDetector(
+                  onTap: appState.isTimerRunning
+                      ? appState.pauseTimer
+                      : () => appState.startTimer(_modes[_modeIndex] == 'Focus'),
+                  child: Container(
+                    width: 72,
+                    height: 72,
+                    decoration: BoxDecoration(
+                      color: color,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                            color: color.withOpacity(0.4),
+                            blurRadius: 16,
+                            offset: const Offset(0, 4)),
+                      ],
+                    ),
+                    child: Icon(
+                      appState.isTimerRunning
+                          ? Icons.pause_rounded
+                          : Icons.play_arrow_rounded,
+                      color: Colors.white,
+                      size: 36,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 20),
+
+                // Skip
+                _CircleButton(
+                  icon: Icons.skip_next_rounded,
+                  onTap: appState.switchToNextMode,
+                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.08),
+                  iconColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                  size: 52,
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 32),
+
+            // ── Session info ─────────────────────────────────────────
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _InfoChip(label: 'Focus', value: '${appState.focusDuration}m', color: _modeColors[0]),
+                const SizedBox(width: 12),
+                _InfoChip(label: 'Short', value: '${appState.shortBreakDuration}m', color: _modeColors[1]),
+                const SizedBox(width: 12),
+                _InfoChip(label: 'Long', value: '${appState.longBreakDuration}m', color: _modeColors[2]),
+              ],
+            ),
+          ],
         ),
-      ],
+      ),
     );
+  }
+}
+
+// ── Ring painter ──────────────────────────────────────────────────────────────
+
+class _RingPainter extends CustomPainter {
+  final double progress;
+  final Color color;
+  final Color trackColor;
+  const _RingPainter({required this.progress, required this.color, required this.trackColor});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final cx = size.width / 2;
+    final cy = size.height / 2;
+    final r = (size.width - 16) / 2;
+    final rect = Rect.fromCircle(center: Offset(cx, cy), radius: r);
+
+    // Track
+    canvas.drawArc(rect, 0, 2 * math.pi, false,
+        Paint()
+          ..color = trackColor
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 12
+          ..strokeCap = StrokeCap.round);
+
+    // Progress
+    if (progress > 0) {
+      canvas.drawArc(
+        rect,
+        -math.pi / 2,
+        2 * math.pi * progress,
+        false,
+        Paint()
+          ..shader = SweepGradient(
+            startAngle: -math.pi / 2,
+            endAngle: -math.pi / 2 + 2 * math.pi * progress,
+            colors: [color.withOpacity(0.5), color],
+          ).createShader(rect)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 12
+          ..strokeCap = StrokeCap.round,
+      );
+    }
   }
 
-  // ----------------------------------------
-  // Timer Display Widget
-  // ----------------------------------------
-  Widget _buildTimerDisplay(AppState appState) {
-    return Column(
-      children: [
-        Text(
-          appState.timerDisplay,
-          style: TextStyle(
-            fontSize: 48,
-            fontWeight: FontWeight.bold,
-            color: _modeColors[_selectedModeIndex],
-          ),
-        ),
-        const SizedBox(height: 10),
-        CircularProgressIndicator(
-          value: appState.progress,
-          strokeWidth: 8,
-          color: _modeColors[_selectedModeIndex],
-        ),
-      ],
-    );
-  }
+  @override
+  bool shouldRepaint(_RingPainter old) =>
+      old.progress != progress || old.color != color;
+}
 
-  // ----------------------------------------
-  // Enhanced Timer Controls
-  // ----------------------------------------
-  Widget _buildTimerControls(AppState appState) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        ElevatedButton(
-          onPressed: appState.isTimerRunning
-              ? null
-              : () => appState.startTimer(_modes[_selectedModeIndex] == "Focus"),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: _modeColors[_selectedModeIndex],
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            textStyle: const TextStyle(fontSize: 16),
-          ),
-          child: Text(appState.isTimerRunning ? "Running" : "Start"),
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+class _CircleButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  final Color color;
+  final Color iconColor;
+  final double size;
+  const _CircleButton({
+    required this.icon,
+    required this.onTap,
+    required this.color,
+    required this.iconColor,
+    required this.size,
+  });
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          child: Icon(icon, color: iconColor, size: size * 0.44),
         ),
-        const SizedBox(width: 10),
-        ElevatedButton(
-          onPressed: appState.isTimerRunning ? appState.pauseTimer : null,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.amber,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            textStyle: const TextStyle(fontSize: 16),
-          ),
-          child: const Text("Pause"),
+      );
+}
+
+class _InfoChip extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+  const _InfoChip({required this.label, required this.value, required this.color});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(20),
         ),
-        const SizedBox(width: 10),
-        ElevatedButton(
-          onPressed: appState.resetTimer,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.red,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            textStyle: const TextStyle(fontSize: 16),
-          ),
-          child: const Text("Reset"),
+        child: Row(
+          children: [
+            Text(value,
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: color)),
+            const SizedBox(width: 4),
+            Text(label,
+                style: TextStyle(fontSize: 12, color: color.withOpacity(0.6))),
+          ],
         ),
-      ],
-    );
-  }
+      );
 }

@@ -3,332 +3,564 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../providers/app_state.dart';
+import '../../models/task.dart';
 
-class DashboardScreen extends StatefulWidget {
+class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
 
   @override
-  _DashboardScreenState createState() => _DashboardScreenState();
-}
-
-class _DashboardScreenState extends State<DashboardScreen> {
-  bool _isUpcomingTasksExpanded = false;
-
-  @override
   Widget build(BuildContext context) {
-    final appState = Provider.of<AppState>(context);
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text("FocusFlow Dashboard"),
-        actions: [
-          IconButton(
-            icon: Icon(
-              appState.themeMode == ThemeMode.light
-                  ? Icons.dark_mode
-                  : Icons.light_mode,
-            ),
-            tooltip: 'Switch between Light and Dark Theme',
-            onPressed: appState.toggleTheme,
-          ),
-        ],
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildTaskOverview(),
-              const SizedBox(height: 20),
-              _buildUpcomingTasksSection(appState.upcomingTasks),
-              const SizedBox(height: 20),
-              _buildMoodTrackerSection(),
-              const SizedBox(height: 20),
-              _buildTimerSection(appState),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () {
-                  appState.clearTaskHistory();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("All task history cleared")),
-                  );
-                },
-                child: const Text("Clear Task History"),
-              ),
-              const SizedBox(height: 10),
-              ElevatedButton(
-                onPressed: () {
-                  appState.clearMoodHistory();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("All mood history cleared")),
-                  );
-                },
-                child: const Text("Clear Mood History"),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ---- Timer section ----
-
-  Widget _buildTimerSection(AppState appState) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text("Pomodoro Timer",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 10),
-            Text("Current Mode: ${appState.currentMode}",
-                style: TextStyle(fontSize: 16, color: Colors.grey[700])),
-            const SizedBox(height: 10),
-            Text("Remaining Time: ${appState.timerDisplay}",
-                style: const TextStyle(
-                    fontSize: 20, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                ElevatedButton(
-                  onPressed: appState.isTimerRunning
-                      ? appState.pauseTimer
-                      : () => appState.startTimer(
-                          appState.currentMode == "Focus"),
-                  child:
-                      Text(appState.isTimerRunning ? "Pause" : "Start"),
-                ),
-                ElevatedButton(
-                  onPressed: appState.resetTimer,
-                  child: const Text("Reset"),
-                ),
-                ElevatedButton(
-                  onPressed: appState.switchToNextMode,
-                  child: const Text("Switch Mode"),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ---- Task overview ----
-
-  Widget _buildTaskOverview() {
     return Consumer<AppState>(
       builder: (context, appState, _) {
-        final progress = appState.totalTasks == 0
-            ? 0.0
-            : appState.completedTasks / appState.totalTasks;
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text("Task Overview",
-                style:
-                    TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 10),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _buildTaskStatusIcon(Icons.assignment, "Total",
-                    appState.totalTasks, Colors.blue),
-                _buildTaskStatusIcon(Icons.check_circle, "Completed",
-                    appState.completedTasks, Colors.green),
-                _buildTaskStatusIcon(Icons.pending, "Pending",
-                    appState.pendingTasks, Colors.red),
-              ],
-            ),
-            const SizedBox(height: 20),
-            _buildProgressBar(progress),
-          ],
+        return Scaffold(
+          appBar: _buildAppBar(context, appState),
+          body: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+            children: [
+              _FocusNowCard(appState: appState),
+              const SizedBox(height: 16),
+              _StatsRow(appState: appState),
+              const SizedBox(height: 16),
+              _MoodCard(appState: appState),
+              const SizedBox(height: 16),
+              _TimerCard(appState: appState),
+              const SizedBox(height: 16),
+              _UpcomingSection(appState: appState),
+            ],
+          ),
         );
       },
     );
   }
 
-  Widget _buildTaskStatusIcon(
-      IconData icon, String label, int count, Color color) {
-    return Column(
-      children: [
-        Icon(icon, color: color, size: 28.0),
-        const SizedBox(height: 4),
-        Text(label, style: TextStyle(color: color, fontSize: 14)),
-        Text("$count",
-            style: TextStyle(
-                color: color,
-                fontWeight: FontWeight.bold,
-                fontSize: 16)),
+  PreferredSizeWidget _buildAppBar(BuildContext context, AppState appState) {
+    final hour = DateTime.now().hour;
+    final greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+
+    return AppBar(
+      title: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            greeting,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                  fontSize: 12,
+                ),
+          ),
+          const Text('FocusFlow', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
+        ],
+      ),
+      actions: [
+        IconButton(
+          icon: Icon(
+            appState.themeMode == ThemeMode.light ? Icons.dark_mode_outlined : Icons.light_mode_outlined,
+          ),
+          onPressed: appState.toggleTheme,
+          tooltip: 'Toggle theme',
+        ),
+        PopupMenuButton<String>(
+          icon: const Icon(Icons.more_vert_rounded),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          onSelected: (value) => _handleMenu(context, appState, value),
+          itemBuilder: (_) => [
+            const PopupMenuItem(value: 'clear_tasks',  child: Text('Clear task history')),
+            const PopupMenuItem(value: 'clear_moods',  child: Text('Clear mood history')),
+          ],
+        ),
       ],
     );
   }
 
-  // Fixed: uses LayoutBuilder so the fill width is relative to the actual
-  // container, not the full screen width (which overflows inside padded cards).
-  Widget _buildProgressBar(double progress) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return Container(
-          height: 10,
-          width: double.infinity,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(5),
-            color: Colors.grey[300],
+  void _handleMenu(BuildContext context, AppState appState, String value) {
+    final label = value == 'clear_tasks' ? 'task' : 'mood';
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Clear $label history?'),
+        content: Text('This will permanently delete all $label data. This cannot be undone.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              if (value == 'clear_tasks') {
+                appState.clearTaskHistory();
+              } else {
+                appState.clearMoodHistory();
+              }
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('${label[0].toUpperCase()}${label.substring(1)} history cleared')),
+              );
+            },
+            child: Text('Clear', style: TextStyle(color: Theme.of(context).colorScheme.error)),
           ),
-          child: Stack(
-            children: [
-              Container(
-                width: progress * constraints.maxWidth,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(5),
-                  gradient: LinearGradient(
-                    colors: [Colors.green[300]!, Colors.green[800]!],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  // ---- Upcoming tasks ----
-
-  Widget _buildUpcomingTasksSection(List<dynamic> upcomingTasks) {
-    return GestureDetector(
-      onTap: () =>
-          setState(() => _isUpcomingTasksExpanded = !_isUpcomingTasksExpanded),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text("Upcoming Tasks",
-                  style: TextStyle(
-                      fontSize: 18, fontWeight: FontWeight.bold)),
-              Icon(
-                _isUpcomingTasksExpanded
-                    ? Icons.expand_less
-                    : Icons.expand_more,
-                color: Colors.grey,
-              ),
-            ],
-          ),
-          if (_isUpcomingTasksExpanded)
-            upcomingTasks.isEmpty
-                ? Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 10.0),
-                    child: Text(
-                      "No upcoming tasks",
-                      style:
-                          TextStyle(fontSize: 16, color: Colors.grey[600]),
-                    ),
-                  )
-                : Column(
-                    children: upcomingTasks.map((task) {
-                      return ListTile(
-                        leading: Icon(
-                          Icons.circle,
-                          size: 10,
-                          color:
-                              task.isCompleted ? Colors.green : Colors.red,
-                        ),
-                        title: Text(task.title),
-                        subtitle: Text(
-                          "Due: ${DateFormat.yMMMd().format(task.dueDate)}"
-                          " (${_calculateCountdown(task.dueDate)})",
-                        ),
-                      );
-                    }).toList(),
-                  ),
         ],
       ),
     );
   }
+}
 
-  String _calculateCountdown(DateTime dueDate) {
-    final difference = dueDate.difference(DateTime.now()).inDays;
-    if (difference < 0) return "Overdue";
-    if (difference == 0) return "Due Today";
-    if (difference == 1) return "Due Tomorrow";
-    return "Due in $difference days";
+// ─── Focus Now card ───────────────────────────────────────────────────────────
+
+class _FocusNowCard extends StatelessWidget {
+  final AppState appState;
+  const _FocusNowCard({required this.appState});
+
+  @override
+  Widget build(BuildContext context) {
+    final nextTask = appState.upcomingTasks.isNotEmpty ? appState.upcomingTasks.first : null;
+    final cs = Theme.of(context).colorScheme;
+
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [cs.primary, Color.lerp(cs.primary, Colors.black, 0.18)!],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      padding: const EdgeInsets.all(20),
+      child: nextTask == null
+          ? _emptyState(context)
+          : _taskState(context, nextTask, cs),
+    );
   }
 
-  // ---- Mood tracker ----
+  Widget _emptyState(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(children: [
+          const Text('🎯', style: TextStyle(fontSize: 20)),
+          const SizedBox(width: 8),
+          Text('All caught up!',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(color: Colors.white70)),
+        ]),
+        const SizedBox(height: 6),
+        const Text(
+          'No pending tasks. Add a new one to get started.',
+          style: TextStyle(color: Colors.white60, fontSize: 14),
+        ),
+      ],
+    );
+  }
 
-  Widget _buildMoodTrackerSection() {
-    return Consumer<AppState>(
-      builder: (context, appState, _) {
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _taskState(BuildContext context, Task task, ColorScheme cs) {
+    final dueStr = task.dueDate != null
+        ? DateFormat.MMMd().format(task.dueDate!)
+        : 'No due date';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(children: [
+          const Text('🎯', style: TextStyle(fontSize: 18)),
+          const SizedBox(width: 8),
+          Text(
+            'Focus now',
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall
+                ?.copyWith(color: Colors.white60, fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 1),
+          ),
+        ]),
+        const SizedBox(height: 10),
+        Text(
+          task.title,
+          style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+        const SizedBox(height: 6),
+        Row(children: [
+          const Icon(Icons.calendar_today_outlined, color: Colors.white60, size: 13),
+          const SizedBox(width: 4),
+          Text(dueStr, style: const TextStyle(color: Colors.white60, fontSize: 13)),
+          if (task.subtasks.isNotEmpty) ...[
+            const SizedBox(width: 12),
+            const Icon(Icons.checklist_rounded, color: Colors.white60, size: 13),
+            const SizedBox(width: 4),
+            Text(
+              '${task.subtasks.where((s) => s.isCompleted).length}/${task.subtasks.length} steps',
+              style: const TextStyle(color: Colors.white60, fontSize: 13),
+            ),
+          ],
+        ]),
+      ],
+    );
+  }
+}
+
+// ─── Stats row ────────────────────────────────────────────────────────────────
+
+class _StatsRow extends StatelessWidget {
+  final AppState appState;
+  const _StatsRow({required this.appState});
+
+  @override
+  Widget build(BuildContext context) {
+    final total     = appState.totalTasks;
+    final completed = appState.completedTasks;
+    final progress  = total == 0 ? 0.0 : completed / total;
+
+    return Column(
+      children: [
+        Row(
           children: [
-            const Text("Mood Tracker",
-                style: TextStyle(
-                    fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: _getMoodColor(appState.selectedMood, context),
-                borderRadius: BorderRadius.circular(8),
+            _StatPill(label: 'Total',     value: '$total',     color: Theme.of(context).colorScheme.primary),
+            const SizedBox(width: 8),
+            _StatPill(label: 'Done',      value: '$completed', color: const Color(0xFF16A34A)),
+            const SizedBox(width: 8),
+            _StatPill(label: 'Remaining', value: '${appState.pendingTasks}', color: const Color(0xFFD97706)),
+          ],
+        ),
+        const SizedBox(height: 12),
+        LayoutBuilder(builder: (context, c) {
+          return ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: Container(
+              height: 8,
+              color: Theme.of(context).colorScheme.primary.withOpacity(0.12),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 600),
+                  curve: Curves.easeOut,
+                  width: progress * c.maxWidth,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Theme.of(context).colorScheme.primary,
+                        const Color(0xFF16A34A),
+                      ],
+                    ),
+                  ),
+                ),
               ),
+            ),
+          );
+        }),
+        const SizedBox(height: 6),
+        Align(
+          alignment: Alignment.centerRight,
+          child: Text(
+            total == 0 ? 'No tasks yet' : '${(progress * 100).round()}% complete',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _StatPill extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+  const _StatPill({required this.label, required this.value, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withOpacity(0.2)),
+        ),
+        child: Column(
+          children: [
+            Text(value,
+                style: TextStyle(
+                    fontSize: 22, fontWeight: FontWeight.w800, color: color)),
+            const SizedBox(height: 2),
+            Text(label,
+                style: TextStyle(
+                    fontSize: 11, fontWeight: FontWeight.w600, color: color.withOpacity(0.7))),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Mood card ────────────────────────────────────────────────────────────────
+
+class _MoodCard extends StatelessWidget {
+  final AppState appState;
+  const _MoodCard({required this.appState});
+
+  @override
+  Widget build(BuildContext context) {
+    final hasMood = appState.selectedMood.isNotEmpty;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Text(
+              hasMood ? appState.selectedMoodEmoji : '😶',
+              style: const TextStyle(fontSize: 32),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      const Text("Current Mood: ",
-                          style: TextStyle(fontWeight: FontWeight.bold)),
-                      Text(
-                        "${appState.selectedMoodEmoji} "
-                        "${appState.selectedMood.isEmpty ? "No mood selected." : appState.selectedMood}",
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.blueAccent),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
                   Text(
-                    appState.moodMessage,
-                    style: const TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.w500),
+                    hasMood ? appState.selectedMood : 'How are you feeling?',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  if (hasMood)
+                    Text(
+                      appState.moodMessage,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 12),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded,
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.3)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Compact timer card ───────────────────────────────────────────────────────
+
+class _TimerCard extends StatelessWidget {
+  final AppState appState;
+  const _TimerCard({required this.appState});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: cs.primary.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.timer_rounded, color: cs.primary, size: 22),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(appState.timerDisplay,
+                      style: TextStyle(
+                          fontSize: 22, fontWeight: FontWeight.w800, color: cs.primary)),
+                  Text(appState.currentMode,
+                      style: Theme.of(context).textTheme.bodySmall),
+                ],
+              ),
+            ),
+            _TimerButton(
+              label: appState.isTimerRunning ? 'Pause' : 'Start',
+              onTap: appState.isTimerRunning
+                  ? appState.pauseTimer
+                  : () => appState.startTimer(appState.currentMode == 'Focus'),
+              primary: !appState.isTimerRunning,
+            ),
+            const SizedBox(width: 8),
+            _TimerButton(
+              label: 'Reset',
+              onTap: appState.resetTimer,
+              primary: false,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TimerButton extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+  final bool primary;
+  const _TimerButton({required this.label, required this.onTap, required this.primary});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: primary ? cs.primary : cs.primary.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: primary ? Colors.white : cs.primary,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Upcoming tasks ───────────────────────────────────────────────────────────
+
+class _UpcomingSection extends StatefulWidget {
+  final AppState appState;
+  const _UpcomingSection({required this.appState});
+  @override
+  State<_UpcomingSection> createState() => _UpcomingSectionState();
+}
+
+class _UpcomingSectionState extends State<_UpcomingSection> {
+  bool _expanded = true;
+
+  String _countdown(DateTime due) {
+    final diff = due.difference(DateTime.now()).inDays;
+    if (diff < 0) return 'Overdue';
+    if (diff == 0) return 'Due today';
+    if (diff == 1) return 'Due tomorrow';
+    return 'In $diff days';
+  }
+
+  Color _urgencyColor(DateTime due) {
+    final diff = due.difference(DateTime.now()).inDays;
+    if (diff < 0) return const Color(0xFFDC2626);
+    if (diff <= 1) return const Color(0xFFD97706);
+    return const Color(0xFF16A34A);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tasks = widget.appState.upcomingTasks;
+    return Column(
+      children: [
+        GestureDetector(
+          onTap: () => setState(() => _expanded = !_expanded),
+          behavior: HitTestBehavior.opaque,
+          child: Row(
+            children: [
+              Text('Upcoming', style: Theme.of(context).textTheme.titleMedium),
+              if (tasks.isNotEmpty) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primary.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '${tasks.length}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                ),
+              ],
+              const Spacer(),
+              Icon(
+                _expanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
+              ),
+            ],
+          ),
+        ),
+        if (_expanded) ...[
+          const SizedBox(height: 10),
+          if (tasks.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Text('Nothing coming up — enjoy the moment!',
+                  style: Theme.of(context).textTheme.bodyMedium),
+            )
+          else
+            ...tasks.map((t) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: _UpcomingTile(task: t, countdown: _countdown, urgencyColor: _urgencyColor),
+                )),
+        ],
+      ],
+    );
+  }
+}
+
+class _UpcomingTile extends StatelessWidget {
+  final Task task;
+  final String Function(DateTime) countdown;
+  final Color Function(DateTime) urgencyColor;
+  const _UpcomingTile({required this.task, required this.countdown, required this.urgencyColor});
+
+  @override
+  Widget build(BuildContext context) {
+    final dueDate = task.dueDate;
+    final color = dueDate != null ? urgencyColor(dueDate) : const Color(0xFF6B6B8A);
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardTheme.color,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.25)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 4,
+            height: 52,
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(12),
+                bottomLeft: Radius.circular(12),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(task.title,
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 2),
+                  Text(
+                    dueDate != null
+                        ? '${DateFormat.MMMd().format(dueDate)} · ${countdown(dueDate)}'
+                        : 'No due date',
+                    style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.w600),
                   ),
                 ],
               ),
             ),
-          ],
-        );
-      },
+          ),
+          const SizedBox(width: 12),
+        ],
+      ),
     );
-  }
-
-  Color _getMoodColor(String mood, BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    switch (mood) {
-      case "Calm":
-        return isDark ? Colors.blue[600]! : Colors.blue[100]!;
-      case "Optimistic":
-        return isDark ? Colors.yellow[600]! : Colors.yellow[100]!;
-      case "Burnt Out":
-        return isDark ? Colors.orange[600]! : Colors.orange[100]!;
-      case "Panicked":
-        return isDark ? Colors.red[600]! : Colors.red[100]!;
-      default:
-        return isDark
-            ? Colors.grey[800]!
-            : Colors.orange[100]!;
-    }
   }
 }
