@@ -1,7 +1,7 @@
 // lib/features/tracker/tracker_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../providers/app_state.dart';
+import '../../providers/task_state.dart';
 import '../../models/task.dart';
 
 class TrackerScreen extends StatelessWidget {
@@ -9,24 +9,24 @@ class TrackerScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<AppState>(
-      builder: (context, appState, _) {
+    return Consumer<TaskState>(
+      builder: (context, taskState, _) {
         return Scaffold(
           appBar: AppBar(title: const Text("Habit Tracker")),
           body: ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              _PointsDisplay(points: appState.totalPoints),
+              _PointsDisplay(points: taskState.totalPoints),
               const SizedBox(height: 8),
               _StatsRow(
-                completedTasks: appState.completedTasks,
-                completedSubtasks: appState.completedSubtasks,
-                pendingTasks: appState.pendingTasks,
+                completedTasks: taskState.completedTasks,
+                completedSubtasks: taskState.completedSubtasks,
+                pendingTasks: taskState.pendingTasks,
               ),
               const SizedBox(height: 24),
-              _ProgressSection(appState: appState),
+              _ProgressSection(taskState: taskState),
               const SizedBox(height: 24),
-              _CompletedTaskList(tasks: appState.completedTaskList),
+              _CompletedTaskList(tasks: taskState.completedTaskList),
             ],
           ),
         );
@@ -176,15 +176,15 @@ class _StatChip extends StatelessWidget {
 // ----------------------------------------
 
 class _ProgressSection extends StatelessWidget {
-  final AppState appState;
-  const _ProgressSection({required this.appState});
+  final TaskState taskState;
+  const _ProgressSection({required this.taskState});
 
   @override
   Widget build(BuildContext context) {
-    final total = appState.totalTasks;
-    final completed = appState.completedTasks;
+    final total = taskState.totalTasks;
+    final completed = taskState.completedTasks;
     final progress = total == 0 ? 0.0 : completed / total;
-    final streak = appState.currentStreak;
+    final streak = taskState.currentStreak;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -225,9 +225,7 @@ class _ProgressSection extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         Text(
-          total == 0
-              ? "No tasks yet"
-              : "$completed of $total tasks completed",
+          total == 0 ? "No tasks yet" : "$completed of $total tasks completed",
           style: const TextStyle(fontSize: 13, color: Colors.black54),
         ),
         const SizedBox(height: 16),
@@ -246,7 +244,8 @@ class _StreakBanner extends StatelessWidget {
   const _StreakBanner({required this.streak});
 
   String get _label {
-    if (streak == 0) return "No active streak — complete a task today to start one!";
+    if (streak == 0)
+      return "No active streak — complete a task today to start one!";
     if (streak == 1) return "1 day streak — great start, keep going!";
     if (streak < 7) return "$streak day streak — you're building momentum!";
     if (streak < 30) return "$streak day streak — on fire! 🔥";
@@ -366,7 +365,8 @@ class _CompletedTaskList extends StatelessWidget {
     }
     if (task.completedAt != null) {
       final d = task.completedAt!;
-      parts.add("Done ${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}");
+      parts.add(
+          "Done ${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}");
     }
 
     if (parts.isEmpty) return null;

@@ -1,7 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../providers/app_state.dart';
+import '../../providers/timer_state.dart';
 
 class TimerScreen extends StatefulWidget {
   const TimerScreen({super.key});
@@ -9,7 +9,8 @@ class TimerScreen extends StatefulWidget {
   _TimerScreenState createState() => _TimerScreenState();
 }
 
-class _TimerScreenState extends State<TimerScreen> with SingleTickerProviderStateMixin {
+class _TimerScreenState extends State<TimerScreen>
+    with SingleTickerProviderStateMixin {
   static const _modes = ['Focus', 'Short Break', 'Long Break'];
   static const _modeEmojis = ['🎯', '☕', '😴'];
   static const _modeColors = [
@@ -18,16 +19,11 @@ class _TimerScreenState extends State<TimerScreen> with SingleTickerProviderStat
     Color(0xFF8B5CF6),
   ];
 
-  late int _modeIndex;
   late AnimationController _pulseController;
 
   @override
   void initState() {
     super.initState();
-    final appState = Provider.of<AppState>(context, listen: false);
-    final idx = _modes.indexOf(appState.currentMode);
-    _modeIndex = idx >= 0 ? idx : 0;
-
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
@@ -42,8 +38,10 @@ class _TimerScreenState extends State<TimerScreen> with SingleTickerProviderStat
 
   @override
   Widget build(BuildContext context) {
-    final appState = Provider.of<AppState>(context);
-    final color = _modeColors[_modeIndex];
+    final timerState = Provider.of<TimerState>(context);
+    final currentModeIndex = _modes.indexOf(timerState.currentMode);
+    final modeIndex = currentModeIndex >= 0 ? currentModeIndex : 0;
+    final color = _modeColors[modeIndex];
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
@@ -57,20 +55,17 @@ class _TimerScreenState extends State<TimerScreen> with SingleTickerProviderStat
             // ── Mode selector ────────────────────────────────────────
             Container(
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1A1A2E) : const Color(0xFFF0F0FA),
+                color:
+                    isDark ? const Color(0xFF1A1A2E) : const Color(0xFFF0F0FA),
                 borderRadius: BorderRadius.circular(14),
               ),
               padding: const EdgeInsets.all(4),
               child: Row(
                 children: List.generate(_modes.length, (i) {
-                  final sel = i == _modeIndex;
+                  final sel = i == modeIndex;
                   return Expanded(
                     child: GestureDetector(
-                      onTap: () {
-                        setState(() => _modeIndex = i);
-                        appState.setMode(_modes[i]);
-                        appState.updateTimerDuration(_modes[i]);
-                      },
+                      onTap: () => timerState.setMode(_modes[i]),
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 200),
                         padding: const EdgeInsets.symmetric(vertical: 10),
@@ -78,19 +73,30 @@ class _TimerScreenState extends State<TimerScreen> with SingleTickerProviderStat
                           color: sel ? _modeColors[i] : Colors.transparent,
                           borderRadius: BorderRadius.circular(10),
                           boxShadow: sel
-                              ? [BoxShadow(color: _modeColors[i].withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 2))]
+                              ? [
+                                  BoxShadow(
+                                      color: _modeColors[i].withOpacity(0.3),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 2))
+                                ]
                               : [],
                         ),
                         child: Column(
                           children: [
-                            Text(_modeEmojis[i], style: const TextStyle(fontSize: 16)),
+                            Text(_modeEmojis[i],
+                                style: const TextStyle(fontSize: 16)),
                             const SizedBox(height: 2),
                             Text(
                               _modes[i],
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w700,
-                                color: sel ? Colors.white : Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                                color: sel
+                                    ? Colors.white
+                                    : Theme.of(context)
+                                        .colorScheme
+                                        .onSurface
+                                        .withOpacity(0.5),
                               ),
                             ),
                           ],
@@ -112,7 +118,7 @@ class _TimerScreenState extends State<TimerScreen> with SingleTickerProviderStat
                 alignment: Alignment.center,
                 children: [
                   // Outer glow (pulse when running)
-                  if (appState.isTimerRunning)
+                  if (timerState.isTimerRunning)
                     AnimatedBuilder(
                       animation: _pulseController,
                       builder: (_, __) => Container(
@@ -120,7 +126,8 @@ class _TimerScreenState extends State<TimerScreen> with SingleTickerProviderStat
                         height: 240 + _pulseController.value * 16,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: color.withOpacity(0.06 * _pulseController.value),
+                          color:
+                              color.withOpacity(0.06 * _pulseController.value),
                         ),
                       ),
                     ),
@@ -129,7 +136,7 @@ class _TimerScreenState extends State<TimerScreen> with SingleTickerProviderStat
                   CustomPaint(
                     size: const Size(240, 240),
                     painter: _RingPainter(
-                      progress: appState.progress,
+                      progress: timerState.progress,
                       color: color,
                       trackColor: color.withOpacity(0.1),
                     ),
@@ -140,12 +147,12 @@ class _TimerScreenState extends State<TimerScreen> with SingleTickerProviderStat
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        _modeEmojis[_modeIndex],
+                        _modeEmojis[modeIndex],
                         style: const TextStyle(fontSize: 28),
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        appState.timerDisplay,
+                        timerState.timerDisplay,
                         style: TextStyle(
                           fontSize: 48,
                           fontWeight: FontWeight.w800,
@@ -154,7 +161,7 @@ class _TimerScreenState extends State<TimerScreen> with SingleTickerProviderStat
                         ),
                       ),
                       Text(
-                        _modes[_modeIndex],
+                        timerState.currentMode,
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
@@ -177,18 +184,20 @@ class _TimerScreenState extends State<TimerScreen> with SingleTickerProviderStat
                 // Reset
                 _CircleButton(
                   icon: Icons.refresh_rounded,
-                  onTap: appState.resetTimer,
-                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.08),
-                  iconColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                  onTap: timerState.resetTimer,
+                  color:
+                      Theme.of(context).colorScheme.onSurface.withOpacity(0.08),
+                  iconColor:
+                      Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
                   size: 52,
                 ),
                 const SizedBox(width: 20),
 
                 // Play / Pause (primary)
                 GestureDetector(
-                  onTap: appState.isTimerRunning
-                      ? appState.pauseTimer
-                      : () => appState.startTimer(_modes[_modeIndex] == 'Focus'),
+                  onTap: timerState.isTimerRunning
+                      ? timerState.pauseTimer
+                      : timerState.startTimer,
                   child: Container(
                     width: 72,
                     height: 72,
@@ -203,7 +212,7 @@ class _TimerScreenState extends State<TimerScreen> with SingleTickerProviderStat
                       ],
                     ),
                     child: Icon(
-                      appState.isTimerRunning
+                      timerState.isTimerRunning
                           ? Icons.pause_rounded
                           : Icons.play_arrow_rounded,
                       color: Colors.white,
@@ -216,9 +225,11 @@ class _TimerScreenState extends State<TimerScreen> with SingleTickerProviderStat
                 // Skip
                 _CircleButton(
                   icon: Icons.skip_next_rounded,
-                  onTap: appState.switchToNextMode,
-                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.08),
-                  iconColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                  onTap: timerState.switchToNextMode,
+                  color:
+                      Theme.of(context).colorScheme.onSurface.withOpacity(0.08),
+                  iconColor:
+                      Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
                   size: 52,
                 ),
               ],
@@ -230,11 +241,20 @@ class _TimerScreenState extends State<TimerScreen> with SingleTickerProviderStat
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                _InfoChip(label: 'Focus', value: '${appState.focusDuration}m', color: _modeColors[0]),
+                _InfoChip(
+                    label: 'Focus',
+                    value: '${timerState.focusDuration}m',
+                    color: _modeColors[0]),
                 const SizedBox(width: 12),
-                _InfoChip(label: 'Short', value: '${appState.shortBreakDuration}m', color: _modeColors[1]),
+                _InfoChip(
+                    label: 'Short',
+                    value: '${timerState.shortBreakDuration}m',
+                    color: _modeColors[1]),
                 const SizedBox(width: 12),
-                _InfoChip(label: 'Long', value: '${appState.longBreakDuration}m', color: _modeColors[2]),
+                _InfoChip(
+                    label: 'Long',
+                    value: '${timerState.longBreakDuration}m',
+                    color: _modeColors[2]),
               ],
             ),
           ],
@@ -250,7 +270,8 @@ class _RingPainter extends CustomPainter {
   final double progress;
   final Color color;
   final Color trackColor;
-  const _RingPainter({required this.progress, required this.color, required this.trackColor});
+  const _RingPainter(
+      {required this.progress, required this.color, required this.trackColor});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -260,7 +281,11 @@ class _RingPainter extends CustomPainter {
     final rect = Rect.fromCircle(center: Offset(cx, cy), radius: r);
 
     // Track
-    canvas.drawArc(rect, 0, 2 * math.pi, false,
+    canvas.drawArc(
+        rect,
+        0,
+        2 * math.pi,
+        false,
         Paint()
           ..color = trackColor
           ..style = PaintingStyle.stroke
@@ -324,7 +349,8 @@ class _InfoChip extends StatelessWidget {
   final String label;
   final String value;
   final Color color;
-  const _InfoChip({required this.label, required this.value, required this.color});
+  const _InfoChip(
+      {required this.label, required this.value, required this.color});
 
   @override
   Widget build(BuildContext context) => Container(
@@ -336,7 +362,8 @@ class _InfoChip extends StatelessWidget {
         child: Row(
           children: [
             Text(value,
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: color)),
+                style: TextStyle(
+                    fontSize: 14, fontWeight: FontWeight.w700, color: color)),
             const SizedBox(width: 4),
             Text(label,
                 style: TextStyle(fontSize: 12, color: color.withOpacity(0.6))),

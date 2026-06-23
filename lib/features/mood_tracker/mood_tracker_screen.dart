@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../providers/app_state.dart';
+import '../../providers/mood_state.dart';
 import '../mood_tracker/mood_history_screen.dart';
 
 class MoodTrackerScreen extends StatelessWidget {
@@ -35,12 +35,28 @@ class MoodTrackerScreen extends StatelessWidget {
     {'e': '🖤', 'l': 'Grieving'},
   ];
 
+  Future<void> _saveMood(
+    BuildContext context,
+    MoodState moodState,
+    String mood,
+    String emoji,
+  ) async {
+    try {
+      await moodState.setMood(mood, emoji);
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not save your mood. Try again.')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Consumer<AppState>(
-      builder: (context, appState, _) {
+    return Consumer<MoodState>(
+      builder: (context, moodState, _) {
         final cs = Theme.of(context).colorScheme;
-        final selected = appState.selectedMood;
+        final selected = moodState.selectedMood;
 
         return Scaffold(
           appBar: AppBar(
@@ -71,7 +87,7 @@ class MoodTrackerScreen extends StatelessWidget {
                   ),
                   child: Row(
                     children: [
-                      Text(appState.selectedMoodEmoji,
+                      Text(moodState.selectedMoodEmoji,
                           style: const TextStyle(fontSize: 28)),
                       const SizedBox(width: 12),
                       Expanded(
@@ -86,7 +102,7 @@ class MoodTrackerScreen extends StatelessWidget {
                                   ?.copyWith(color: cs.primary),
                             ),
                             Text(
-                              appState.moodMessage,
+                              moodState.moodMessage,
                               style: Theme.of(context).textTheme.bodySmall,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
@@ -124,7 +140,12 @@ class MoodTrackerScreen extends StatelessWidget {
                       emoji: mood['e']!,
                       label: mood['l']!,
                       isSelected: isSelected,
-                      onTap: () => appState.setMood(mood['l']!, mood['e']!),
+                      onTap: () => _saveMood(
+                        context,
+                        moodState,
+                        mood['l']!,
+                        mood['e']!,
+                      ),
                     );
                   },
                 ),
@@ -164,7 +185,9 @@ class _MoodCell extends StatelessWidget {
               : (isDark ? const Color(0xFF1A1A2E) : Colors.white),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: isSelected ? cs.primary : (isDark ? const Color(0xFF2D2D44) : const Color(0xFFE4E4F0)),
+            color: isSelected
+                ? cs.primary
+                : (isDark ? const Color(0xFF2D2D44) : const Color(0xFFE4E4F0)),
             width: isSelected ? 2 : 1,
           ),
         ),

@@ -1,8 +1,13 @@
-import 'package:sqflite/sqflite.dart';
 import 'database_helper.dart';
 
 class TaskDatabase {
   final dbHelper = DatabaseHelper.instance;
+
+  void _requireAffectedRow(int count, String operation) {
+    if (count == 0) {
+      throw StateError('$operation did not match an existing record.');
+    }
+  }
 
   Future<int> insertTask(String title, String dueDate) async {
     final db = await dbHelper.database;
@@ -23,14 +28,15 @@ class TaskDatabase {
     return await db.query('tasks');
   }
 
-  Future<int> editTask(int id, String newTitle, String newDueDate) async {
+  Future<void> editTask(int id, String newTitle, String newDueDate) async {
     final db = await dbHelper.database;
-    return await db.update(
+    final count = await db.update(
       'tasks',
       {'title': newTitle, 'due_date': newDueDate},
       where: 'id = ?',
       whereArgs: [id],
     );
+    _requireAffectedRow(count, 'Editing task $id');
   }
 
   // Keeps is_completed, status, and completed_at in sync.
@@ -38,23 +44,24 @@ class TaskDatabase {
   // if the task is un-completed, so the streak reflects actual completion days.
   Future<void> updateTaskStatus(int taskId, String newStatus) async {
     final db = await dbHelper.database;
-    await db.update(
+    final count = await db.update(
       'tasks',
       {
         'status': newStatus,
         'is_completed': newStatus == 'completed' ? 1 : 0,
-        'completed_at': newStatus == 'completed'
-            ? DateTime.now().toIso8601String()
-            : null,
+        'completed_at':
+            newStatus == 'completed' ? DateTime.now().toIso8601String() : null,
       },
       where: 'id = ?',
       whereArgs: [taskId],
     );
+    _requireAffectedRow(count, 'Updating task $taskId');
   }
 
-  Future<int> deleteTask(int id) async {
+  Future<void> deleteTask(int id) async {
     final db = await dbHelper.database;
-    return await db.delete('tasks', where: 'id = ?', whereArgs: [id]);
+    final count = await db.delete('tasks', where: 'id = ?', whereArgs: [id]);
+    _requireAffectedRow(count, 'Deleting task $id');
   }
 
   Future<void> clearTasks() async {
@@ -80,29 +87,36 @@ class TaskDatabase {
     );
   }
 
-  Future<int> updateSubtask(int subtaskId, String newTitle) async {
+  Future<void> updateSubtask(int subtaskId, String newTitle) async {
     final db = await dbHelper.database;
-    return await db.update(
+    final count = await db.update(
       'subtasks',
       {'title': newTitle},
       where: 'id = ?',
       whereArgs: [subtaskId],
     );
+    _requireAffectedRow(count, 'Editing subtask $subtaskId');
   }
 
-  // Persists subtask completion state. Called by AppState.toggleSubtaskCompletion.
-  Future<int> updateSubtaskStatus(int subtaskId, bool isCompleted) async {
+  // Persists subtask completion state.
+  Future<void> updateSubtaskStatus(int subtaskId, bool isCompleted) async {
     final db = await dbHelper.database;
-    return await db.update(
+    final count = await db.update(
       'subtasks',
       {'is_completed': isCompleted ? 1 : 0},
       where: 'id = ?',
       whereArgs: [subtaskId],
     );
+    _requireAffectedRow(count, 'Updating subtask $subtaskId');
   }
 
-  Future<int> deleteSubtask(int subtaskId) async {
+  Future<void> deleteSubtask(int subtaskId) async {
     final db = await dbHelper.database;
-    return await db.delete('subtasks', where: 'id = ?', whereArgs: [subtaskId]);
+    final count = await db.delete(
+      'subtasks',
+      where: 'id = ?',
+      whereArgs: [subtaskId],
+    );
+    _requireAffectedRow(count, 'Deleting subtask $subtaskId');
   }
 }

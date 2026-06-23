@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../providers/app_state.dart';
+import '../../providers/mood_state.dart';
 
-// Refactored to read from AppState.moodHistoryList instead of querying
+// Reads from MoodState so history updates immediately after a mood is saved.
 // MoodDatabase directly. This keeps it consistent with the rest of the app
 // and means it automatically reflects any mood logged in the same session.
 class MoodHistoryScreen extends StatelessWidget {
@@ -10,9 +10,9 @@ class MoodHistoryScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<AppState>(
-      builder: (context, appState, _) {
-        final history = appState.moodHistoryList;
+    return Consumer<MoodState>(
+      builder: (context, moodState, _) {
+        final history = moodState.moodHistoryList;
 
         return Scaffold(
           appBar: AppBar(

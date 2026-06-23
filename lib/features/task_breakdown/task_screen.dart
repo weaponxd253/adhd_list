@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../providers/app_state.dart';
+import '../../providers/task_state.dart';
 import 'task_input_section.dart';
 import 'task_list_section.dart';
 
@@ -37,9 +37,9 @@ class _TaskScreenState extends State<TaskScreen> {
         children: [
           TaskInputSection(taskController: _taskController),
           Expanded(
-            child: Consumer<AppState>(
-              builder: (context, appState, child) {
-                return TaskListSection(tasks: appState.tasks);
+            child: Consumer<TaskState>(
+              builder: (context, taskState, child) {
+                return TaskListSection(tasks: taskState.tasks);
               },
             ),
           ),

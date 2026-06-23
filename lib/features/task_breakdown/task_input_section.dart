@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../providers/app_state.dart';
+import '../../providers/task_state.dart';
 
 class TaskInputSection extends StatefulWidget {
   final TextEditingController taskController;
@@ -31,7 +31,7 @@ class _TaskInputSectionState extends State<TaskInputSection> {
 
   void _clearDate() => setState(() => _selectedDate = null);
 
-  void _submit() {
+  Future<void> _submit() async {
     final title = widget.taskController.text.trim();
     if (title.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -41,9 +41,17 @@ class _TaskInputSectionState extends State<TaskInputSection> {
     }
     // Due date is optional — default to 30 days out if not set
     final due = _selectedDate ?? DateTime.now().add(const Duration(days: 30));
-    Provider.of<AppState>(context, listen: false).addTask(title, due);
-    widget.taskController.clear();
-    setState(() => _selectedDate = null);
+    try {
+      await Provider.of<TaskState>(context, listen: false).addTask(title, due);
+      if (!mounted) return;
+      widget.taskController.clear();
+      setState(() => _selectedDate = null);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not save the task. Try again.')),
+      );
+    }
   }
 
   @override
@@ -83,33 +91,42 @@ class _TaskInputSectionState extends State<TaskInputSection> {
                 child: _selectedDate == null
                     ? OutlinedButton.icon(
                         onPressed: _pickDate,
-                        icon: const Icon(Icons.calendar_today_outlined, size: 16),
+                        icon:
+                            const Icon(Icons.calendar_today_outlined, size: 16),
                         label: const Text('Due date (optional)'),
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                          foregroundColor: Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withOpacity(0.5),
                           side: BorderSide(
                             color: isDark
                                 ? const Color(0xFF2D2D44)
                                 : const Color(0xFFE4E4F0),
                           ),
                           padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                          textStyle: const TextStyle(
+                              fontSize: 13, fontWeight: FontWeight.w500),
                         ),
                       )
                     : GestureDetector(
                         onTap: _pickDate,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 10),
                           decoration: BoxDecoration(
                             color: cs.primary.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: cs.primary.withOpacity(0.3)),
+                            border:
+                                Border.all(color: cs.primary.withOpacity(0.3)),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.calendar_today_rounded, size: 14, color: cs.primary),
+                              Icon(Icons.calendar_today_rounded,
+                                  size: 14, color: cs.primary),
                               const SizedBox(width: 6),
                               Text(
                                 _formatDate(_selectedDate!),
@@ -121,7 +138,8 @@ class _TaskInputSectionState extends State<TaskInputSection> {
                               const SizedBox(width: 8),
                               GestureDetector(
                                 onTap: _clearDate,
-                                child: Icon(Icons.close_rounded, size: 14, color: cs.primary),
+                                child: Icon(Icons.close_rounded,
+                                    size: 14, color: cs.primary),
                               ),
                             ],
                           ),
@@ -134,8 +152,10 @@ class _TaskInputSectionState extends State<TaskInputSection> {
               ElevatedButton(
                 onPressed: _submit,
                 style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                 ),
                 child: const Row(
                   children: [
@@ -158,7 +178,16 @@ class _TaskInputSectionState extends State<TaskInputSection> {
     if (_isSameDay(date, today)) return 'Today';
     if (_isSameDay(date, tomorrow)) return 'Tomorrow';
     final diff = date.difference(today).inDays;
-    if (diff < 7) return '${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][date.weekday - 1]}';
+    if (diff < 7)
+      return '${[
+        'Mon',
+        'Tue',
+        'Wed',
+        'Thu',
+        'Fri',
+        'Sat',
+        'Sun'
+      ][date.weekday - 1]}';
     return '${date.day}/${date.month}';
   }
 
