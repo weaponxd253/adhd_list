@@ -1,16 +1,21 @@
 import 'package:sqflite/sqflite.dart';
 import 'database_helper.dart';
+import '../repositories/repositories.dart';
 
 // MoodDatabase is now a thin facade over DatabaseHelper.
 // All mood data lives in focusflow.db alongside tasks and subtasks.
-class MoodDatabase {
-  static final MoodDatabase _instance = MoodDatabase._privateConstructor();
+class MoodDatabase implements MoodRepository {
+  static final MoodDatabase _instance = MoodDatabase();
   static MoodDatabase get instance => _instance;
 
-  MoodDatabase._privateConstructor();
+  MoodDatabase({DatabaseHelper? dbHelper})
+      : _dbHelper = dbHelper ?? DatabaseHelper.instance;
 
-  Future<Database> get _db async => DatabaseHelper.instance.database;
+  final DatabaseHelper _dbHelper;
 
+  Future<Database> get _db async => _dbHelper.database;
+
+  @override
   Future<Map<String, dynamic>?> fetchLastMood() async {
     final db = await _db;
     final results = await db.query(
@@ -21,6 +26,7 @@ class MoodDatabase {
     return results.isNotEmpty ? results.first : null;
   }
 
+  @override
   Future<int> insertMood(String mood, String emoji) async {
     final db = await _db;
     return await db.insert('moods', {
@@ -30,11 +36,13 @@ class MoodDatabase {
     });
   }
 
+  @override
   Future<List<Map<String, dynamic>>> fetchMoods() async {
     final db = await _db;
     return await db.query('moods', orderBy: 'date DESC');
   }
 
+  @override
   Future<void> clearMoods() async {
     final db = await _db;
     await db.delete('moods');

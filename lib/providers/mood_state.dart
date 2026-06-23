@@ -4,11 +4,17 @@ import 'dart:collection';
 import 'package:flutter/foundation.dart';
 
 import '../database/mood_database.dart';
+import '../repositories/repositories.dart';
 
 class MoodState extends ChangeNotifier {
-  MoodState() {
-    unawaited(_load());
+  MoodState({
+    MoodRepository? repository,
+    bool autoLoad = true,
+  }) : _repository = repository ?? MoodDatabase.instance {
+    if (autoLoad) unawaited(load());
   }
+
+  final MoodRepository _repository;
 
   String _selectedMood = '';
   String _selectedMoodEmoji = '';
@@ -51,9 +57,9 @@ class MoodState extends ChangeNotifier {
   String get moodMessage =>
       _messages[_selectedMood] ?? 'Notice what you need in this moment.';
 
-  Future<void> _load() async {
-    final lastMood = await MoodDatabase.instance.fetchLastMood();
-    _history = await MoodDatabase.instance.fetchMoods();
+  Future<void> load() async {
+    final lastMood = await _repository.fetchLastMood();
+    _history = await _repository.fetchMoods();
     if (lastMood != null) {
       _selectedMood = lastMood['mood'] as String;
       _selectedMoodEmoji = lastMood['emoji'] as String;
@@ -62,15 +68,15 @@ class MoodState extends ChangeNotifier {
   }
 
   Future<void> setMood(String mood, String emoji) async {
-    await MoodDatabase.instance.insertMood(mood, emoji);
+    await _repository.insertMood(mood, emoji);
     _selectedMood = mood;
     _selectedMoodEmoji = emoji;
-    _history = await MoodDatabase.instance.fetchMoods();
+    _history = await _repository.fetchMoods();
     notifyListeners();
   }
 
   Future<void> clearMoodHistory() async {
-    await MoodDatabase.instance.clearMoods();
+    await _repository.clearMoods();
     _history = [];
     _selectedMood = '';
     _selectedMoodEmoji = '';

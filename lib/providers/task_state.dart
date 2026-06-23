@@ -6,13 +6,20 @@ import 'package:flutter/foundation.dart';
 import '../database/task_database.dart';
 import '../models/subtask.dart';
 import '../models/task.dart';
+import '../repositories/repositories.dart';
 
 class TaskState extends ChangeNotifier {
-  TaskState() {
-    unawaited(loadTasks());
+  TaskState({
+    TaskRepository? repository,
+    DateTime Function()? now,
+    bool autoLoad = true,
+  })  : _repository = repository ?? TaskDatabase(),
+        _now = now ?? DateTime.now {
+    if (autoLoad) unawaited(loadTasks());
   }
 
-  final TaskDatabase _database = TaskDatabase();
+  final TaskRepository _repository;
+  final DateTime Function() _now;
   List<Task> _tasks = [];
 
   UnmodifiableListView<Task> get tasks => UnmodifiableListView(_tasks);
@@ -32,10 +39,10 @@ class TaskState extends ChangeNotifier {
   }
 
   Future<void> loadTasks() async {
-    final rows = await _database.fetchTasks();
+    final rows = await _repository.fetchTasks();
     final loaded = <Task>[];
     for (final row in rows) {
-      final subtaskRows = await _database.fetchSubtasks(row['id'] as int);
+      final subtaskRows = await _repository.fetchSubtasks(row['id'] as int);
       loaded.add(
         Task(
           id: row['id'] as int,
@@ -54,12 +61,12 @@ class TaskState extends ChangeNotifier {
   }
 
   Future<void> addTask(String title, DateTime dueDate) async {
-    await _database.insertTask(title, dueDate.toIso8601String());
+    await _repository.insertTask(title, dueDate.toIso8601String());
     await loadTasks();
   }
 
   Future<void> clearTaskHistory() async {
-    await _database.clearTasks();
+    await _repository.clearTasks();
     _tasks = [];
     notifyListeners();
   }
@@ -69,12 +76,12 @@ class TaskState extends ChangeNotifier {
     String title,
     DateTime dueDate,
   ) async {
-    await _database.editTask(taskId, title, dueDate.toIso8601String());
+    await _repository.editTask(taskId, title, dueDate.toIso8601String());
     await loadTasks();
   }
 
   Future<void> deleteTask(int taskId) async {
-    await _database.deleteTask(taskId);
+    await _repository.deleteTask(taskId);
     _tasks = _tasks.where((task) => task.id != taskId).toList();
     notifyListeners();
   }
@@ -82,15 +89,15 @@ class TaskState extends ChangeNotifier {
   Future<void> toggleTaskCompletion(int taskId) async {
     final task = _requireTask(taskId);
     final status = task.isCompleted ? 'pending' : 'completed';
-    await _database.updateTaskStatus(taskId, status);
+    await _repository.updateTaskStatus(taskId, status);
     task.status = status;
-    task.completedAt = status == 'completed' ? DateTime.now() : null;
+    task.completedAt = status == 'completed' ? _now() : null;
     notifyListeners();
   }
 
   Future<void> addSubtask(int taskId, String title) async {
     final task = _requireTask(taskId);
-    final id = await _database.insertSubtask(taskId, title);
+    final id = await _repository.insertSubtask(taskId, title);
     task.subtasks.add(Subtask(id: id, title: title));
     notifyListeners();
   }
@@ -102,7 +109,7 @@ class TaskState extends ChangeNotifier {
   ) async {
     final task = _requireTask(taskId);
     final subtask = _requireSubtask(task, subtaskId);
-    await _database.updateSubtask(subtaskId, title);
+    await _repository.updateSubtask(subtaskId, title);
     subtask.title = title;
     notifyListeners();
   }
@@ -110,7 +117,7 @@ class TaskState extends ChangeNotifier {
   Future<void> deleteSubtask(int taskId, int subtaskId) async {
     final task = _requireTask(taskId);
     _requireSubtask(task, subtaskId);
-    await _database.deleteSubtask(subtaskId);
+    await _repository.deleteSubtask(subtaskId);
     task.subtasks.removeWhere((item) => item.id == subtaskId);
     notifyListeners();
   }
@@ -119,7 +126,7 @@ class TaskState extends ChangeNotifier {
     final task = _requireTask(taskId);
     final subtask = _requireSubtask(task, subtaskId);
     final completed = !subtask.isCompleted;
-    await _database.updateSubtaskStatus(subtaskId, completed);
+    await _repository.updateSubtaskStatus(subtaskId, completed);
     subtask.isCompleted = completed;
     notifyListeners();
   }
@@ -146,7 +153,7 @@ class TaskState extends ChangeNotifier {
   int get totalPoints => (completedTasks * 10) + (completedSubtasks * 5);
 
   int get currentStreak {
-    final now = DateTime.now();
+    final now = _now();
     final today = DateTime(now.year, now.month, now.day);
     final completionDays = _tasks
         .where((task) => task.isCompleted && task.completedAt != null)

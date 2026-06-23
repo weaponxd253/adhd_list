@@ -1,7 +1,11 @@
 import 'database_helper.dart';
+import '../repositories/repositories.dart';
 
-class TaskDatabase {
-  final dbHelper = DatabaseHelper.instance;
+class TaskDatabase implements TaskRepository {
+  TaskDatabase({DatabaseHelper? dbHelper})
+      : dbHelper = dbHelper ?? DatabaseHelper.instance;
+
+  final DatabaseHelper dbHelper;
 
   void _requireAffectedRow(int count, String operation) {
     if (count == 0) {
@@ -9,6 +13,7 @@ class TaskDatabase {
     }
   }
 
+  @override
   Future<int> insertTask(String title, String dueDate) async {
     final db = await dbHelper.database;
     return await db.insert(
@@ -23,11 +28,13 @@ class TaskDatabase {
     );
   }
 
+  @override
   Future<List<Map<String, dynamic>>> fetchTasks() async {
     final db = await dbHelper.database;
     return await db.query('tasks');
   }
 
+  @override
   Future<void> editTask(int id, String newTitle, String newDueDate) async {
     final db = await dbHelper.database;
     final count = await db.update(
@@ -42,6 +49,7 @@ class TaskDatabase {
   // Keeps is_completed, status, and completed_at in sync.
   // completed_at is stamped when the task is first marked done and cleared
   // if the task is un-completed, so the streak reflects actual completion days.
+  @override
   Future<void> updateTaskStatus(int taskId, String newStatus) async {
     final db = await dbHelper.database;
     final count = await db.update(
@@ -58,17 +66,20 @@ class TaskDatabase {
     _requireAffectedRow(count, 'Updating task $taskId');
   }
 
+  @override
   Future<void> deleteTask(int id) async {
     final db = await dbHelper.database;
     final count = await db.delete('tasks', where: 'id = ?', whereArgs: [id]);
     _requireAffectedRow(count, 'Deleting task $id');
   }
 
+  @override
   Future<void> clearTasks() async {
     final db = await dbHelper.database;
     await db.delete('tasks');
   }
 
+  @override
   Future<int> insertSubtask(int taskId, String title) async {
     final db = await dbHelper.database;
     return await db.insert(
@@ -77,6 +88,7 @@ class TaskDatabase {
     );
   }
 
+  @override
   Future<List<Map<String, dynamic>>> fetchSubtasks(int taskId) async {
     final db = await dbHelper.database;
     return await db.query(
@@ -87,6 +99,7 @@ class TaskDatabase {
     );
   }
 
+  @override
   Future<void> updateSubtask(int subtaskId, String newTitle) async {
     final db = await dbHelper.database;
     final count = await db.update(
@@ -99,6 +112,7 @@ class TaskDatabase {
   }
 
   // Persists subtask completion state.
+  @override
   Future<void> updateSubtaskStatus(int subtaskId, bool isCompleted) async {
     final db = await dbHelper.database;
     final count = await db.update(
@@ -110,6 +124,7 @@ class TaskDatabase {
     _requireAffectedRow(count, 'Updating subtask $subtaskId');
   }
 
+  @override
   Future<void> deleteSubtask(int subtaskId) async {
     final db = await dbHelper.database;
     final count = await db.delete(

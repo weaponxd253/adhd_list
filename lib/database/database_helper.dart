@@ -3,24 +3,51 @@ import 'package:sqflite/sqflite.dart';
 
 class DatabaseHelper {
   static const _schemaVersion = 6;
-  static final DatabaseHelper instance = DatabaseHelper._privateConstructor();
-  static Future<Database>? _databaseFuture;
+  static final DatabaseHelper instance = DatabaseHelper._();
 
-  DatabaseHelper._privateConstructor();
+  DatabaseHelper._({
+    DatabaseFactory? databaseFactory,
+    String? databasePath,
+  })  : _databaseFactory = databaseFactory ?? databaseFactorySqflitePlugin,
+        _databasePath = databasePath;
+
+  factory DatabaseHelper.forTesting({
+    required DatabaseFactory databaseFactory,
+    required String databasePath,
+  }) {
+    return DatabaseHelper._(
+      databaseFactory: databaseFactory,
+      databasePath: databasePath,
+    );
+  }
+
+  final DatabaseFactory _databaseFactory;
+  final String? _databasePath;
+  Future<Database>? _databaseFuture;
 
   Future<Database> get database => _databaseFuture ??= _initDatabase();
 
   Future<Database> _initDatabase() async {
-    final path = join(await getDatabasesPath(), 'focusflow.db');
-    return openDatabase(
+    final path = _databasePath ??
+        join(await _databaseFactory.getDatabasesPath(), 'focusflow.db');
+    return _databaseFactory.openDatabase(
       path,
-      version: _schemaVersion,
-      onConfigure: (db) async {
-        await db.execute('PRAGMA foreign_keys = ON');
-      },
-      onCreate: _onCreate,
-      onUpgrade: _onUpgrade,
+      options: OpenDatabaseOptions(
+        version: _schemaVersion,
+        onConfigure: (db) async {
+          await db.execute('PRAGMA foreign_keys = ON');
+        },
+        onCreate: _onCreate,
+        onUpgrade: _onUpgrade,
+      ),
     );
+  }
+
+  Future<void> close() async {
+    final future = _databaseFuture;
+    if (future == null) return;
+    await (await future).close();
+    _databaseFuture = null;
   }
 
   Future<void> _createSubtasksTable(DatabaseExecutor db) async {
