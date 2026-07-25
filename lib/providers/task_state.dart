@@ -21,8 +21,14 @@ class TaskState extends ChangeNotifier {
   final TaskRepository _repository;
   final DateTime Function() _now;
   List<Task> _tasks = [];
+  final Set<int> _busyTaskIds = {};
+  bool _isLoading = false;
+  bool _isCreating = false;
 
   UnmodifiableListView<Task> get tasks => UnmodifiableListView(_tasks);
+  bool get isLoading => _isLoading;
+  bool get isCreating => _isCreating;
+  bool isTaskBusy(int taskId) => _busyTaskIds.contains(taskId);
 
   Task _requireTask(int taskId) {
     for (final task in _tasks) {
@@ -39,30 +45,43 @@ class TaskState extends ChangeNotifier {
   }
 
   Future<void> loadTasks() async {
-    final rows = await _repository.fetchTasks();
-    final loaded = <Task>[];
-    for (final row in rows) {
-      final subtaskRows = await _repository.fetchSubtasks(row['id'] as int);
-      loaded.add(
-        Task(
-          id: row['id'] as int,
-          title: row['title'] as String,
-          dueDate: DateTime.parse(row['due_date'] as String),
-          status: row['is_completed'] == 1 ? 'completed' : 'pending',
-          completedAt: row['completed_at'] == null
-              ? null
-              : DateTime.tryParse(row['completed_at'] as String),
-          subtasks: subtaskRows.map(Subtask.fromMap).toList(),
-        ),
-      );
-    }
-    _tasks = loaded;
+    _isLoading = true;
     notifyListeners();
+    try {
+      final rows = await _repository.fetchTasks();
+      final loaded = <Task>[];
+      for (final row in rows) {
+        final subtaskRows = await _repository.fetchSubtasks(row['id'] as int);
+        loaded.add(
+          Task(
+            id: row['id'] as int,
+            title: row['title'] as String,
+            dueDate: DateTime.parse(row['due_date'] as String),
+            status: row['is_completed'] == 1 ? 'completed' : 'pending',
+            completedAt: row['completed_at'] == null
+                ? null
+                : DateTime.tryParse(row['completed_at'] as String),
+            subtasks: subtaskRows.map(Subtask.fromMap).toList(),
+          ),
+        );
+      }
+      _tasks = loaded;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 
   Future<void> addTask(String title, DateTime dueDate) async {
-    await _repository.insertTask(title, dueDate.toIso8601String());
-    await loadTasks();
+    _isCreating = true;
+    notifyListeners();
+    try {
+      await _repository.insertTask(title, dueDate.toIso8601String());
+      await loadTasks();
+    } finally {
+      _isCreating = false;
+      notifyListeners();
+    }
   }
 
   Future<void> clearTaskHistory() async {
@@ -76,30 +95,62 @@ class TaskState extends ChangeNotifier {
     String title,
     DateTime dueDate,
   ) async {
-    await _repository.editTask(taskId, title, dueDate.toIso8601String());
-    await loadTasks();
+    await _runTaskMutation(taskId, () async {
+      await _repository.editTask(taskId, title, dueDate.toIso8601String());
+      await loadTasks();
+    });
   }
 
-  Future<void> deleteTask(int taskId) async {
-    await _repository.deleteTask(taskId);
-    _tasks = _tasks.where((task) => task.id != taskId).toList();
+  Future<Task> deleteTask(int taskId) async {
+    final task = _copyTask(_requireTask(taskId));
+    await _runTaskMutation(taskId, () async {
+      await _repository.deleteTask(taskId);
+      _tasks = _tasks.where((item) => item.id != taskId).toList();
+    });
+    return task;
+  }
+
+  Future<void> restoreTask(Task task) async {
+    _isCreating = true;
     notifyListeners();
+    try {
+      final taskId = await _repository.insertTask(
+        task.title,
+        task.dueDate.toIso8601String(),
+      );
+      if (task.isCompleted) {
+        await _repository.updateTaskStatus(taskId, 'completed');
+      }
+      for (final subtask in task.subtasks) {
+        final subtaskId =
+            await _repository.insertSubtask(taskId, subtask.title);
+        if (subtask.isCompleted) {
+          await _repository.updateSubtaskStatus(subtaskId, true);
+        }
+      }
+      await loadTasks();
+    } finally {
+      _isCreating = false;
+      notifyListeners();
+    }
   }
 
   Future<void> toggleTaskCompletion(int taskId) async {
     final task = _requireTask(taskId);
     final status = task.isCompleted ? 'pending' : 'completed';
-    await _repository.updateTaskStatus(taskId, status);
-    task.status = status;
-    task.completedAt = status == 'completed' ? _now() : null;
-    notifyListeners();
+    await _runTaskMutation(taskId, () async {
+      await _repository.updateTaskStatus(taskId, status);
+      task.status = status;
+      task.completedAt = status == 'completed' ? _now() : null;
+    });
   }
 
   Future<void> addSubtask(int taskId, String title) async {
     final task = _requireTask(taskId);
-    final id = await _repository.insertSubtask(taskId, title);
-    task.subtasks.add(Subtask(id: id, title: title));
-    notifyListeners();
+    await _runTaskMutation(taskId, () async {
+      final id = await _repository.insertSubtask(taskId, title);
+      task.subtasks.add(Subtask(id: id, title: title));
+    });
   }
 
   Future<void> editSubtask(
@@ -109,26 +160,62 @@ class TaskState extends ChangeNotifier {
   ) async {
     final task = _requireTask(taskId);
     final subtask = _requireSubtask(task, subtaskId);
-    await _repository.updateSubtask(subtaskId, title);
-    subtask.title = title;
-    notifyListeners();
+    await _runTaskMutation(taskId, () async {
+      await _repository.updateSubtask(subtaskId, title);
+      subtask.title = title;
+    });
   }
 
   Future<void> deleteSubtask(int taskId, int subtaskId) async {
     final task = _requireTask(taskId);
     _requireSubtask(task, subtaskId);
-    await _repository.deleteSubtask(subtaskId);
-    task.subtasks.removeWhere((item) => item.id == subtaskId);
-    notifyListeners();
+    await _runTaskMutation(taskId, () async {
+      await _repository.deleteSubtask(subtaskId);
+      task.subtasks.removeWhere((item) => item.id == subtaskId);
+    });
   }
 
   Future<void> toggleSubtaskCompletion(int taskId, int subtaskId) async {
     final task = _requireTask(taskId);
     final subtask = _requireSubtask(task, subtaskId);
     final completed = !subtask.isCompleted;
-    await _repository.updateSubtaskStatus(subtaskId, completed);
-    subtask.isCompleted = completed;
+    await _runTaskMutation(taskId, () async {
+      await _repository.updateSubtaskStatus(subtaskId, completed);
+      subtask.isCompleted = completed;
+    });
+  }
+
+  Future<void> _runTaskMutation(
+    int taskId,
+    Future<void> Function() operation,
+  ) async {
+    _busyTaskIds.add(taskId);
     notifyListeners();
+    try {
+      await operation();
+    } finally {
+      _busyTaskIds.remove(taskId);
+      notifyListeners();
+    }
+  }
+
+  Task _copyTask(Task task) {
+    return Task(
+      id: task.id,
+      title: task.title,
+      dueDate: task.dueDate,
+      status: task.status,
+      completedAt: task.completedAt,
+      subtasks: task.subtasks
+          .map(
+            (subtask) => Subtask(
+              id: subtask.id,
+              title: subtask.title,
+              isCompleted: subtask.isCompleted,
+            ),
+          )
+          .toList(),
+    );
   }
 
   int get totalTasks => _tasks.length;

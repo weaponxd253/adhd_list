@@ -238,19 +238,19 @@ class _TimerScreenState extends State<TimerScreen>
             const SizedBox(height: 32),
 
             // ── Session info ─────────────────────────────────────────
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 12,
+              runSpacing: 8,
               children: [
                 _InfoChip(
                     label: 'Focus',
                     value: '${timerState.focusDuration}m',
                     color: _modeColors[0]),
-                const SizedBox(width: 12),
                 _InfoChip(
                     label: 'Short',
                     value: '${timerState.shortBreakDuration}m',
                     color: _modeColors[1]),
-                const SizedBox(width: 12),
                 _InfoChip(
                     label: 'Long',
                     value: '${timerState.longBreakDuration}m',

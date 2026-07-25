@@ -1,17 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../../providers/task_state.dart';
 import 'task_input_section.dart';
 import 'task_list_section.dart';
 
-// Changed to StatefulWidget so _taskController is properly disposed.
-// The previous StatelessWidget version created a controller that was never
-// disposed, leaking resources on every rebuild.
 class TaskScreen extends StatefulWidget {
   const TaskScreen({super.key});
 
   @override
-  _TaskScreenState createState() => _TaskScreenState();
+  State<TaskScreen> createState() => _TaskScreenState();
 }
 
 class _TaskScreenState extends State<TaskScreen> {
@@ -32,14 +30,21 @@ class _TaskScreenState extends State<TaskScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Task Breakdown")),
+      appBar: AppBar(title: const Text('Tasks')),
       body: Column(
         children: [
           TaskInputSection(taskController: _taskController),
           Expanded(
             child: Consumer<TaskState>(
-              builder: (context, taskState, child) {
-                return TaskListSection(tasks: taskState.tasks);
+              builder: (context, taskState, _) {
+                if (taskState.isLoading && taskState.tasks.isEmpty) {
+                  return const Center(
+                    child: CircularProgressIndicator(
+                      semanticsLabel: 'Loading tasks',
+                    ),
+                  );
+                }
+                return TaskListSection(taskState: taskState);
               },
             ),
           ),

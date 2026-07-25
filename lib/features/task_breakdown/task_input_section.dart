@@ -1,51 +1,54 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../../providers/task_state.dart';
+import '../../theme/app_theme.dart';
 
 class TaskInputSection extends StatefulWidget {
-  final TextEditingController taskController;
   const TaskInputSection({super.key, required this.taskController});
 
+  final TextEditingController taskController;
+
   @override
-  _TaskInputSectionState createState() => _TaskInputSectionState();
+  State<TaskInputSection> createState() => _TaskInputSectionState();
 }
 
 class _TaskInputSectionState extends State<TaskInputSection> {
   DateTime? _selectedDate;
+  String? _errorText;
 
   Future<void> _pickDate() async {
+    final now = DateUtils.dateOnly(DateTime.now());
     final picked = await showDatePicker(
       context: context,
-      initialDate: DateTime.now().add(const Duration(days: 1)),
-      firstDate: DateTime.now(),
+      initialDate: _selectedDate ?? now.add(const Duration(days: 1)),
+      firstDate: now,
       lastDate: DateTime(2100),
-      builder: (context, child) => Theme(
-        data: Theme.of(context).copyWith(
-          dialogBackgroundColor: Theme.of(context).cardTheme.color,
-        ),
-        child: child!,
-      ),
+      helpText: 'Choose a task due date',
     );
-    if (picked != null) setState(() => _selectedDate = picked);
+    if (picked != null && mounted) {
+      setState(() => _selectedDate = picked);
+    }
   }
-
-  void _clearDate() => setState(() => _selectedDate = null);
 
   Future<void> _submit() async {
     final title = widget.taskController.text.trim();
     if (title.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a task name')),
-      );
+      setState(() => _errorText = 'Enter a task name');
       return;
     }
-    // Due date is optional — default to 30 days out if not set
-    final due = _selectedDate ?? DateTime.now().add(const Duration(days: 30));
+
+    setState(() => _errorText = null);
+    final dueDate =
+        _selectedDate ?? DateTime.now().add(const Duration(days: 30));
     try {
-      await Provider.of<TaskState>(context, listen: false).addTask(title, due);
+      await context.read<TaskState>().addTask(title, dueDate);
       if (!mounted) return;
       widget.taskController.clear();
       setState(() => _selectedDate = null);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Task added')),
+      );
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -56,141 +59,121 @@ class _TaskInputSectionState extends State<TaskInputSection> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final state = context.watch<TaskState>();
+    final dueLabel =
+        _selectedDate == null ? 'Due date' : _formatDate(_selectedDate!);
 
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardTheme.color,
-        border: Border(
-          bottom: BorderSide(
-            color: isDark ? const Color(0xFF2D2D44) : const Color(0xFFE4E4F0),
-          ),
-        ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        AppSpacing.sm,
+        AppSpacing.md,
+        AppSpacing.xs,
       ),
-      child: Column(
-        children: [
-          // Task name input
-          TextField(
-            controller: widget.taskController,
-            textCapitalization: TextCapitalization.sentences,
-            onSubmitted: (_) => _submit(),
-            decoration: const InputDecoration(
-              hintText: 'What do you need to do?',
-              prefixIcon: Icon(Icons.edit_outlined, size: 20),
-            ),
-          ),
-          const SizedBox(height: 10),
-
-          // Date chip + Add button row
-          Row(
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.sm),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Date selector — optional
-              Expanded(
-                child: _selectedDate == null
-                    ? OutlinedButton.icon(
-                        onPressed: _pickDate,
-                        icon:
-                            const Icon(Icons.calendar_today_outlined, size: 16),
-                        label: const Text('Due date (optional)'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Theme.of(context)
-                              .colorScheme
-                              .onSurface
-                              .withOpacity(0.5),
-                          side: BorderSide(
-                            color: isDark
-                                ? const Color(0xFF2D2D44)
-                                : const Color(0xFFE4E4F0),
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12)),
-                          textStyle: const TextStyle(
-                              fontSize: 13, fontWeight: FontWeight.w500),
-                        ),
-                      )
-                    : GestureDetector(
-                        onTap: _pickDate,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 10),
-                          decoration: BoxDecoration(
-                            color: cs.primary.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(12),
-                            border:
-                                Border.all(color: cs.primary.withOpacity(0.3)),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.calendar_today_rounded,
-                                  size: 14, color: cs.primary),
-                              const SizedBox(width: 6),
-                              Text(
-                                _formatDate(_selectedDate!),
-                                style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: cs.primary),
-                              ),
-                              const SizedBox(width: 8),
-                              GestureDetector(
-                                onTap: _clearDate,
-                                child: Icon(Icons.close_rounded,
-                                    size: 14, color: cs.primary),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
+              TextField(
+                key: const Key('task-name-field'),
+                controller: widget.taskController,
+                enabled: !state.isCreating,
+                textCapitalization: TextCapitalization.sentences,
+                textInputAction: TextInputAction.done,
+                onChanged: (_) {
+                  if (_errorText != null) setState(() => _errorText = null);
+                },
+                onSubmitted: (_) => state.isCreating ? null : _submit(),
+                decoration: InputDecoration(
+                  hintText: 'What needs doing?',
+                  errorText: _errorText,
+                  prefixIcon: const Icon(Icons.add_task_rounded),
+                ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(height: AppSpacing.xs),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final stackActions =
+                      MediaQuery.textScalerOf(context).scale(1) > 1.3 ||
+                          constraints.maxWidth < 320;
+                  final dateButton = OutlinedButton.icon(
+                    key: const Key('task-due-date-button'),
+                    onPressed: state.isCreating ? null : _pickDate,
+                    icon: const Icon(Icons.calendar_today_outlined, size: 18),
+                    label: Text(dueLabel, overflow: TextOverflow.ellipsis),
+                  );
+                  final addButton = ElevatedButton.icon(
+                    key: const Key('add-task-button'),
+                    onPressed: state.isCreating ? null : _submit,
+                    icon: state.isCreating
+                        ? const SizedBox.square(
+                            dimension: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.add_rounded, size: 20),
+                    label: Text(state.isCreating ? 'Adding' : 'Add task'),
+                  );
 
-              // Add button
-              ElevatedButton(
-                onPressed: _submit,
-                style: ElevatedButton.styleFrom(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.add_rounded, size: 18),
-                    SizedBox(width: 4),
-                    Text('Add'),
-                  ],
-                ),
+                  if (stackActions) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(child: dateButton),
+                            if (_selectedDate != null)
+                              IconButton(
+                                tooltip: 'Clear due date',
+                                onPressed: state.isCreating
+                                    ? null
+                                    : () => setState(
+                                          () => _selectedDate = null,
+                                        ),
+                                icon: const Icon(Icons.close_rounded),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: AppSpacing.xs),
+                        addButton,
+                      ],
+                    );
+                  }
+
+                  return Row(
+                    children: [
+                      Expanded(child: dateButton),
+                      if (_selectedDate != null)
+                        IconButton(
+                          tooltip: 'Clear due date',
+                          onPressed: state.isCreating
+                              ? null
+                              : () => setState(() => _selectedDate = null),
+                          icon: const Icon(Icons.close_rounded),
+                        ),
+                      const SizedBox(width: AppSpacing.xs),
+                      addButton,
+                    ],
+                  );
+                },
               ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }
 
   String _formatDate(DateTime date) {
-    final today = DateTime.now();
-    final tomorrow = today.add(const Duration(days: 1));
-    if (_isSameDay(date, today)) return 'Today';
-    if (_isSameDay(date, tomorrow)) return 'Tomorrow';
-    final diff = date.difference(today).inDays;
-    if (diff < 7)
-      return '${[
-        'Mon',
-        'Tue',
-        'Wed',
-        'Thu',
-        'Fri',
-        'Sat',
-        'Sun'
-      ][date.weekday - 1]}';
-    return '${date.day}/${date.month}';
+    final today = DateUtils.dateOnly(DateTime.now());
+    final selected = DateUtils.dateOnly(date);
+    final difference = selected.difference(today).inDays;
+    if (difference == 0) return 'Today';
+    if (difference == 1) return 'Tomorrow';
+    return '${date.month}/${date.day}/${date.year}';
   }
-
-  bool _isSameDay(DateTime a, DateTime b) =>
-      a.year == b.year && a.month == b.month && a.day == b.day;
 }

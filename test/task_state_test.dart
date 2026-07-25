@@ -151,5 +151,41 @@ void main() {
 
       await expectLater(state.toggleTaskCompletion(404), throwsStateError);
     });
+
+    test('deletion returns a snapshot that can be restored', () async {
+      final repository = FakeTaskRepository(
+        tasks: [
+          taskRow(
+            id: 8,
+            title: 'Recover me',
+            dueDate: today,
+            completed: true,
+            completedAt: today,
+          ),
+        ],
+        subtasks: {
+          8: [
+            subtaskRow(
+              id: 9,
+              taskId: 8,
+              title: 'Recovered step',
+              completed: true,
+            ),
+          ],
+        },
+      );
+      final state = TaskState(repository: repository, autoLoad: false);
+      await state.loadTasks();
+
+      final deleted = await state.deleteTask(8);
+      expect(state.tasks, isEmpty);
+
+      await state.restoreTask(deleted);
+      expect(state.tasks, hasLength(1));
+      expect(state.tasks.single.title, 'Recover me');
+      expect(state.tasks.single.isCompleted, isTrue);
+      expect(state.tasks.single.subtasks.single.title, 'Recovered step');
+      expect(state.tasks.single.subtasks.single.isCompleted, isTrue);
+    });
   });
 }
