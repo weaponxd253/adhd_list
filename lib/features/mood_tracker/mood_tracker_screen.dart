@@ -76,21 +76,27 @@ class MoodTrackerScreen extends StatelessWidget {
           body: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Current mood banner
               if (selected.isNotEmpty)
                 Container(
-                  margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                  padding: const EdgeInsets.all(14),
+                  margin: const EdgeInsets.fromLTRB(
+                    AppSpacing.md,
+                    AppSpacing.sm,
+                    AppSpacing.md,
+                    0,
+                  ),
+                  padding: const EdgeInsets.all(AppSpacing.sm),
                   decoration: BoxDecoration(
                     color: cs.primary.withOpacity(0.08),
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(AppRadii.card),
                     border: Border.all(color: cs.primary.withOpacity(0.2)),
                   ),
                   child: Row(
                     children: [
-                      Text(moodState.selectedMoodEmoji,
-                          style: const TextStyle(fontSize: 28)),
-                      const SizedBox(width: 12),
+                      Text(
+                        moodState.selectedMoodEmoji,
+                        style: const TextStyle(fontSize: 28),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -114,50 +120,86 @@ class MoodTrackerScreen extends StatelessWidget {
                     ],
                   ),
                 ),
-
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.md,
+                  AppSpacing.md,
+                  AppSpacing.md,
+                  AppSpacing.xs,
+                ),
                 child: Text(
                   'How are you feeling?',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
               ),
-
-              // 3-column grid
               Expanded(
-                child: GridView.builder(
-                  padding: EdgeInsets.fromLTRB(
-                    AppSpacing.md,
-                    0,
-                    AppSpacing.md,
-                    AppInsets.bottomNavigationScrollPadding(context),
+                child: _MoodGrid(
+                  moods: _moods,
+                  selected: selected,
+                  onSelected: (mood) => _saveMood(
+                    context,
+                    moodState,
+                    mood['l']!,
+                    mood['e']!,
                   ),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3,
-                    childAspectRatio: 1.1,
-                    crossAxisSpacing: 10,
-                    mainAxisSpacing: 10,
-                  ),
-                  itemCount: _moods.length,
-                  itemBuilder: (context, i) {
-                    final mood = _moods[i];
-                    final isSelected = selected == mood['l'];
-                    return _MoodCell(
-                      emoji: mood['e']!,
-                      label: mood['l']!,
-                      isSelected: isSelected,
-                      onTap: () => _saveMood(
-                        context,
-                        moodState,
-                        mood['l']!,
-                        mood['e']!,
-                      ),
-                    );
-                  },
                 ),
               ),
             ],
           ),
+        );
+      },
+    );
+  }
+}
+
+class _MoodGrid extends StatelessWidget {
+  const _MoodGrid({
+    required this.moods,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final List<Map<String, String>> moods;
+  final String selected;
+  final ValueChanged<Map<String, String>> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const columns = 3;
+        const tileGap = AppSpacing.sm;
+        final availableWidth = constraints.maxWidth - AppSpacing.md * 2;
+        final tileWidth = (availableWidth - tileGap * (columns - 1)) / columns;
+        final tileHeight = tileWidth / 1.08;
+
+        return ListView(
+          padding: EdgeInsets.fromLTRB(
+            AppSpacing.md,
+            0,
+            AppSpacing.md,
+            AppInsets.bottomScrollPadding(context),
+          ),
+          children: [
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: tileGap,
+              runSpacing: tileGap,
+              children: [
+                for (final mood in moods)
+                  SizedBox(
+                    width: tileWidth,
+                    height: tileHeight,
+                    child: _MoodCell(
+                      emoji: mood['e']!,
+                      label: mood['l']!,
+                      isSelected: selected == mood['l'],
+                      onTap: () => onSelected(mood),
+                    ),
+                  ),
+              ],
+            ),
+          ],
         );
       },
     );
@@ -180,20 +222,20 @@ class _MoodCell extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final selectedFill = Color.alphaBlend(
+      cs.primary.withOpacity(isDark ? 0.18 : 0.10),
+      cs.surface,
+    );
 
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         decoration: BoxDecoration(
-          color: isSelected
-              ? cs.primary.withOpacity(0.12)
-              : (isDark ? const Color(0xFF1A1A2E) : Colors.white),
-          borderRadius: BorderRadius.circular(14),
+          color: isSelected ? selectedFill : cs.surface,
+          borderRadius: BorderRadius.circular(AppRadii.control),
           border: Border.all(
-            color: isSelected
-                ? cs.primary
-                : (isDark ? const Color(0xFF2D2D44) : const Color(0xFFE4E4F0)),
+            color: isSelected ? cs.primary : cs.outlineVariant,
             width: isSelected ? 2 : 1,
           ),
         ),
@@ -201,7 +243,7 @@ class _MoodCell extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(emoji, style: const TextStyle(fontSize: 28)),
-            const SizedBox(height: 5),
+            const SizedBox(height: AppSpacing.xxs),
             Text(
               label,
               style: TextStyle(

@@ -22,6 +22,13 @@ abstract final class AppSizes {
 }
 
 abstract final class AppInsets {
+  static double bottomScrollPadding(
+    BuildContext context, {
+    double extra = AppSpacing.lg,
+  }) {
+    return extra + MediaQuery.paddingOf(context).bottom;
+  }
+
   static double bottomNavigationScrollPadding(
     BuildContext context, {
     double extra = AppSpacing.lg,
@@ -42,7 +49,7 @@ abstract final class AppInsets {
       left,
       top,
       right,
-      bottomNavigationScrollPadding(context, extra: bottom),
+      bottomScrollPadding(context, extra: bottom),
     );
   }
 }
