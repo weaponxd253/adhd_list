@@ -21,6 +21,32 @@ abstract final class AppSizes {
   static const navigationHeight = 72.0;
 }
 
+abstract final class AppInsets {
+  static double bottomNavigationScrollPadding(
+    BuildContext context, {
+    double extra = AppSpacing.lg,
+  }) {
+    return AppSizes.navigationHeight +
+        extra +
+        MediaQuery.paddingOf(context).bottom;
+  }
+
+  static EdgeInsets screenScrollPadding(
+    BuildContext context, {
+    double left = AppSpacing.md,
+    double top = AppSpacing.sm,
+    double right = AppSpacing.md,
+    double bottom = AppSpacing.lg,
+  }) {
+    return EdgeInsets.fromLTRB(
+      left,
+      top,
+      right,
+      bottomNavigationScrollPadding(context, extra: bottom),
+    );
+  }
+}
+
 abstract final class AppColors {
   static const primary = Color(0xFF5656D6);
   static const primaryDark = Color(0xFF8B92FF);
@@ -91,6 +117,22 @@ abstract final class AppTheme {
   static final light = _build(Brightness.light);
   static final dark = _build(Brightness.dark);
 
+  static SystemUiOverlayStyle systemOverlayStyle(Brightness brightness) {
+    final dark = brightness == Brightness.dark;
+    final surface = dark ? AppColors.surfaceDark : AppColors.surface;
+    final iconBrightness = dark ? Brightness.light : Brightness.dark;
+
+    return SystemUiOverlayStyle(
+      statusBarColor: surface,
+      statusBarIconBrightness: iconBrightness,
+      statusBarBrightness: dark ? Brightness.dark : Brightness.light,
+      systemNavigationBarColor: surface,
+      systemNavigationBarIconBrightness: iconBrightness,
+      systemNavigationBarDividerColor:
+          dark ? AppColors.borderDark : AppColors.border,
+    );
+  }
+
   static ThemeData _build(Brightness brightness) {
     final dark = brightness == Brightness.dark;
     final primary = dark ? AppColors.primaryDark : AppColors.primary;
@@ -139,14 +181,14 @@ abstract final class AppTheme {
         fontSize: 28,
         height: 1.2,
         fontWeight: FontWeight.w800,
-        letterSpacing: -0.8,
+        letterSpacing: 0,
       ),
       headlineMedium: TextStyle(
         color: text,
         fontSize: 22,
         height: 1.25,
         fontWeight: FontWeight.w700,
-        letterSpacing: -0.4,
+        letterSpacing: 0,
       ),
       titleLarge: TextStyle(
         color: text,
@@ -199,8 +241,7 @@ abstract final class AppTheme {
         elevation: 0,
         scrolledUnderElevation: 1,
         centerTitle: false,
-        systemOverlayStyle:
-            dark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
+        systemOverlayStyle: systemOverlayStyle(brightness),
         titleTextStyle: textTheme.headlineMedium,
       ),
       cardTheme: CardTheme(

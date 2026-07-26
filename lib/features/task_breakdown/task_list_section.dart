@@ -56,11 +56,11 @@ class _TaskListSectionState extends State<TaskListSection> {
 
     return ListView(
       key: const PageStorageKey('task-list'),
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.md,
-        AppSpacing.xs,
-        AppSpacing.md,
-        AppSpacing.lg,
+      padding: AppInsets.screenScrollPadding(
+        context,
+        left: AppSpacing.md,
+        top: AppSpacing.xs,
+        right: AppSpacing.md,
       ),
       children: [
         _SectionHeader(
@@ -103,6 +103,8 @@ class _TaskListSectionState extends State<TaskListSection> {
                 ? semantic.warning
                 : Theme.of(context).colorScheme.primary;
     final compactActions = MediaQuery.textScalerOf(context).scale(1) > 1.3;
+    final useActionMenu =
+        compactActions || MediaQuery.sizeOf(context).width < 430;
 
     return Padding(
       key: ValueKey('task-${task.id}'),
@@ -189,9 +191,10 @@ class _TaskListSectionState extends State<TaskListSection> {
                       ),
                     ),
                   ),
-                  if (compactActions)
+                  if (useActionMenu)
                     PopupMenuButton<String>(
                       tooltip: 'Task actions for ${task.title}',
+                      icon: const Icon(Icons.more_horiz_rounded),
                       enabled: !busy,
                       onSelected: (value) {
                         if (value == 'edit') _showEditTask(task);
@@ -222,6 +225,8 @@ class _TaskListSectionState extends State<TaskListSection> {
                       tooltip: 'Edit ${task.title}',
                       onPressed: busy ? null : () => _showEditTask(task),
                       icon: const Icon(Icons.edit_outlined),
+                      iconSize: 22,
+                      visualDensity: VisualDensity.compact,
                     ),
                     IconButton(
                       tooltip: 'Delete ${task.title}',
@@ -230,6 +235,8 @@ class _TaskListSectionState extends State<TaskListSection> {
                         Icons.delete_outline_rounded,
                         color: semantic.danger,
                       ),
+                      iconSize: 22,
+                      visualDensity: VisualDensity.compact,
                     ),
                   ],
                   IconButton(
@@ -244,6 +251,8 @@ class _TaskListSectionState extends State<TaskListSection> {
                           ? Icons.expand_less_rounded
                           : Icons.expand_more_rounded,
                     ),
+                    iconSize: 22,
+                    visualDensity: VisualDensity.compact,
                   ),
                 ],
               ),
@@ -259,7 +268,7 @@ class _TaskListSectionState extends State<TaskListSection> {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(
-        AppSpacing.lg,
+        AppSpacing.md,
         AppSpacing.xs,
         AppSpacing.sm,
         AppSpacing.sm,
@@ -309,6 +318,10 @@ class _TaskListSectionState extends State<TaskListSection> {
                 tooltip: 'Add step',
                 onPressed: busy ? null : () => _addSubtask(task),
                 icon: const Icon(Icons.add_rounded),
+                style: IconButton.styleFrom(
+                  minimumSize: const Size(44, 44),
+                  fixedSize: const Size(44, 44),
+                ),
               ),
             ],
           ),
@@ -528,41 +541,43 @@ class _SubtaskRow extends StatelessWidget {
     return Semantics(
       label:
           '${subtask.title}, ${subtask.isCompleted ? "completed" : "not completed"}',
-      child: Row(
-        children: [
-          Container(
-            width: 2,
-            height: 40,
-            margin: const EdgeInsets.only(right: AppSpacing.xs),
-            color: Theme.of(context).colorScheme.outlineVariant,
-          ),
-          Checkbox(
-            value: subtask.isCompleted,
-            onChanged: enabled ? (_) => onToggle() : null,
-            semanticLabel: subtask.isCompleted
-                ? 'Mark ${subtask.title} incomplete'
-                : 'Mark ${subtask.title} complete',
-          ),
-          Expanded(
-            child: Text(
-              subtask.title,
-              style: TextStyle(
-                decoration:
-                    subtask.isCompleted ? TextDecoration.lineThrough : null,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxs),
+        child: Row(
+          children: [
+            const SizedBox(width: AppSpacing.xs),
+            Checkbox(
+              value: subtask.isCompleted,
+              onChanged: enabled ? (_) => onToggle() : null,
+              semanticLabel: subtask.isCompleted
+                  ? 'Mark ${subtask.title} incomplete'
+                  : 'Mark ${subtask.title} complete',
+            ),
+            Expanded(
+              child: Text(
+                subtask.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  decoration:
+                      subtask.isCompleted ? TextDecoration.lineThrough : null,
+                ),
               ),
             ),
-          ),
-          IconButton(
-            tooltip: 'Edit ${subtask.title}',
-            onPressed: enabled ? onEdit : null,
-            icon: const Icon(Icons.edit_outlined, size: 20),
-          ),
-          IconButton(
-            tooltip: 'Delete ${subtask.title}',
-            onPressed: enabled ? onDelete : null,
-            icon: const Icon(Icons.close_rounded, size: 20),
-          ),
-        ],
+            IconButton(
+              tooltip: 'Edit ${subtask.title}',
+              onPressed: enabled ? onEdit : null,
+              icon: const Icon(Icons.edit_outlined, size: 20),
+              visualDensity: VisualDensity.compact,
+            ),
+            IconButton(
+              tooltip: 'Delete ${subtask.title}',
+              onPressed: enabled ? onDelete : null,
+              icon: const Icon(Icons.close_rounded, size: 20),
+              visualDensity: VisualDensity.compact,
+            ),
+          ],
+        ),
       ),
     );
   }

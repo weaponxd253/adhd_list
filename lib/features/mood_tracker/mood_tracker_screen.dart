@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/mood_state.dart';
+import '../../theme/app_theme.dart';
 import '../mood_tracker/mood_history_screen.dart';
 
 class MoodTrackerScreen extends StatelessWidget {
@@ -125,7 +126,12 @@ class MoodTrackerScreen extends StatelessWidget {
               // 3-column grid
               Expanded(
                 child: GridView.builder(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                  padding: EdgeInsets.fromLTRB(
+                    AppSpacing.md,
+                    0,
+                    AppSpacing.md,
+                    AppInsets.bottomNavigationScrollPadding(context),
+                  ),
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 3,
                     childAspectRatio: 1.1,

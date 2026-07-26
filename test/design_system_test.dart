@@ -86,7 +86,7 @@ void main() {
 
     navigation = tester.widget(find.byType(NavigationBar));
     expect(navigation.selectedIndex, 1);
-    expect(find.text('Task Breakdown'), findsOneWidget);
+    expect(find.widgetWithText(AppBar, 'Tasks'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('navigation-timer')));
     await tester.pump(const Duration(milliseconds: 300));

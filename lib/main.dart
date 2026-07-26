@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import 'features/home/home_screen.dart';
@@ -33,6 +34,14 @@ class FocusFlowApp extends StatelessWidget {
             themeMode: settings.themeMode,
             home: const HomeScreen(),
             debugShowCheckedModeBanner: false,
+            builder: (context, child) {
+              return AnnotatedRegion<SystemUiOverlayStyle>(
+                value: AppTheme.systemOverlayStyle(
+                  Theme.of(context).brightness,
+                ),
+                child: child ?? const SizedBox.shrink(),
+              );
+            },
           );
         },
       ),

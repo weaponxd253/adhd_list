@@ -7,6 +7,7 @@ import '../../providers/settings_state.dart';
 import '../../providers/task_state.dart';
 import '../../providers/timer_state.dart';
 import '../../models/task.dart';
+import '../../theme/app_theme.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -16,7 +17,12 @@ class DashboardScreen extends StatelessWidget {
     return Scaffold(
       appBar: _buildAppBar(context, context.watch<SettingsState>()),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        padding: AppInsets.screenScrollPadding(
+          context,
+          left: AppSpacing.md,
+          top: AppSpacing.xs,
+          right: AppSpacing.md,
+        ),
         children: [
           Consumer<TaskState>(
             builder: (_, state, __) => _FocusNowCard(taskState: state),
@@ -212,7 +218,7 @@ class _FocusNowCard extends StatelessWidget {
                 color: Colors.white60,
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                letterSpacing: 1),
+                letterSpacing: 0),
           ),
         ]),
         const SizedBox(height: 10),

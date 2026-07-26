@@ -81,9 +81,14 @@ void main() {
     await state.loadTasks();
     await _pumpTaskScreen(tester, state);
 
-    expect(find.byTooltip('Edit Accessible task'), findsOneWidget);
-    expect(find.byTooltip('Delete Accessible task'), findsOneWidget);
+    expect(find.byTooltip('Task actions for Accessible task'), findsOneWidget);
     expect(find.byTooltip('Expand task'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Task actions for Accessible task'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Edit'), findsOneWidget);
+    expect(find.text('Delete'), findsOneWidget);
   });
 
   testWidgets('deletion offers undo and restores the task', (tester) async {
@@ -96,13 +101,17 @@ void main() {
     await state.loadTasks();
     await _pumpTaskScreen(tester, state);
 
-    await tester.tap(find.byTooltip('Delete Undo task'));
+    await tester.tap(find.byTooltip('Task actions for Undo task'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete'));
     await tester.pump(const Duration(milliseconds: 500));
 
     expect(find.text('Undo task deleted'), findsOneWidget);
     expect(find.text('Undo task'), findsNothing);
 
-    await tester.tap(find.byType(SnackBarAction));
+    final undoAction =
+        tester.widget<SnackBarAction>(find.byType(SnackBarAction));
+    undoAction.onPressed();
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
