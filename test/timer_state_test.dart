@@ -72,6 +72,23 @@ void main() {
       expect(state.timerDisplay, '10:00');
     });
 
+    test('completes a session by switching to the next ready mode', () {
+      fakeAsync((async) {
+        final state = TimerState();
+        state.updateDurations(focus: 1, shortBreak: 5, longBreak: 15);
+
+        state.startTimer();
+        async.elapse(const Duration(minutes: 1));
+
+        expect(state.isTimerRunning, isFalse);
+        expect(state.currentMode, 'Short Break');
+        expect(state.timerDisplay, '05:00');
+        expect(state.statusLabel, 'Short Break ready');
+        expect(state.completionMessage, 'Focus complete. Short Break ready.');
+        state.dispose();
+      });
+    });
+
     test('dispose cancels future ticks', () {
       fakeAsync((async) {
         final state = TimerState();

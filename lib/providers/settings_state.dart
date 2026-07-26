@@ -5,6 +5,21 @@ import 'package:flutter/material.dart';
 import '../database/settings_database.dart';
 import '../repositories/repositories.dart';
 
+@immutable
+class TimerPreset {
+  const TimerPreset({
+    required this.label,
+    required this.focus,
+    required this.shortBreak,
+    required this.longBreak,
+  });
+
+  final String label;
+  final int focus;
+  final int shortBreak;
+  final int longBreak;
+}
+
 class SettingsState extends ChangeNotifier {
   SettingsState({
     SettingsRepository? repository,
@@ -26,6 +41,26 @@ class SettingsState extends ChangeNotifier {
   static const defaultLongBreakDuration = 15;
   static const defaultDueDateOffset = 30;
   static const dueDateOffsetOptions = [1, 7, 30];
+  static const timerPresets = [
+    TimerPreset(
+      label: 'Classic',
+      focus: 25,
+      shortBreak: 5,
+      longBreak: 15,
+    ),
+    TimerPreset(
+      label: 'Gentle',
+      focus: 15,
+      shortBreak: 5,
+      longBreak: 10,
+    ),
+    TimerPreset(
+      label: 'Deep Work',
+      focus: 50,
+      shortBreak: 10,
+      longBreak: 30,
+    ),
+  ];
 
   final SettingsRepository _repository;
   ThemeMode _themeMode = ThemeMode.light;
@@ -104,6 +139,14 @@ class SettingsState extends ChangeNotifier {
     _shortBreakDuration = shortBreak;
     _longBreakDuration = longBreak;
     notifyListeners();
+  }
+
+  Future<void> applyTimerPreset(TimerPreset preset) {
+    return setTimerDurations(
+      focus: preset.focus,
+      shortBreak: preset.shortBreak,
+      longBreak: preset.longBreak,
+    );
   }
 
   Future<void> setDefaultDueDateOffsetDays(int days) async {

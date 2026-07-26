@@ -28,6 +28,11 @@ class SettingsScreen extends StatelessWidget {
           _SettingsSection(
             title: 'Timer',
             children: [
+              _TimerPresetControl(
+                settings: settings,
+                onSelected: (preset) => _applyTimerPreset(context, preset),
+              ),
+              _SettingsDivider(),
               _DurationRow(
                 label: 'Focus',
                 value: settings.focusDuration,
@@ -113,6 +118,18 @@ class SettingsScreen extends StatelessWidget {
     } catch (_) {
       if (!context.mounted) return;
       _showMessage(context, 'Could not save timer settings.');
+    }
+  }
+
+  Future<void> _applyTimerPreset(
+    BuildContext context,
+    TimerPreset preset,
+  ) async {
+    try {
+      await context.read<SettingsState>().applyTimerPreset(preset);
+    } catch (_) {
+      if (!context.mounted) return;
+      _showMessage(context, 'Could not save timer preset.');
     }
   }
 
@@ -298,6 +315,48 @@ class _DueDateDefaultControl extends StatelessWidget {
   }
 }
 
+class _TimerPresetControl extends StatelessWidget {
+  const _TimerPresetControl({
+    required this.settings,
+    required this.onSelected,
+  });
+
+  final SettingsState settings;
+  final ValueChanged<TimerPreset> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return _SettingsControlBlock(
+      icon: Icons.tune_rounded,
+      label: 'Preset',
+      scrollControl: false,
+      control: Wrap(
+        spacing: AppSpacing.xs,
+        runSpacing: AppSpacing.xs,
+        children: [
+          for (final preset in SettingsState.timerPresets)
+            ChoiceChip(
+              key: Key('timer-preset-${_presetId(preset)}'),
+              label: Text(preset.label),
+              selected: _isCurrentPreset(preset),
+              onSelected: (_) => onSelected(preset),
+            ),
+        ],
+      ),
+    );
+  }
+
+  bool _isCurrentPreset(TimerPreset preset) {
+    return settings.focusDuration == preset.focus &&
+        settings.shortBreakDuration == preset.shortBreak &&
+        settings.longBreakDuration == preset.longBreak;
+  }
+
+  String _presetId(TimerPreset preset) {
+    return preset.label.toLowerCase().replaceAll(' ', '-');
+  }
+}
+
 class _DurationRow extends StatelessWidget {
   const _DurationRow({
     required this.label,
@@ -432,11 +491,13 @@ class _SettingsControlBlock extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.control,
+    this.scrollControl = true,
   });
 
   final IconData icon;
   final String label;
   final Widget control;
+  final bool scrollControl;
 
   @override
   Widget build(BuildContext context) {
@@ -457,10 +518,12 @@ class _SettingsControlBlock extends StatelessWidget {
           const SizedBox(height: AppSpacing.sm),
           Align(
             alignment: Alignment.centerLeft,
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: control,
-            ),
+            child: scrollControl
+                ? SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: control,
+                  )
+                : SizedBox(width: double.infinity, child: control),
           ),
         ],
       ),

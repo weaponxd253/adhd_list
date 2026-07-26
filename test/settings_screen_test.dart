@@ -61,6 +61,9 @@ void main() {
     expect(find.text('Timer'), findsOneWidget);
     expect(find.text('Tasks'), findsOneWidget);
     expect(find.text('Data'), findsOneWidget);
+
+    await tester.drag(find.byType(ListView), const Offset(0, -500));
+    await tester.pumpAndSettle();
     expect(find.text('About'), findsOneWidget);
   });
 
@@ -74,6 +77,15 @@ void main() {
     await tester.pump();
     expect(settings.focusDuration, 26);
     expect(repository.values[SettingsState.focusDurationKey], '26');
+
+    await tester.tap(find.byKey(const Key('timer-preset-deep-work')));
+    await tester.pump();
+    expect(settings.focusDuration, 50);
+    expect(settings.shortBreakDuration, 10);
+    expect(settings.longBreakDuration, 30);
+    expect(repository.values[SettingsState.focusDurationKey], '50');
+    expect(repository.values[SettingsState.shortBreakDurationKey], '10');
+    expect(repository.values[SettingsState.longBreakDurationKey], '30');
 
     await tester.tap(find.text('7 days'));
     await tester.pump();

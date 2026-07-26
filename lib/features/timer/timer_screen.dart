@@ -46,6 +46,17 @@ class _TimerScreenState extends State<TimerScreen>
     final currentModeIndex = _modes.indexOf(timerState.currentMode);
     final modeIndex = currentModeIndex >= 0 ? currentModeIndex : 0;
     final color = _modeColors[modeIndex];
+    final completionMessage = timerState.completionMessage;
+
+    if (completionMessage != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(content: Text(completionMessage)));
+        context.read<TimerState>().clearCompletionMessage();
+      });
+    }
 
     return Scaffold(
       appBar: AppBar(title: const Text('Timer')),
@@ -84,11 +95,49 @@ class _TimerScreenState extends State<TimerScreen>
               ),
               SizedBox(height: compact ? AppSpacing.xl : 48),
               _TimerControls(timerState: timerState, color: color),
+              const SizedBox(height: AppSpacing.sm),
+              _TimerStatusChip(label: timerState.statusLabel, color: color),
               SizedBox(height: compact ? AppSpacing.lg : AppSpacing.xl),
               _SessionLengths(timerState: timerState, colors: _modeColors),
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+class _TimerStatusChip extends StatelessWidget {
+  const _TimerStatusChip({
+    required this.label,
+    required this.color,
+  });
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.10),
+          borderRadius: BorderRadius.circular(AppRadii.pill),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.xs,
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
       ),
     );
   }

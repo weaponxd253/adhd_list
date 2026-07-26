@@ -15,7 +15,18 @@ class TimerState extends ChangeNotifier {
   int longBreakDuration = 15;
 
   int _currentDuration = 0;
+  String? _completionMessage;
+  String? _lastCompletedMode;
   Timer? _timer;
+
+  String? get completionMessage => _completionMessage;
+
+  String get statusLabel {
+    if (isTimerRunning) return 'Session in progress';
+    if (_lastCompletedMode != null) return '$currentMode ready';
+    if (remainingTime < _currentDuration) return 'Paused';
+    return 'Ready to start';
+  }
 
   int _durationForMode(String mode) {
     switch (mode) {
@@ -35,13 +46,14 @@ class TimerState extends ChangeNotifier {
 
   void startTimer() {
     if (isTimerRunning) return;
+    _clearCompletionState();
     isTimerRunning = true;
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (remainingTime > 0) {
+      if (remainingTime > 1) {
         remainingTime--;
         notifyListeners();
       } else {
-        stopTimer();
+        _completeSession();
       }
     });
     notifyListeners();
@@ -50,6 +62,7 @@ class TimerState extends ChangeNotifier {
   void stopTimer() {
     _timer?.cancel();
     isTimerRunning = false;
+    _clearCompletionState();
     _resetDuration();
     notifyListeners();
   }
@@ -63,6 +76,7 @@ class TimerState extends ChangeNotifier {
   void resetTimer() {
     _timer?.cancel();
     isTimerRunning = false;
+    _clearCompletionState();
     _resetDuration();
     notifyListeners();
   }
@@ -80,6 +94,7 @@ class TimerState extends ChangeNotifier {
     focusDuration = focus;
     shortBreakDuration = shortBreak;
     longBreakDuration = longBreak;
+    _clearCompletionState();
 
     if (!isTimerRunning) {
       _resetDuration();
@@ -95,23 +110,47 @@ class TimerState extends ChangeNotifier {
     }
     _timer?.cancel();
     isTimerRunning = false;
+    _clearCompletionState();
     currentMode = mode;
     _resetDuration();
     notifyListeners();
   }
 
   void switchToNextMode() {
-    switch (currentMode) {
+    setMode(_nextModeFor(currentMode));
+  }
+
+  void clearCompletionMessage() {
+    if (_completionMessage == null) return;
+    _completionMessage = null;
+    notifyListeners();
+  }
+
+  void _completeSession() {
+    final completedMode = currentMode;
+    _timer?.cancel();
+    isTimerRunning = false;
+    currentMode = _nextModeFor(currentMode);
+    _lastCompletedMode = completedMode;
+    _completionMessage = '$completedMode complete. $currentMode ready.';
+    _resetDuration();
+    notifyListeners();
+  }
+
+  String _nextModeFor(String mode) {
+    switch (mode) {
       case 'Focus':
-        setMode('Short Break');
-        return;
+        return 'Short Break';
       case 'Short Break':
-        setMode('Long Break');
-        return;
+        return 'Long Break';
       default:
-        setMode('Focus');
-        return;
+        return 'Focus';
     }
+  }
+
+  void _clearCompletionState() {
+    _completionMessage = null;
+    _lastCompletedMode = null;
   }
 
   String get timerDisplay {

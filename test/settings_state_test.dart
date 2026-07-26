@@ -78,6 +78,20 @@ void main() {
       expect(state.defaultDueDateOffsetDays, 7);
     });
 
+    test('applies timer presets through duration persistence', () async {
+      final repository = FakeSettingsRepository();
+      final state = SettingsState(repository: repository, autoLoad: false);
+
+      await state.applyTimerPreset(SettingsState.timerPresets.last);
+
+      expect(state.focusDuration, 50);
+      expect(state.shortBreakDuration, 10);
+      expect(state.longBreakDuration, 30);
+      expect(repository.values[SettingsState.focusDurationKey], '50');
+      expect(repository.values[SettingsState.shortBreakDurationKey], '10');
+      expect(repository.values[SettingsState.longBreakDurationKey], '30');
+    });
+
     test('failed persistence leaves the visible theme unchanged', () async {
       final repository = FakeSettingsRepository()..failWrites = true;
       final state = SettingsState(repository: repository, autoLoad: false);
