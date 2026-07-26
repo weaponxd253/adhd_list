@@ -171,7 +171,9 @@ class _MoodGrid extends StatelessWidget {
         const tileGap = AppSpacing.sm;
         final availableWidth = constraints.maxWidth - AppSpacing.md * 2;
         final tileWidth = (availableWidth - tileGap * (columns - 1)) / columns;
-        final tileHeight = tileWidth / 1.08;
+        final textScale = MediaQuery.textScalerOf(context).scale(1);
+        final tileHeight =
+            tileWidth / 1.08 + (textScale > 1.2 ? (textScale - 1.2) * 28 : 0);
 
         return ListView(
           padding: EdgeInsets.fromLTRB(
@@ -227,37 +229,54 @@ class _MoodCell extends StatelessWidget {
       cs.surface,
     );
 
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        decoration: BoxDecoration(
-          color: isSelected ? selectedFill : cs.surface,
-          borderRadius: BorderRadius.circular(AppRadii.control),
-          border: Border.all(
-            color: isSelected ? cs.primary : cs.outlineVariant,
-            width: isSelected ? 2 : 1,
-          ),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(emoji, style: const TextStyle(fontSize: 28)),
-            const SizedBox(height: AppSpacing.xxs),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                color: isSelected
-                    ? cs.primary
-                    : Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+    return Tooltip(
+      message: label,
+      child: Semantics(
+        button: true,
+        selected: isSelected,
+        label: 'Select $label mood',
+        excludeSemantics: true,
+        child: GestureDetector(
+          onTap: onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            decoration: BoxDecoration(
+              color: isSelected ? selectedFill : cs.surface,
+              borderRadius: BorderRadius.circular(AppRadii.control),
+              border: Border.all(
+                color: isSelected ? cs.primary : cs.outlineVariant,
+                width: isSelected ? 2 : 1,
               ),
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
             ),
-          ],
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(emoji, style: const TextStyle(fontSize: 28)),
+                const SizedBox(height: AppSpacing.xxs),
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight:
+                          isSelected ? FontWeight.w700 : FontWeight.w500,
+                      color: isSelected
+                          ? cs.primary
+                          : Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withOpacity(0.7),
+                    ),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

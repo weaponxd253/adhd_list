@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 class TimerState extends ChangeNotifier {
-  TimerState() {
+  TimerState({DateTime Function()? now}) : _now = now ?? DateTime.now {
     _resetDuration();
   }
 
@@ -15,8 +15,10 @@ class TimerState extends ChangeNotifier {
   int longBreakDuration = 15;
 
   int _currentDuration = 0;
+  final DateTime Function() _now;
   String? _completionMessage;
   String? _lastCompletedMode;
+  DateTime? _sessionEndsAt;
   Timer? _timer;
 
   String? get completionMessage => _completionMessage;
@@ -48,19 +50,15 @@ class TimerState extends ChangeNotifier {
     if (isTimerRunning) return;
     _clearCompletionState();
     isTimerRunning = true;
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (remainingTime > 1) {
-        remainingTime--;
-        notifyListeners();
-      } else {
-        _completeSession();
-      }
-    });
+    _sessionEndsAt = _now().add(Duration(seconds: remainingTime));
+    _startTicker();
     notifyListeners();
   }
 
   void stopTimer() {
     _timer?.cancel();
+    _timer = null;
+    _sessionEndsAt = null;
     isTimerRunning = false;
     _clearCompletionState();
     _resetDuration();
@@ -68,13 +66,20 @@ class TimerState extends ChangeNotifier {
   }
 
   void pauseTimer() {
+    if (!isTimerRunning) return;
+    syncWithClock(notify: false);
+    if (!isTimerRunning) return;
     _timer?.cancel();
+    _timer = null;
+    _sessionEndsAt = null;
     isTimerRunning = false;
     notifyListeners();
   }
 
   void resetTimer() {
     _timer?.cancel();
+    _timer = null;
+    _sessionEndsAt = null;
     isTimerRunning = false;
     _clearCompletionState();
     _resetDuration();
@@ -109,6 +114,8 @@ class TimerState extends ChangeNotifier {
       return;
     }
     _timer?.cancel();
+    _timer = null;
+    _sessionEndsAt = null;
     isTimerRunning = false;
     _clearCompletionState();
     currentMode = mode;
@@ -120,6 +127,23 @@ class TimerState extends ChangeNotifier {
     setMode(_nextModeFor(currentMode));
   }
 
+  void syncWithClock({bool notify = true}) {
+    if (!isTimerRunning || _sessionEndsAt == null) return;
+
+    final remainingMs = _sessionEndsAt!.difference(_now()).inMilliseconds;
+    if (remainingMs <= 0) {
+      _completeSession();
+      return;
+    }
+
+    final nextRemaining = (remainingMs + 999) ~/ 1000;
+    if (nextRemaining == remainingTime) return;
+
+    remainingTime =
+        nextRemaining > _currentDuration ? _currentDuration : nextRemaining;
+    if (notify) notifyListeners();
+  }
+
   void clearCompletionMessage() {
     if (_completionMessage == null) return;
     _completionMessage = null;
@@ -129,6 +153,8 @@ class TimerState extends ChangeNotifier {
   void _completeSession() {
     final completedMode = currentMode;
     _timer?.cancel();
+    _timer = null;
+    _sessionEndsAt = null;
     isTimerRunning = false;
     currentMode = _nextModeFor(currentMode);
     _lastCompletedMode = completedMode;
@@ -151,6 +177,14 @@ class TimerState extends ChangeNotifier {
   void _clearCompletionState() {
     _completionMessage = null;
     _lastCompletedMode = null;
+  }
+
+  void _startTicker() {
+    _timer?.cancel();
+    _timer = Timer.periodic(
+      const Duration(seconds: 1),
+      (_) => syncWithClock(),
+    );
   }
 
   String get timerDisplay {

@@ -24,10 +24,12 @@ class TaskState extends ChangeNotifier {
   final Set<int> _busyTaskIds = {};
   bool _isLoading = false;
   bool _isCreating = false;
+  String? _loadError;
 
   UnmodifiableListView<Task> get tasks => UnmodifiableListView(_tasks);
   bool get isLoading => _isLoading;
   bool get isCreating => _isCreating;
+  String? get loadError => _loadError;
   bool isTaskBusy(int taskId) => _busyTaskIds.contains(taskId);
 
   Task _requireTask(int taskId) {
@@ -46,6 +48,7 @@ class TaskState extends ChangeNotifier {
 
   Future<void> loadTasks() async {
     _isLoading = true;
+    _loadError = null;
     notifyListeners();
     try {
       final rows = await _repository.fetchTasks();
@@ -66,6 +69,8 @@ class TaskState extends ChangeNotifier {
         );
       }
       _tasks = loaded;
+    } catch (_) {
+      _loadError = 'Could not load tasks. Try again.';
     } finally {
       _isLoading = false;
       notifyListeners();

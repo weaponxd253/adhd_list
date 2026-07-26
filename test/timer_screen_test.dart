@@ -29,7 +29,9 @@ Future<void> _pumpTimerScreen(
 
 void main() {
   testWidgets('shows timer status and completion feedback', (tester) async {
-    final state = TimerState()
+    final startedAt = DateTime(2026, 6, 23, 9);
+    var now = startedAt;
+    final state = TimerState(now: () => now)
       ..updateDurations(focus: 1, shortBreak: 5, longBreak: 15);
     await _pumpTimerScreen(tester, state);
 
@@ -39,7 +41,29 @@ void main() {
     await tester.pump();
     expect(find.text('Session in progress'), findsOneWidget);
 
-    await tester.pump(const Duration(minutes: 1));
+    now = startedAt.add(const Duration(minutes: 1));
+    state.syncWithClock();
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('Short Break ready'), findsOneWidget);
+    expect(find.text('Focus complete. Short Break ready.'), findsOneWidget);
+  });
+
+  testWidgets('reconciles completed sessions when the app resumes',
+      (tester) async {
+    final startedAt = DateTime(2026, 6, 23, 9);
+    var now = startedAt;
+    final state = TimerState(now: () => now)
+      ..updateDurations(focus: 1, shortBreak: 5, longBreak: 15);
+    await _pumpTimerScreen(tester, state);
+
+    state.startTimer();
+    await tester.pump();
+
+    now = startedAt.add(const Duration(seconds: 75));
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
     await tester.pump();
 
     expect(find.text('Short Break ready'), findsOneWidget);

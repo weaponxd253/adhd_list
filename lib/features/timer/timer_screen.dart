@@ -14,7 +14,7 @@ class TimerScreen extends StatefulWidget {
 }
 
 class _TimerScreenState extends State<TimerScreen>
-    with SingleTickerProviderStateMixin {
+    with WidgetsBindingObserver, SingleTickerProviderStateMixin {
   static const _modes = ['Focus', 'Short Break', 'Long Break'];
   static const _modeEmojis = ['\u{1F3AF}', '\u{2615}', '\u{1F634}'];
   static const _modeColors = [
@@ -28,6 +28,7 @@ class _TimerScreenState extends State<TimerScreen>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
@@ -36,8 +37,15 @@ class _TimerScreenState extends State<TimerScreen>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _pulseController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed || !mounted) return;
+    context.read<TimerState>().syncWithClock();
   }
 
   @override
@@ -118,23 +126,27 @@ class _TimerStatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.10),
-          borderRadius: BorderRadius.circular(AppRadii.pill),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.md,
-            vertical: AppSpacing.xs,
+    return Semantics(
+      liveRegion: true,
+      label: label,
+      child: Center(
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.10),
+            borderRadius: BorderRadius.circular(AppRadii.pill),
           ),
-          child: Text(
-            label,
-            style: TextStyle(
-              color: color,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.xs,
+            ),
+            child: Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ),
@@ -246,58 +258,65 @@ class _TimerRing extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final trackColor = color.withOpacity(isDark ? 0.22 : 0.16);
 
-    return Center(
-      child: SizedBox.square(
-        dimension: size,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            if (timerState.isTimerRunning)
-              AnimatedBuilder(
-                animation: pulse,
-                builder: (_, __) => Container(
-                  width: size + pulse.value * 16,
-                  height: size + pulse.value * 16,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: color.withOpacity(0.06 * pulse.value),
-                  ),
-                ),
-              ),
-            CustomPaint(
-              size: Size.square(size),
-              painter: _RingPainter(
-                progress: timerState.progress.clamp(0, 1).toDouble(),
-                color: color,
-                trackColor: trackColor,
-              ),
-            ),
-            Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+    return Semantics(
+      liveRegion: timerState.isTimerRunning,
+      label: '${timerState.currentMode} timer',
+      value: '${timerState.timerDisplay} remaining, ${timerState.statusLabel}',
+      child: ExcludeSemantics(
+        child: Center(
+          child: SizedBox.square(
+            dimension: size,
+            child: Stack(
+              alignment: Alignment.center,
               children: [
-                Text(emoji, style: const TextStyle(fontSize: 28)),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  timerState.timerDisplay,
-                  style: TextStyle(
-                    fontSize: 48,
-                    fontWeight: FontWeight.w800,
+                if (timerState.isTimerRunning)
+                  AnimatedBuilder(
+                    animation: pulse,
+                    builder: (_, __) => Container(
+                      width: size + pulse.value * 16,
+                      height: size + pulse.value * 16,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: color.withOpacity(0.06 * pulse.value),
+                      ),
+                    ),
+                  ),
+                CustomPaint(
+                  size: Size.square(size),
+                  painter: _RingPainter(
+                    progress: timerState.progress.clamp(0, 1).toDouble(),
                     color: color,
-                    letterSpacing: 0,
+                    trackColor: trackColor,
                   ),
                 ),
-                Text(
-                  timerState.currentMode,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: color.withOpacity(0.78),
-                    letterSpacing: 0,
-                  ),
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(emoji, style: const TextStyle(fontSize: 28)),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      timerState.timerDisplay,
+                      style: TextStyle(
+                        fontSize: 48,
+                        fontWeight: FontWeight.w800,
+                        color: color,
+                        letterSpacing: 0,
+                      ),
+                    ),
+                    Text(
+                      timerState.currentMode,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: color.withOpacity(0.78),
+                        letterSpacing: 0,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -329,33 +348,36 @@ class _TimerControls extends StatelessWidget {
           size: 52,
         ),
         const SizedBox(width: AppSpacing.lg),
-        Semantics(
-          button: true,
-          label: timerState.isTimerRunning ? 'Pause timer' : 'Start timer',
-          child: GestureDetector(
-            onTap: timerState.isTimerRunning
-                ? timerState.pauseTimer
-                : timerState.startTimer,
-            child: Container(
-              width: 72,
-              height: 72,
-              decoration: BoxDecoration(
-                color: color,
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: color.withOpacity(0.36),
-                    blurRadius: 16,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Icon(
-                timerState.isTimerRunning
-                    ? Icons.pause_rounded
-                    : Icons.play_arrow_rounded,
-                color: Colors.white,
-                size: 36,
+        Tooltip(
+          message: timerState.isTimerRunning ? 'Pause timer' : 'Start timer',
+          child: Semantics(
+            button: true,
+            label: timerState.isTimerRunning ? 'Pause timer' : 'Start timer',
+            child: GestureDetector(
+              onTap: timerState.isTimerRunning
+                  ? timerState.pauseTimer
+                  : timerState.startTimer,
+              child: Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  color: color,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: color.withOpacity(0.36),
+                      blurRadius: 16,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  timerState.isTimerRunning
+                      ? Icons.pause_rounded
+                      : Icons.play_arrow_rounded,
+                  color: Colors.white,
+                  size: 36,
+                ),
               ),
             ),
           ),

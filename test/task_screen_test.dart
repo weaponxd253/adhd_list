@@ -54,6 +54,29 @@ void main() {
     expect(find.text('Enter a task name'), findsOneWidget);
   });
 
+  testWidgets('shows a retry state when tasks fail to load', (tester) async {
+    final repository = FakeTaskRepository(
+      tasks: [taskRow(id: 1, title: 'Recovered task', dueDate: today)],
+    )..failReads = true;
+    final state = TaskState(
+      repository: repository,
+      autoLoad: false,
+    );
+
+    await state.loadTasks();
+    await _pumpTaskScreen(tester, state);
+
+    expect(find.text('Tasks could not load'), findsOneWidget);
+    expect(find.byKey(const Key('retry-load-tasks')), findsOneWidget);
+
+    repository.failReads = false;
+    await tester.tap(find.byKey(const Key('retry-load-tasks')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Recovered task'), findsOneWidget);
+    expect(find.text('Tasks could not load'), findsNothing);
+  });
+
   testWidgets('uses the configured default due date when no date is selected',
       (tester) async {
     final repository = FakeTaskRepository();

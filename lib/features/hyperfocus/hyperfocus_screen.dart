@@ -2,20 +2,25 @@
 import 'package:flutter/material.dart';
 
 class HyperfocusScreen extends StatelessWidget {
+  const HyperfocusScreen({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Hyperfocus Mode")),
+      appBar: AppBar(title: const Text("Hyperfocus Mode")),
       body: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text("Background Sound"),
-          SoundOptions(),
-          SizedBox(height: 20),
-          Text("Focus Time"),
-          FocusTimeSlider(),
-          SizedBox(height: 20),
-          ElevatedButton(onPressed: () {}, child: Text("Start Focus Mode")),
+          const Text("Background Sound"),
+          const SoundOptions(),
+          const SizedBox(height: 20),
+          const Text("Focus Time"),
+          const FocusTimeSlider(),
+          const SizedBox(height: 20),
+          ElevatedButton(
+            onPressed: () {},
+            child: const Text("Start Focus Mode"),
+          ),
         ],
       ),
     );
@@ -23,19 +28,23 @@ class HyperfocusScreen extends StatelessWidget {
 }
 
 class SoundOptions extends StatelessWidget {
+  const SoundOptions({super.key});
+
   @override
   Widget build(BuildContext context) {
     return DropdownButton<String>(
       items: ["White Noise", "Lo-fi Beats", "Nature Sounds"].map((sound) {
-        return DropdownMenuItem(child: Text(sound), value: sound);
+        return DropdownMenuItem(value: sound, child: Text(sound));
       }).toList(),
       onChanged: (value) {},
-      hint: Text("Choose Background Sound"),
+      hint: const Text("Choose Background Sound"),
     );
   }
 }
 
 class FocusTimeSlider extends StatelessWidget {
+  const FocusTimeSlider({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Slider(

@@ -9,11 +9,13 @@ class FakeTaskRepository implements TaskRepository {
 
   List<Map<String, dynamic>> taskRows;
   Map<int, List<Map<String, dynamic>>> subtaskRows;
+  bool failReads = false;
   bool failWrites = false;
   int nextTaskId = 100;
   int nextSubtaskId = 200;
 
   Never _failure() => throw StateError('write failed');
+  Never _readFailure() => throw StateError('read failed');
 
   @override
   Future<void> clearTasks() async {
@@ -46,12 +48,16 @@ class FakeTaskRepository implements TaskRepository {
   }
 
   @override
-  Future<List<Map<String, dynamic>>> fetchSubtasks(int taskId) async =>
-      subtaskRows[taskId]?.map(Map<String, dynamic>.from).toList() ?? [];
+  Future<List<Map<String, dynamic>>> fetchSubtasks(int taskId) async {
+    if (failReads) _readFailure();
+    return subtaskRows[taskId]?.map(Map<String, dynamic>.from).toList() ?? [];
+  }
 
   @override
-  Future<List<Map<String, dynamic>>> fetchTasks() async =>
-      taskRows.map(Map<String, dynamic>.from).toList();
+  Future<List<Map<String, dynamic>>> fetchTasks() async {
+    if (failReads) _readFailure();
+    return taskRows.map(Map<String, dynamic>.from).toList();
+  }
 
   @override
   Future<int> insertSubtask(int taskId, String title) async {

@@ -244,8 +244,9 @@ class _StreakBanner extends StatelessWidget {
   const _StreakBanner({required this.streak});
 
   String get _label {
-    if (streak == 0)
+    if (streak == 0) {
       return "No active streak — complete a task today to start one!";
+    }
     if (streak == 1) return "1 day streak — great start, keep going!";
     if (streak < 7) return "$streak day streak — you're building momentum!";
     if (streak < 30) return "$streak day streak — on fire! 🔥";

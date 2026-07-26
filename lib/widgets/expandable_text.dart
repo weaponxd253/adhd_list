@@ -11,7 +11,7 @@ class ExpandableText extends StatefulWidget {
   });
 
   @override
-  _ExpandableTextState createState() => _ExpandableTextState();
+  State<ExpandableText> createState() => _ExpandableTextState();
 }
 
 class _ExpandableTextState extends State<ExpandableText> {
@@ -59,7 +59,8 @@ class _ExpandableTextState extends State<ExpandableText> {
             },
             child: Text(
               _isExpanded ? 'Show less' : 'Read more',
-              style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                  color: Colors.blue, fontWeight: FontWeight.bold),
             ),
           ),
       ],

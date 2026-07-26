@@ -15,21 +15,26 @@ void main() {
     });
 
     test('start, pause, resume, and reset are deterministic', () {
-      fakeAsync((async) {
-        final state = TimerState();
+      fakeAsync((_) {
+        final startedAt = DateTime(2026, 6, 23, 9);
+        var now = startedAt;
+        final state = TimerState(now: () => now);
         state.focusDuration = 1;
         state.resetTimer();
 
         state.startTimer();
-        async.elapse(const Duration(seconds: 3));
+        now = now.add(const Duration(seconds: 3));
+        state.syncWithClock();
         expect(state.timerDisplay, '00:57');
 
         state.pauseTimer();
-        async.elapse(const Duration(seconds: 5));
+        now = now.add(const Duration(seconds: 5));
+        state.syncWithClock();
         expect(state.timerDisplay, '00:57');
 
         state.startTimer();
-        async.elapse(const Duration(seconds: 2));
+        now = now.add(const Duration(seconds: 2));
+        state.syncWithClock();
         expect(state.timerDisplay, '00:55');
 
         state.resetTimer();
@@ -73,17 +78,45 @@ void main() {
     });
 
     test('completes a session by switching to the next ready mode', () {
-      fakeAsync((async) {
-        final state = TimerState();
+      fakeAsync((_) {
+        final startedAt = DateTime(2026, 6, 23, 9);
+        var now = startedAt;
+        final state = TimerState(now: () => now);
         state.updateDurations(focus: 1, shortBreak: 5, longBreak: 15);
 
         state.startTimer();
-        async.elapse(const Duration(minutes: 1));
+        now = now.add(const Duration(minutes: 1));
+        state.syncWithClock();
 
         expect(state.isTimerRunning, isFalse);
         expect(state.currentMode, 'Short Break');
         expect(state.timerDisplay, '05:00');
         expect(state.statusLabel, 'Short Break ready');
+        expect(state.completionMessage, 'Focus complete. Short Break ready.');
+        state.dispose();
+      });
+    });
+
+    test('syncs stale running sessions against the clock', () {
+      fakeAsync((_) {
+        final startedAt = DateTime(2026, 6, 23, 9);
+        var now = startedAt;
+        final state = TimerState(now: () => now);
+        state.updateDurations(focus: 1, shortBreak: 5, longBreak: 15);
+
+        state.startTimer();
+        now = startedAt.add(const Duration(seconds: 30));
+        state.syncWithClock();
+
+        expect(state.isTimerRunning, isTrue);
+        expect(state.timerDisplay, '00:30');
+
+        now = startedAt.add(const Duration(seconds: 75));
+        state.syncWithClock();
+
+        expect(state.isTimerRunning, isFalse);
+        expect(state.currentMode, 'Short Break');
+        expect(state.timerDisplay, '05:00');
         expect(state.completionMessage, 'Focus complete. Short Break ready.');
         state.dispose();
       });
