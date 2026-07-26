@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../providers/timer_state.dart';
 import '../../theme/app_theme.dart';
+import 'timer_history_screen.dart';
 
 class TimerScreen extends StatefulWidget {
   const TimerScreen({super.key});
@@ -67,7 +68,19 @@ class _TimerScreenState extends State<TimerScreen>
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Timer')),
+      appBar: AppBar(
+        title: const Text('Timer'),
+        actions: [
+          IconButton(
+            tooltip: 'Timer history',
+            icon: const Icon(Icons.history_rounded),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const TimerHistoryScreen()),
+            ),
+          ),
+        ],
+      ),
       body: LayoutBuilder(
         builder: (context, constraints) {
           final compact = constraints.maxHeight < 700;

@@ -1,10 +1,25 @@
 import 'dart:async';
+import 'dart:collection';
 
 import 'package:flutter/foundation.dart';
 
+import '../database/timer_session_database.dart';
+import '../models/focus_session.dart';
+import '../repositories/repositories.dart';
+import '../services/timer_notification_service.dart';
+
 class TimerState extends ChangeNotifier {
-  TimerState({DateTime Function()? now}) : _now = now ?? DateTime.now {
+  TimerState({
+    DateTime Function()? now,
+    TimerSessionRepository? sessionRepository,
+    TimerNotificationService? notificationService,
+    bool autoLoadHistory = false,
+  })  : _now = now ?? DateTime.now,
+        _sessionRepository = sessionRepository ?? TimerSessionDatabase(),
+        _notificationService =
+            notificationService ?? const NoopTimerNotificationService() {
     _resetDuration();
+    if (autoLoadHistory) unawaited(loadSessionHistory());
   }
 
   bool isTimerRunning = false;
@@ -16,18 +31,57 @@ class TimerState extends ChangeNotifier {
 
   int _currentDuration = 0;
   final DateTime Function() _now;
+  final TimerSessionRepository _sessionRepository;
+  final TimerNotificationService _notificationService;
+  final List<FocusSession> _sessions = [];
   String? _completionMessage;
   String? _lastCompletedMode;
+  String? _sessionHistoryError;
+  DateTime? _sessionStartedAt;
   DateTime? _sessionEndsAt;
+  int? _sessionPlannedDurationSeconds;
   Timer? _timer;
+  bool _isSessionHistoryLoading = false;
+  bool _notificationsEnabled = false;
+  bool _notificationPermissionGranted = false;
+  bool _disposed = false;
 
   String? get completionMessage => _completionMessage;
+  UnmodifiableListView<FocusSession> get sessionHistory =>
+      UnmodifiableListView(_sessions);
+  bool get isSessionHistoryLoading => _isSessionHistoryLoading;
+  String? get sessionHistoryError => _sessionHistoryError;
+  bool get notificationsEnabled => _notificationsEnabled;
+  bool get notificationPermissionGranted => _notificationPermissionGranted;
 
   String get statusLabel {
     if (isTimerRunning) return 'Session in progress';
     if (_lastCompletedMode != null) return '$currentMode ready';
     if (remainingTime < _currentDuration) return 'Paused';
     return 'Ready to start';
+  }
+
+  int get completedSessionsToday {
+    final today = _now();
+    return _sessions.where((session) {
+      return session.completed && _isSameDay(session.endedAt, today);
+    }).length;
+  }
+
+  int get focusMinutesToday {
+    final today = _now();
+    final seconds = _sessions.where((session) {
+      return session.completed &&
+          session.mode == 'Focus' &&
+          _isSameDay(session.endedAt, today);
+    }).fold<int>(0, (total, session) => total + session.durationSeconds);
+    return seconds ~/ 60;
+  }
+
+  bool _isSameDay(DateTime first, DateTime second) {
+    return first.year == second.year &&
+        first.month == second.month &&
+        first.day == second.day;
   }
 
   int _durationForMode(String mode) {
@@ -49,9 +103,12 @@ class TimerState extends ChangeNotifier {
   void startTimer() {
     if (isTimerRunning) return;
     _clearCompletionState();
+    _sessionStartedAt ??= _now();
+    _sessionPlannedDurationSeconds ??= _currentDuration;
     isTimerRunning = true;
     _sessionEndsAt = _now().add(Duration(seconds: remainingTime));
     _startTicker();
+    unawaited(_scheduleCompletionNotification());
     notifyListeners();
   }
 
@@ -59,9 +116,11 @@ class TimerState extends ChangeNotifier {
     _timer?.cancel();
     _timer = null;
     _sessionEndsAt = null;
+    _clearSessionTracking();
     isTimerRunning = false;
     _clearCompletionState();
     _resetDuration();
+    unawaited(_notificationService.cancelTimerCompletion());
     notifyListeners();
   }
 
@@ -73,6 +132,7 @@ class TimerState extends ChangeNotifier {
     _timer = null;
     _sessionEndsAt = null;
     isTimerRunning = false;
+    unawaited(_notificationService.cancelTimerCompletion());
     notifyListeners();
   }
 
@@ -80,9 +140,11 @@ class TimerState extends ChangeNotifier {
     _timer?.cancel();
     _timer = null;
     _sessionEndsAt = null;
+    _clearSessionTracking();
     isTimerRunning = false;
     _clearCompletionState();
     _resetDuration();
+    unawaited(_notificationService.cancelTimerCompletion());
     notifyListeners();
   }
 
@@ -102,7 +164,31 @@ class TimerState extends ChangeNotifier {
     _clearCompletionState();
 
     if (!isTimerRunning) {
+      _clearSessionTracking();
       _resetDuration();
+    }
+    notifyListeners();
+  }
+
+  void updateSettings({
+    required int focus,
+    required int shortBreak,
+    required int longBreak,
+    required bool notificationsEnabled,
+  }) {
+    updateDurations(
+      focus: focus,
+      shortBreak: shortBreak,
+      longBreak: longBreak,
+    );
+
+    if (_notificationsEnabled == notificationsEnabled) return;
+    _notificationsEnabled = notificationsEnabled;
+    if (_notificationsEnabled) {
+      if (isTimerRunning) unawaited(_scheduleCompletionNotification());
+    } else {
+      _notificationPermissionGranted = false;
+      unawaited(_notificationService.cancelTimerCompletion());
     }
     notifyListeners();
   }
@@ -116,10 +202,12 @@ class TimerState extends ChangeNotifier {
     _timer?.cancel();
     _timer = null;
     _sessionEndsAt = null;
+    _clearSessionTracking();
     isTimerRunning = false;
     _clearCompletionState();
     currentMode = mode;
     _resetDuration();
+    unawaited(_notificationService.cancelTimerCompletion());
     notifyListeners();
   }
 
@@ -150,16 +238,58 @@ class TimerState extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> loadSessionHistory({int limit = 60}) async {
+    _isSessionHistoryLoading = true;
+    _sessionHistoryError = null;
+    notifyListeners();
+
+    try {
+      final rows = await _sessionRepository.fetchSessions(limit: limit);
+      if (_disposed) return;
+      _sessions
+        ..clear()
+        ..addAll(rows.map(FocusSession.fromMap));
+    } catch (_) {
+      if (_disposed) return;
+      _sessionHistoryError = 'Could not load timer history.';
+    } finally {
+      if (!_disposed) {
+        _isSessionHistoryLoading = false;
+        notifyListeners();
+      }
+    }
+  }
+
+  Future<void> clearSessionHistory() async {
+    await _sessionRepository.clearSessions();
+    _sessions.clear();
+    notifyListeners();
+  }
+
   void _completeSession() {
     final completedMode = currentMode;
+    final endedAt = _sessionEndsAt ?? _now();
+    final startedAt = _sessionStartedAt ??
+        endedAt.subtract(Duration(seconds: _currentDuration));
+    final durationSeconds = _sessionPlannedDurationSeconds ?? _currentDuration;
     _timer?.cancel();
     _timer = null;
     _sessionEndsAt = null;
+    _clearSessionTracking();
     isTimerRunning = false;
     currentMode = _nextModeFor(currentMode);
     _lastCompletedMode = completedMode;
     _completionMessage = '$completedMode complete. $currentMode ready.';
     _resetDuration();
+    unawaited(_notificationService.cancelTimerCompletion());
+    unawaited(
+      _recordCompletedSession(
+        mode: completedMode,
+        startedAt: startedAt,
+        endedAt: endedAt,
+        durationSeconds: durationSeconds,
+      ),
+    );
     notifyListeners();
   }
 
@@ -179,11 +309,73 @@ class TimerState extends ChangeNotifier {
     _lastCompletedMode = null;
   }
 
+  void _clearSessionTracking() {
+    _sessionStartedAt = null;
+    _sessionPlannedDurationSeconds = null;
+  }
+
   void _startTicker() {
     _timer?.cancel();
     _timer = Timer.periodic(
       const Duration(seconds: 1),
       (_) => syncWithClock(),
+    );
+  }
+
+  Future<void> _recordCompletedSession({
+    required String mode,
+    required DateTime startedAt,
+    required DateTime endedAt,
+    required int durationSeconds,
+  }) async {
+    final session = FocusSession(
+      mode: mode,
+      startedAt: startedAt,
+      endedAt: endedAt,
+      durationSeconds: durationSeconds,
+    );
+
+    try {
+      final id = await _sessionRepository.insertSession(session.toMap());
+      if (_disposed) return;
+      _sessions.insert(
+        0,
+        FocusSession(
+          id: id,
+          mode: session.mode,
+          startedAt: session.startedAt,
+          endedAt: session.endedAt,
+          durationSeconds: session.durationSeconds,
+          completed: session.completed,
+        ),
+      );
+      notifyListeners();
+    } catch (_) {
+      if (_disposed) return;
+      _sessionHistoryError = 'Could not save timer session.';
+      notifyListeners();
+    }
+  }
+
+  Future<void> _scheduleCompletionNotification() async {
+    final when = _sessionEndsAt;
+    if (!_notificationsEnabled || when == null) return;
+
+    final mode = currentMode;
+    final nextMode = _nextModeFor(mode);
+    final granted = await _notificationService.requestPermission();
+    if (_disposed) return;
+
+    _notificationPermissionGranted = granted;
+    if (!granted) {
+      notifyListeners();
+      return;
+    }
+
+    await _notificationService.scheduleTimerCompletion(
+      when: when,
+      title: '$mode complete',
+      body: '$nextMode ready.',
     );
   }
 
@@ -198,6 +390,7 @@ class TimerState extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     _timer?.cancel();
     super.dispose();
   }

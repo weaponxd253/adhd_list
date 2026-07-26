@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
+import 'helpers/fakes.dart';
+
 Future<void> _pumpTimerScreen(
   WidgetTester tester,
   TimerState state,
@@ -31,8 +33,10 @@ void main() {
   testWidgets('shows timer status and completion feedback', (tester) async {
     final startedAt = DateTime(2026, 6, 23, 9);
     var now = startedAt;
-    final state = TimerState(now: () => now)
-      ..updateDurations(focus: 1, shortBreak: 5, longBreak: 15);
+    final state = TimerState(
+      now: () => now,
+      sessionRepository: FakeTimerSessionRepository(),
+    )..updateDurations(focus: 1, shortBreak: 5, longBreak: 15);
     await _pumpTimerScreen(tester, state);
 
     expect(find.text('Ready to start'), findsOneWidget);
@@ -54,8 +58,10 @@ void main() {
       (tester) async {
     final startedAt = DateTime(2026, 6, 23, 9);
     var now = startedAt;
-    final state = TimerState(now: () => now)
-      ..updateDurations(focus: 1, shortBreak: 5, longBreak: 15);
+    final state = TimerState(
+      now: () => now,
+      sessionRepository: FakeTimerSessionRepository(),
+    )..updateDurations(focus: 1, shortBreak: 5, longBreak: 15);
     await _pumpTimerScreen(tester, state);
 
     state.startTimer();

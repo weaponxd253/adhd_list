@@ -24,13 +24,14 @@ class FocusFlowApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => MoodState()),
         ChangeNotifierProvider(create: (_) => SettingsState()),
         ChangeNotifierProxyProvider<SettingsState, TimerState>(
-          create: (_) => TimerState(),
+          create: (_) => TimerState(autoLoadHistory: true),
           update: (_, settings, timerState) {
-            final state = timerState ?? TimerState();
-            state.updateDurations(
+            final state = timerState ?? TimerState(autoLoadHistory: true);
+            state.updateSettings(
               focus: settings.focusDuration,
               shortBreak: settings.shortBreakDuration,
               longBreak: settings.longBreakDuration,
+              notificationsEnabled: settings.timerNotificationsEnabled,
             );
             return state;
           },

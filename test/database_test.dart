@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:adhd_list/database/database_helper.dart';
 import 'package:adhd_list/database/settings_database.dart';
 import 'package:adhd_list/database/task_database.dart';
+import 'package:adhd_list/database/timer_session_database.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -21,7 +22,7 @@ void main() {
 
     tearDown(() => helper.close());
 
-    test('creates all tables and indexes at version 6', () async {
+    test('creates all tables and indexes at version 7', () async {
       final db = await helper.database;
       final objects = await db.query(
         'sqlite_master',
@@ -31,16 +32,26 @@ void main() {
       );
       final names = {for (final row in objects) row['name'] as String};
 
-      expect(names, containsAll(['tasks', 'subtasks', 'moods', 'settings']));
+      expect(
+        names,
+        containsAll([
+          'tasks',
+          'subtasks',
+          'moods',
+          'settings',
+          'timer_sessions',
+        ]),
+      );
       expect(
         names,
         containsAll([
           'idx_tasks_due_date',
           'idx_subtasks_task_id',
           'idx_moods_date',
+          'idx_timer_sessions_ended_at',
         ]),
       );
-      expect(await db.getVersion(), 6);
+      expect(await db.getVersion(), 7);
     });
 
     test('enforces due dates and foreign keys', () async {
@@ -100,6 +111,26 @@ void main() {
       expect(await db.query('settings'), hasLength(1));
     });
 
+    test('timer sessions persist and clear', () async {
+      final sessions = TimerSessionDatabase(dbHelper: helper);
+
+      final id = await sessions.insertSession({
+        'mode': 'Focus',
+        'started_at': DateTime(2026, 6, 24, 9).toIso8601String(),
+        'ended_at': DateTime(2026, 6, 24, 9, 25).toIso8601String(),
+        'duration_seconds': 1500,
+        'completed': 1,
+      });
+
+      final rows = await sessions.fetchSessions();
+      expect(id, isPositive);
+      expect(rows.single['mode'], 'Focus');
+      expect(rows.single['duration_seconds'], 1500);
+
+      await sessions.clearSessions();
+      expect(await sessions.fetchSessions(), isEmpty);
+    });
+
     test('zero-row updates and deletes throw', () async {
       final tasks = TaskDatabase(dbHelper: helper);
 
@@ -111,7 +142,7 @@ void main() {
     });
   });
 
-  test('version 6 repairs a version 4 database with missing objects', () async {
+  test('version 7 repairs a version 4 database with missing objects', () async {
     final directory = await Directory.systemTemp.createTemp('focusflow_test_');
     final path = '${directory.path}${Platform.pathSeparator}repair.db';
     final oldDb = await databaseFactoryFfi.openDatabase(
@@ -159,8 +190,11 @@ void main() {
     final tableNames = tables.map((row) => row['name']);
 
     expect(columnNames, containsAll(['status', 'completed_at']));
-    expect(tableNames, containsAll(['subtasks', 'moods', 'settings']));
+    expect(
+      tableNames,
+      containsAll(['subtasks', 'moods', 'settings', 'timer_sessions']),
+    );
     expect((await db.query('tasks')).single['due_date'], isNotNull);
-    expect(await db.getVersion(), 6);
+    expect(await db.getVersion(), 7);
   });
 }

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../providers/mood_state.dart';
 import '../../providers/settings_state.dart';
 import '../../providers/task_state.dart';
+import '../../providers/timer_state.dart';
 import '../../theme/app_theme.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -32,6 +33,8 @@ class SettingsScreen extends StatelessWidget {
                 settings: settings,
                 onSelected: (preset) => _applyTimerPreset(context, preset),
               ),
+              _SettingsDivider(),
+              _TimerNotificationsRow(settings: settings),
               _SettingsDivider(),
               _DurationRow(
                 label: 'Focus',
@@ -88,6 +91,12 @@ class SettingsScreen extends StatelessWidget {
                 icon: Icons.mood_bad_outlined,
                 label: 'Clear mood history',
                 onPressed: () => _confirmClearMoods(context),
+              ),
+              _SettingsDivider(),
+              _DangerActionRow(
+                icon: Icons.history_rounded,
+                label: 'Clear timer history',
+                onPressed: () => _confirmClearTimerSessions(context),
               ),
             ],
           ),
@@ -164,6 +173,23 @@ class SettingsScreen extends StatelessWidget {
       if (context.mounted) _showMessage(context, 'Mood history cleared');
     } catch (_) {
       if (context.mounted) _showMessage(context, 'Could not clear moods.');
+    }
+  }
+
+  Future<void> _confirmClearTimerSessions(BuildContext context) async {
+    final confirmed = await _confirmDestructiveAction(
+      context,
+      title: 'Clear timer history?',
+      message: 'This permanently deletes all completed timer sessions.',
+      confirmLabel: 'Clear timer history',
+    );
+    if (!confirmed || !context.mounted) return;
+
+    try {
+      await context.read<TimerState>().clearSessionHistory();
+      if (context.mounted) _showMessage(context, 'Timer history cleared');
+    } catch (_) {
+      if (context.mounted) _showMessage(context, 'Could not clear timers.');
     }
   }
 
@@ -307,6 +333,38 @@ class _DueDateDefaultControl extends StatelessWidget {
             if (!context.mounted) return;
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Could not save task setting.')),
+            );
+          }
+        },
+      ),
+    );
+  }
+}
+
+class _TimerNotificationsRow extends StatelessWidget {
+  const _TimerNotificationsRow({required this.settings});
+
+  final SettingsState settings;
+
+  @override
+  Widget build(BuildContext context) {
+    return _SettingsRow(
+      icon: Icons.notifications_active_outlined,
+      label: 'Timer notifications',
+      trailing: Switch(
+        key: const Key('timer-notifications-toggle'),
+        value: settings.timerNotificationsEnabled,
+        onChanged: (enabled) async {
+          try {
+            await context
+                .read<SettingsState>()
+                .setTimerNotificationsEnabled(enabled);
+          } catch (_) {
+            if (!context.mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Could not save notification setting.'),
+              ),
             );
           }
         },

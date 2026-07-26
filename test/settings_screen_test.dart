@@ -87,6 +87,14 @@ void main() {
     expect(repository.values[SettingsState.shortBreakDurationKey], '10');
     expect(repository.values[SettingsState.longBreakDurationKey], '30');
 
+    await tester.tap(find.byKey(const Key('timer-notifications-toggle')));
+    await tester.pump();
+    expect(settings.timerNotificationsEnabled, isTrue);
+    expect(
+      repository.values[SettingsState.timerNotificationsEnabledKey],
+      'true',
+    );
+
     await tester.tap(find.text('7 days'));
     await tester.pump();
     expect(settings.defaultDueDateOffsetDays, 7);
@@ -119,6 +127,8 @@ void main() {
       taskState: taskState,
     );
 
+    await tester.ensureVisible(find.byTooltip('Clear task history'));
+    await tester.pump();
     await tester.tap(find.byTooltip('Clear task history'));
     await tester.pumpAndSettle();
     expect(find.text('Clear task history?'), findsOneWidget);

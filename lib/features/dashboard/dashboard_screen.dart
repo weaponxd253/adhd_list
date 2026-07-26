@@ -379,6 +379,16 @@ class _TimerCard extends StatelessWidget {
                           color: cs.primary)),
                   Text(timerState.currentMode,
                       style: Theme.of(context).textTheme.bodySmall),
+                  Text(
+                    timerState.completedSessionsToday == 0
+                        ? 'No sessions today'
+                        : '${timerState.focusMinutesToday}m focus today • ${timerState.completedSessionsToday} sessions',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ],
               ),
             ),

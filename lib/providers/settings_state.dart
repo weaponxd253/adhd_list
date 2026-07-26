@@ -33,6 +33,7 @@ class SettingsState extends ChangeNotifier {
   static const shortBreakDurationKey = 'short_break_duration_minutes';
   static const longBreakDurationKey = 'long_break_duration_minutes';
   static const defaultDueDateOffsetKey = 'default_due_date_offset_days';
+  static const timerNotificationsEnabledKey = 'timer_notifications_enabled';
 
   static const minTimerMinutes = 1;
   static const maxTimerMinutes = 180;
@@ -40,6 +41,7 @@ class SettingsState extends ChangeNotifier {
   static const defaultShortBreakDuration = 5;
   static const defaultLongBreakDuration = 15;
   static const defaultDueDateOffset = 30;
+  static const defaultTimerNotificationsEnabled = false;
   static const dueDateOffsetOptions = [1, 7, 30];
   static const timerPresets = [
     TimerPreset(
@@ -68,12 +70,14 @@ class SettingsState extends ChangeNotifier {
   int _shortBreakDuration = defaultShortBreakDuration;
   int _longBreakDuration = defaultLongBreakDuration;
   int _defaultDueDateOffsetDays = defaultDueDateOffset;
+  bool _timerNotificationsEnabled = defaultTimerNotificationsEnabled;
 
   ThemeMode get themeMode => _themeMode;
   int get focusDuration => _focusDuration;
   int get shortBreakDuration => _shortBreakDuration;
   int get longBreakDuration => _longBreakDuration;
   int get defaultDueDateOffsetDays => _defaultDueDateOffsetDays;
+  bool get timerNotificationsEnabled => _timerNotificationsEnabled;
 
   Future<void> load() async {
     _themeMode = _themeModeFromValue(await _repository.read(themeModeKey));
@@ -104,6 +108,10 @@ class SettingsState extends ChangeNotifier {
     _defaultDueDateOffsetDays = dueDateOffsetOptions.contains(dueDateOffset)
         ? dueDateOffset
         : defaultDueDateOffset;
+    _timerNotificationsEnabled = _boolFromValue(
+      await _repository.read(timerNotificationsEnabledKey),
+      defaultTimerNotificationsEnabled,
+    );
     notifyListeners();
   }
 
@@ -160,6 +168,14 @@ class SettingsState extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> setTimerNotificationsEnabled(bool enabled) async {
+    if (enabled == _timerNotificationsEnabled) return;
+
+    await _repository.write(timerNotificationsEnabledKey, '$enabled');
+    _timerNotificationsEnabled = enabled;
+    notifyListeners();
+  }
+
   ThemeMode _themeModeFromValue(String? value) {
     return value == ThemeMode.dark.name ? ThemeMode.dark : ThemeMode.light;
   }
@@ -173,6 +189,11 @@ class SettingsState extends ChangeNotifier {
     final parsed = int.tryParse(value ?? '');
     if (parsed == null || parsed < min || parsed > max) return fallback;
     return parsed;
+  }
+
+  bool _boolFromValue(String? value, bool fallback) {
+    if (value == null) return fallback;
+    return value.toLowerCase() == 'true';
   }
 
   void _validateTimerDuration(int value) {

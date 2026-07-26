@@ -23,3 +23,9 @@ abstract interface class SettingsRepository {
   Future<String?> read(String key);
   Future<void> write(String key, String value);
 }
+
+abstract interface class TimerSessionRepository {
+  Future<int> insertSession(Map<String, Object?> session);
+  Future<List<Map<String, Object?>>> fetchSessions({int limit = 60});
+  Future<void> clearSessions();
+}

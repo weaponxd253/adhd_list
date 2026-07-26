@@ -38,6 +38,7 @@ void main() {
           SettingsState.shortBreakDurationKey: '8',
           SettingsState.longBreakDurationKey: '20',
           SettingsState.defaultDueDateOffsetKey: '7',
+          SettingsState.timerNotificationsEnabledKey: 'true',
         },
       );
       final state = SettingsState(repository: repository, autoLoad: false);
@@ -48,6 +49,7 @@ void main() {
       expect(state.shortBreakDuration, 8);
       expect(state.longBreakDuration, 20);
       expect(state.defaultDueDateOffsetDays, 7);
+      expect(state.timerNotificationsEnabled, isTrue);
     });
 
     test('persists timer durations together', () async {
@@ -76,6 +78,19 @@ void main() {
 
       expect(repository.values[SettingsState.defaultDueDateOffsetKey], '7');
       expect(state.defaultDueDateOffsetDays, 7);
+    });
+
+    test('persists timer notification preference', () async {
+      final repository = FakeSettingsRepository();
+      final state = SettingsState(repository: repository, autoLoad: false);
+
+      await state.setTimerNotificationsEnabled(true);
+
+      expect(
+        repository.values[SettingsState.timerNotificationsEnabledKey],
+        'true',
+      );
+      expect(state.timerNotificationsEnabled, isTrue);
     });
 
     test('applies timer presets through duration persistence', () async {

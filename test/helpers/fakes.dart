@@ -1,4 +1,5 @@
 import 'package:adhd_list/repositories/repositories.dart';
+import 'package:adhd_list/services/timer_notification_service.dart';
 
 class FakeTaskRepository implements TaskRepository {
   FakeTaskRepository({
@@ -173,6 +174,73 @@ class FakeSettingsRepository implements SettingsRepository {
     if (failWrites) throw StateError('write failed');
     this.value = value;
     values[key] = value;
+  }
+}
+
+class FakeTimerSessionRepository implements TimerSessionRepository {
+  FakeTimerSessionRepository({List<Map<String, Object?>>? sessions})
+      : sessionRows = sessions ?? [];
+
+  List<Map<String, Object?>> sessionRows;
+  bool failReads = false;
+  bool failWrites = false;
+  int nextSessionId = 1;
+
+  Never _failure() => throw StateError('timer session failure');
+
+  @override
+  Future<void> clearSessions() async {
+    if (failWrites) _failure();
+    sessionRows = [];
+  }
+
+  @override
+  Future<List<Map<String, Object?>>> fetchSessions({int limit = 60}) async {
+    if (failReads) _failure();
+    final rows = sessionRows.map(Map<String, Object?>.from).toList()
+      ..sort(
+        (a, b) => (b['ended_at'] as String).compareTo(a['ended_at'] as String),
+      );
+    return rows.take(limit).toList();
+  }
+
+  @override
+  Future<int> insertSession(Map<String, Object?> session) async {
+    if (failWrites) _failure();
+    final id = nextSessionId++;
+    sessionRows.insert(0, {...session, 'id': id});
+    return id;
+  }
+}
+
+class FakeTimerNotificationService implements TimerNotificationService {
+  bool permissionGranted = true;
+  int permissionRequests = 0;
+  int cancelCount = 0;
+  final scheduled = <Map<String, Object?>>[];
+
+  @override
+  Future<void> cancelTimerCompletion() async {
+    cancelCount++;
+  }
+
+  @override
+  Future<bool> requestPermission() async {
+    permissionRequests++;
+    return permissionGranted;
+  }
+
+  @override
+  Future<void> scheduleTimerCompletion({
+    required DateTime when,
+    required String title,
+    required String body,
+  }) async {
+    scheduled.add({
+      'when': when,
+      'title': title,
+      'body': body,
+    });
   }
 }
 

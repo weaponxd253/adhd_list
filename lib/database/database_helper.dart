@@ -2,7 +2,7 @@ import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
 class DatabaseHelper {
-  static const _schemaVersion = 6;
+  static const _schemaVersion = 7;
   static final DatabaseHelper instance = DatabaseHelper._();
 
   DatabaseHelper._({
@@ -96,6 +96,10 @@ class DatabaseHelper {
     await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_moods_date ON moods(date)',
     );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_timer_sessions_ended_at '
+      'ON timer_sessions(ended_at)',
+    );
   }
 
   Future<void> _createSettingsTable(DatabaseExecutor db) async {
@@ -103,6 +107,19 @@ class DatabaseHelper {
       CREATE TABLE IF NOT EXISTS settings (
         key TEXT PRIMARY KEY,
         value TEXT NOT NULL
+      )
+    ''');
+  }
+
+  Future<void> _createTimerSessionsTable(DatabaseExecutor db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS timer_sessions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        mode TEXT NOT NULL,
+        started_at TEXT NOT NULL,
+        ended_at TEXT NOT NULL,
+        duration_seconds INTEGER NOT NULL,
+        completed INTEGER DEFAULT 1
       )
     ''');
   }
@@ -129,6 +146,7 @@ class DatabaseHelper {
     await _createSubtasksTable(db);
     await _createMoodsTable(db);
     await _createSettingsTable(db);
+    await _createTimerSessionsTable(db);
     await _createIndexes(db);
   }
 
@@ -147,6 +165,7 @@ class DatabaseHelper {
     await _createSubtasksTable(db);
     await _createMoodsTable(db);
     await _createSettingsTable(db);
+    await _createTimerSessionsTable(db);
     await _createIndexes(db);
   }
 }
