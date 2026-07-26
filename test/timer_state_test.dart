@@ -219,6 +219,34 @@ void main() {
       });
     });
 
+    test('notification permission can be requested before the timer starts',
+        () async {
+      final notifications = FakeTimerNotificationService();
+      final state = TimerState(
+        notificationService: notifications,
+        sessionRepository: FakeTimerSessionRepository(),
+      );
+      addTearDown(state.dispose);
+
+      state.updateSettings(
+        focus: 25,
+        shortBreak: 5,
+        longBreak: 15,
+        notificationsEnabled: true,
+      );
+
+      notifications.permissionGranted = false;
+      expect(await state.requestNotificationPermission(), isFalse);
+      expect(notifications.permissionRequests, 1);
+      expect(state.notificationPermissionNeeded, isTrue);
+
+      notifications.permissionGranted = true;
+      expect(await state.requestNotificationPermission(), isTrue);
+      expect(notifications.permissionRequests, 2);
+      expect(state.notificationPermissionGranted, isTrue);
+      expect(state.notificationPermissionNeeded, isFalse);
+    });
+
     test('dispose cancels future ticks', () {
       fakeAsync((async) {
         final state = TimerState();

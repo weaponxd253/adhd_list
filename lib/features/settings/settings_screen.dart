@@ -348,9 +348,12 @@ class _TimerNotificationsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final timerState = context.watch<TimerState>();
+
     return _SettingsRow(
       icon: Icons.notifications_active_outlined,
       label: 'Timer notifications',
+      subtitle: _statusText(timerState),
       trailing: Switch(
         key: const Key('timer-notifications-toggle'),
         value: settings.timerNotificationsEnabled,
@@ -359,6 +362,18 @@ class _TimerNotificationsRow extends StatelessWidget {
             await context
                 .read<SettingsState>()
                 .setTimerNotificationsEnabled(enabled);
+            if (!context.mounted) return;
+
+            final timerState = context.read<TimerState>();
+            timerState.updateSettings(
+              focus: settings.focusDuration,
+              shortBreak: settings.shortBreakDuration,
+              longBreak: settings.longBreakDuration,
+              notificationsEnabled: enabled,
+            );
+            if (enabled && context.mounted) {
+              await timerState.requestNotificationPermission();
+            }
           } catch (_) {
             if (!context.mounted) return;
             ScaffoldMessenger.of(context).showSnackBar(
@@ -370,6 +385,12 @@ class _TimerNotificationsRow extends StatelessWidget {
         },
       ),
     );
+  }
+
+  String _statusText(TimerState timerState) {
+    if (!settings.timerNotificationsEnabled) return 'Off';
+    if (timerState.notificationPermissionGranted) return 'Enabled';
+    return 'Permission needed';
   }
 }
 
@@ -594,12 +615,14 @@ class _SettingsRow extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.trailing,
+    this.subtitle,
     this.iconColor,
     this.labelColor,
   });
 
   final IconData icon;
   final String label;
+  final String? subtitle;
   final Widget trailing;
   final Color? iconColor;
   final Color? labelColor;
@@ -618,11 +641,23 @@ class _SettingsRow extends StatelessWidget {
           Icon(icon, color: iconColor ?? cs.onSurfaceVariant),
           const SizedBox(width: AppSpacing.sm),
           Expanded(
-            child: Text(
-              label,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: labelColor,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: labelColor,
+                      ),
+                ),
+                if (subtitle != null) ...[
+                  const SizedBox(height: AppSpacing.xxs),
+                  Text(
+                    subtitle!,
+                    style: Theme.of(context).textTheme.bodySmall,
                   ),
+                ],
+              ],
             ),
           ),
           const SizedBox(width: AppSpacing.sm),

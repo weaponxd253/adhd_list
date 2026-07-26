@@ -94,6 +94,7 @@ class _TaskListSectionState extends State<TaskListSection> {
   Widget _buildTaskCard(Task task) {
     final expanded = _expandedTaskIds.contains(task.id);
     final busy = widget.taskState.isTaskBusy(task.id);
+    final colorScheme = Theme.of(context).colorScheme;
     final semantic = Theme.of(context).extension<AppSemanticColors>()!;
     final statusColor = task.isCompleted
         ? semantic.success
@@ -101,7 +102,7 @@ class _TaskListSectionState extends State<TaskListSection> {
             ? semantic.danger
             : _dayDifference(task.dueDate) <= 1
                 ? semantic.warning
-                : Theme.of(context).colorScheme.primary;
+                : colorScheme.primary;
     final compactActions = MediaQuery.textScalerOf(context).scale(1) > 1.3;
     final useActionMenu =
         compactActions || MediaQuery.sizeOf(context).width < 430;
@@ -265,6 +266,8 @@ class _TaskListSectionState extends State<TaskListSection> {
   }
 
   Widget _buildSubtasks(Task task, bool busy) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(
@@ -274,9 +277,9 @@ class _TaskListSectionState extends State<TaskListSection> {
         AppSpacing.sm,
       ),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        color: colorScheme.surfaceContainerHighest,
         border: Border(
-          top: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+          top: BorderSide(color: colorScheme.outlineVariant),
         ),
       ),
       child: Column(
@@ -319,6 +322,12 @@ class _TaskListSectionState extends State<TaskListSection> {
                 onPressed: busy ? null : () => _addSubtask(task),
                 icon: const Icon(Icons.add_rounded),
                 style: IconButton.styleFrom(
+                  backgroundColor: colorScheme.primary,
+                  foregroundColor: colorScheme.onPrimary,
+                  disabledBackgroundColor:
+                      colorScheme.onSurface.withOpacity(0.12),
+                  disabledForegroundColor:
+                      colorScheme.onSurface.withOpacity(0.38),
                   minimumSize: const Size(44, 44),
                   fixedSize: const Size(44, 44),
                 ),

@@ -2,6 +2,7 @@ import 'package:adhd_list/features/settings/settings_screen.dart';
 import 'package:adhd_list/providers/mood_state.dart';
 import 'package:adhd_list/providers/settings_state.dart';
 import 'package:adhd_list/providers/task_state.dart';
+import 'package:adhd_list/providers/timer_state.dart';
 import 'package:adhd_list/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -14,11 +15,18 @@ Future<void> _pumpSettingsScreen(
   required SettingsState settings,
   TaskState? taskState,
   MoodState? moodState,
+  TimerState? timerState,
 }) async {
   tester.view.physicalSize = const Size(400, 1000);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
+  final resolvedTimerState = timerState ??
+      TimerState(
+        notificationService: FakeTimerNotificationService(),
+        sessionRepository: FakeTimerSessionRepository(),
+      );
+  addTearDown(resolvedTimerState.dispose);
 
   await tester.pumpWidget(
     MultiProvider(
@@ -38,6 +46,7 @@ Future<void> _pumpSettingsScreen(
                 autoLoad: false,
               ),
         ),
+        ChangeNotifierProvider.value(value: resolvedTimerState),
       ],
       child: MaterialApp(
         theme: AppTheme.light,
@@ -70,8 +79,17 @@ void main() {
   testWidgets('updates persisted timer and task defaults', (tester) async {
     final repository = FakeSettingsRepository();
     final settings = SettingsState(repository: repository, autoLoad: false);
+    final notificationService = FakeTimerNotificationService();
+    final timerState = TimerState(
+      notificationService: notificationService,
+      sessionRepository: FakeTimerSessionRepository(),
+    );
 
-    await _pumpSettingsScreen(tester, settings: settings);
+    await _pumpSettingsScreen(
+      tester,
+      settings: settings,
+      timerState: timerState,
+    );
 
     await tester.tap(find.byKey(const Key('increase-focus-duration')));
     await tester.pump();
@@ -90,6 +108,9 @@ void main() {
     await tester.tap(find.byKey(const Key('timer-notifications-toggle')));
     await tester.pump();
     expect(settings.timerNotificationsEnabled, isTrue);
+    expect(notificationService.permissionRequests, 1);
+    expect(timerState.notificationPermissionGranted, isTrue);
+    expect(find.text('Enabled'), findsOneWidget);
     expect(
       repository.values[SettingsState.timerNotificationsEnabledKey],
       'true',

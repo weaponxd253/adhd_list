@@ -180,7 +180,7 @@ class _MoodGrid extends StatelessWidget {
             AppSpacing.md,
             0,
             AppSpacing.md,
-            AppInsets.bottomScrollPadding(context),
+            AppInsets.bottomNavigationScrollPadding(context),
           ),
           children: [
             Wrap(

@@ -53,6 +53,8 @@ class TimerState extends ChangeNotifier {
   String? get sessionHistoryError => _sessionHistoryError;
   bool get notificationsEnabled => _notificationsEnabled;
   bool get notificationPermissionGranted => _notificationPermissionGranted;
+  bool get notificationPermissionNeeded =>
+      _notificationsEnabled && !_notificationPermissionGranted;
 
   String get statusLabel {
     if (isTimerRunning) return 'Session in progress';
@@ -191,6 +193,33 @@ class TimerState extends ChangeNotifier {
       unawaited(_notificationService.cancelTimerCompletion());
     }
     notifyListeners();
+  }
+
+  Future<bool> requestNotificationPermission() async {
+    if (!_notificationsEnabled) {
+      if (_notificationPermissionGranted) {
+        _notificationPermissionGranted = false;
+        notifyListeners();
+      }
+      return false;
+    }
+
+    final granted = await _requestNotificationPermission();
+    if (granted && isTimerRunning) {
+      await _scheduleCompletionNotification(ensurePermission: false);
+    }
+    return granted;
+  }
+
+  Future<bool> _requestNotificationPermission() async {
+    final granted = await _notificationService.requestPermission();
+    if (_disposed) return false;
+
+    if (_notificationPermissionGranted != granted) {
+      _notificationPermissionGranted = granted;
+      notifyListeners();
+    }
+    return granted;
   }
 
   void setMode(String mode) {
@@ -357,20 +386,18 @@ class TimerState extends ChangeNotifier {
     }
   }
 
-  Future<void> _scheduleCompletionNotification() async {
+  Future<void> _scheduleCompletionNotification({
+    bool ensurePermission = true,
+  }) async {
     final when = _sessionEndsAt;
     if (!_notificationsEnabled || when == null) return;
 
     final mode = currentMode;
     final nextMode = _nextModeFor(mode);
-    final granted = await _notificationService.requestPermission();
-    if (_disposed) return;
-
-    _notificationPermissionGranted = granted;
-    if (!granted) {
-      notifyListeners();
-      return;
-    }
+    final granted = ensurePermission
+        ? await _requestNotificationPermission()
+        : _notificationPermissionGranted;
+    if (_disposed || !granted) return;
 
     await _notificationService.scheduleTimerCompletion(
       when: when,

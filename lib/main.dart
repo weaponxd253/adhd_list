@@ -7,9 +7,11 @@ import 'providers/mood_state.dart';
 import 'providers/settings_state.dart';
 import 'providers/task_state.dart';
 import 'providers/timer_state.dart';
+import 'services/local_timer_notification_service.dart';
 import 'theme/app_theme.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const FocusFlowApp());
 }
 
@@ -24,9 +26,16 @@ class FocusFlowApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => MoodState()),
         ChangeNotifierProvider(create: (_) => SettingsState()),
         ChangeNotifierProxyProvider<SettingsState, TimerState>(
-          create: (_) => TimerState(autoLoadHistory: true),
+          create: (_) => TimerState(
+            autoLoadHistory: true,
+            notificationService: LocalTimerNotificationService(),
+          ),
           update: (_, settings, timerState) {
-            final state = timerState ?? TimerState(autoLoadHistory: true);
+            final state = timerState ??
+                TimerState(
+                  autoLoadHistory: true,
+                  notificationService: LocalTimerNotificationService(),
+                );
             state.updateSettings(
               focus: settings.focusDuration,
               shortBreak: settings.shortBreakDuration,
