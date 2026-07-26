@@ -1,4 +1,5 @@
 import 'package:adhd_list/features/task_breakdown/task_screen.dart';
+import 'package:adhd_list/providers/settings_state.dart';
 import 'package:adhd_list/providers/task_state.dart';
 import 'package:adhd_list/theme/app_theme.dart';
 import 'package:flutter/material.dart';
@@ -9,15 +10,25 @@ import 'helpers/fakes.dart';
 
 Future<void> _pumpTaskScreen(
   WidgetTester tester,
-  TaskState state,
-) async {
+  TaskState state, {
+  SettingsState? settings,
+}) async {
   tester.view.physicalSize = const Size(400, 1000);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
   await tester.pumpWidget(
-    ChangeNotifierProvider.value(
-      value: state,
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider.value(value: state),
+        ChangeNotifierProvider.value(
+          value: settings ??
+              SettingsState(
+                repository: FakeSettingsRepository(),
+                autoLoad: false,
+              ),
+        ),
+      ],
       child: MaterialApp(
         theme: AppTheme.light,
         home: const TaskScreen(),
@@ -41,6 +52,32 @@ void main() {
     await tester.pump();
 
     expect(find.text('Enter a task name'), findsOneWidget);
+  });
+
+  testWidgets('uses the configured default due date when no date is selected',
+      (tester) async {
+    final repository = FakeTaskRepository();
+    final taskState = TaskState(
+      repository: repository,
+      autoLoad: false,
+    );
+    final settings = SettingsState(
+      repository: FakeSettingsRepository(),
+      autoLoad: false,
+    );
+    await settings.setDefaultDueDateOffsetDays(7);
+    await _pumpTaskScreen(tester, taskState, settings: settings);
+
+    final beforeSubmit = DateUtils.dateOnly(DateTime.now());
+    await tester.enterText(find.byKey(const Key('task-name-field')), 'Plan');
+    await tester.tap(find.byKey(const Key('add-task-button')));
+    await tester.pumpAndSettle();
+
+    final dueDate =
+        DateTime.parse(repository.taskRows.single['due_date'] as String);
+    final dueDay = DateUtils.dateOnly(dueDate);
+
+    expect(dueDay.difference(beforeSubmit).inDays, 7);
   });
 
   testWidgets('separates pending and completed tasks', (tester) async {
@@ -135,8 +172,16 @@ void main() {
     await tester.pumpWidget(
       MediaQuery(
         data: const MediaQueryData(textScaler: TextScaler.linear(2)),
-        child: ChangeNotifierProvider.value(
-          value: state,
+        child: MultiProvider(
+          providers: [
+            ChangeNotifierProvider.value(value: state),
+            ChangeNotifierProvider(
+              create: (_) => SettingsState(
+                repository: FakeSettingsRepository(),
+                autoLoad: false,
+              ),
+            ),
+          ],
           child: MaterialApp(
             theme: AppTheme.light,
             home: const TaskScreen(),

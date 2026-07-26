@@ -3,10 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../providers/mood_state.dart';
-import '../../providers/settings_state.dart';
 import '../../providers/task_state.dart';
 import '../../providers/timer_state.dart';
 import '../../models/task.dart';
+import '../../features/settings/settings_screen.dart';
 import '../../theme/app_theme.dart';
 
 class DashboardScreen extends StatelessWidget {
@@ -15,7 +15,7 @@ class DashboardScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: _buildAppBar(context, context.watch<SettingsState>()),
+      appBar: _buildAppBar(context),
       body: ListView(
         padding: AppInsets.screenScrollPadding(
           context,
@@ -48,10 +48,7 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
-  PreferredSizeWidget _buildAppBar(
-    BuildContext context,
-    SettingsState settings,
-  ) {
+  PreferredSizeWidget _buildAppBar(BuildContext context) {
     final hour = DateTime.now().hour;
     final greeting = hour < 12
         ? 'Good morning'
@@ -77,79 +74,14 @@ class DashboardScreen extends StatelessWidget {
       ),
       actions: [
         IconButton(
-          icon: Icon(
-            settings.themeMode == ThemeMode.light
-                ? Icons.dark_mode_outlined
-                : Icons.light_mode_outlined,
+          icon: const Icon(Icons.settings_outlined),
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const SettingsScreen()),
           ),
-          onPressed: settings.toggleTheme,
-          tooltip: 'Toggle theme',
-        ),
-        PopupMenuButton<String>(
-          icon: const Icon(Icons.more_vert_rounded),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          onSelected: (value) => _handleMenu(context, value),
-          itemBuilder: (_) => [
-            const PopupMenuItem(
-                value: 'clear_tasks', child: Text('Clear task history')),
-            const PopupMenuItem(
-                value: 'clear_moods', child: Text('Clear mood history')),
-          ],
+          tooltip: 'Settings',
         ),
       ],
-    );
-  }
-
-  void _handleMenu(
-    BuildContext context,
-    String value,
-  ) {
-    final label = value == 'clear_tasks' ? 'task' : 'mood';
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Clear $label history?'),
-        content: Text(
-            'This will permanently delete all $label data. This cannot be undone.'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel')),
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              try {
-                if (value == 'clear_tasks') {
-                  await context.read<TaskState>().clearTaskHistory();
-                } else {
-                  await context.read<MoodState>().clearMoodHistory();
-                }
-                if (!context.mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      '${label[0].toUpperCase()}${label.substring(1)} history cleared',
-                    ),
-                  ),
-                );
-              } catch (_) {
-                if (!context.mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'Could not clear $label history. Try again.',
-                    ),
-                  ),
-                );
-              }
-            },
-            child: Text('Clear',
-                style: TextStyle(color: Theme.of(context).colorScheme.error)),
-          ),
-        ],
-      ),
     );
   }
 }

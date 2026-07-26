@@ -150,18 +150,23 @@ class FakeMoodRepository implements MoodRepository {
 }
 
 class FakeSettingsRepository implements SettingsRepository {
-  FakeSettingsRepository({this.value});
+  FakeSettingsRepository({
+    this.value,
+    Map<String, String>? values,
+  }) : values = values ?? {};
 
   String? value;
+  Map<String, String> values;
   bool failWrites = false;
 
   @override
-  Future<String?> read(String key) async => value;
+  Future<String?> read(String key) async => values[key] ?? value;
 
   @override
   Future<void> write(String key, String value) async {
     if (failWrites) throw StateError('write failed');
     this.value = value;
+    values[key] = value;
   }
 }
 

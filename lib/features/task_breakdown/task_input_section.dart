@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../providers/task_state.dart';
+import '../../providers/settings_state.dart';
 import '../../theme/app_theme.dart';
 
 class TaskInputSection extends StatefulWidget {
@@ -39,8 +40,10 @@ class _TaskInputSectionState extends State<TaskInputSection> {
     }
 
     setState(() => _errorText = null);
+    final defaultOffsetDays =
+        context.read<SettingsState>().defaultDueDateOffsetDays;
     final dueDate =
-        _selectedDate ?? DateTime.now().add(const Duration(days: 30));
+        _selectedDate ?? DateTime.now().add(Duration(days: defaultOffsetDays));
     try {
       await context.read<TaskState>().addTask(title, dueDate);
       if (!mounted) return;

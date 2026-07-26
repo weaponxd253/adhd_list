@@ -67,6 +67,26 @@ class TimerState extends ChangeNotifier {
     notifyListeners();
   }
 
+  void updateDurations({
+    required int focus,
+    required int shortBreak,
+    required int longBreak,
+  }) {
+    final changed = focusDuration != focus ||
+        shortBreakDuration != shortBreak ||
+        longBreakDuration != longBreak;
+    if (!changed) return;
+
+    focusDuration = focus;
+    shortBreakDuration = shortBreak;
+    longBreakDuration = longBreak;
+
+    if (!isTimerRunning) {
+      _resetDuration();
+    }
+    notifyListeners();
+  }
+
   void setMode(String mode) {
     if (!isTimerRunning &&
         mode == currentMode &&

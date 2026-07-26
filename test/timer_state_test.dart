@@ -57,6 +57,21 @@ void main() {
       });
     });
 
+    test('updates durations and resets idle sessions', () {
+      final state = TimerState();
+      addTearDown(state.dispose);
+
+      state.updateDurations(focus: 50, shortBreak: 10, longBreak: 30);
+
+      expect(state.focusDuration, 50);
+      expect(state.shortBreakDuration, 10);
+      expect(state.longBreakDuration, 30);
+      expect(state.timerDisplay, '50:00');
+
+      state.switchToNextMode();
+      expect(state.timerDisplay, '10:00');
+    });
+
     test('dispose cancels future ticks', () {
       fakeAsync((async) {
         final state = TimerState();
