@@ -122,6 +122,47 @@ void main() {
     expect(repository.values[SettingsState.defaultDueDateOffsetKey], '7');
   });
 
+  testWidgets('turning notifications off cancels pending timer alerts',
+      (tester) async {
+    final repository = FakeSettingsRepository();
+    final settings = SettingsState(repository: repository, autoLoad: false);
+    await settings.setTimerNotificationsEnabled(true);
+
+    final notificationService = FakeTimerNotificationService();
+    final timerState = TimerState(
+      notificationService: notificationService,
+      sessionRepository: FakeTimerSessionRepository(),
+    );
+    timerState.updateSettings(
+      focus: settings.focusDuration,
+      shortBreak: settings.shortBreakDuration,
+      longBreak: settings.longBreakDuration,
+      notificationsEnabled: true,
+    );
+    timerState.startTimer();
+
+    await _pumpSettingsScreen(
+      tester,
+      settings: settings,
+      timerState: timerState,
+    );
+    await tester.pumpAndSettle();
+
+    expect(notificationService.scheduled, hasLength(1));
+    expect(find.text('Enabled'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('timer-notifications-toggle')));
+    await tester.pumpAndSettle();
+
+    expect(settings.timerNotificationsEnabled, isFalse);
+    expect(timerState.notificationsEnabled, isFalse);
+    expect(notificationService.cancelCount, greaterThanOrEqualTo(1));
+    expect(find.text('Off'), findsOneWidget);
+
+    timerState.resetTimer();
+    await tester.pump();
+  });
+
   testWidgets('confirms before clearing task history', (tester) async {
     final settings = SettingsState(
       repository: FakeSettingsRepository(),
