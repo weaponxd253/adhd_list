@@ -1,6 +1,7 @@
 import 'package:adhd_list/features/task_breakdown/task_screen.dart';
 import 'package:adhd_list/providers/settings_state.dart';
 import 'package:adhd_list/providers/task_state.dart';
+import 'package:adhd_list/providers/timer_state.dart';
 import 'package:adhd_list/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -12,6 +13,7 @@ Future<void> _pumpTaskScreen(
   WidgetTester tester,
   TaskState state, {
   SettingsState? settings,
+  TimerState? timerState,
 }) async {
   tester.view.physicalSize = const Size(400, 1000);
   tester.view.devicePixelRatio = 1;
@@ -26,6 +28,13 @@ Future<void> _pumpTaskScreen(
               SettingsState(
                 repository: FakeSettingsRepository(),
                 autoLoad: false,
+              ),
+        ),
+        ChangeNotifierProvider.value(
+          value: timerState ??
+              TimerState(
+                notificationService: FakeTimerNotificationService(),
+                sessionRepository: FakeTimerSessionRepository(),
               ),
         ),
       ],
@@ -147,8 +156,75 @@ void main() {
     await tester.tap(find.byTooltip('Task actions for Accessible task'));
     await tester.pumpAndSettle();
 
+    expect(find.text("I'm stuck"), findsOneWidget);
     expect(find.text('Edit'), findsOneWidget);
     expect(find.text('Delete'), findsOneWidget);
+  });
+
+  testWidgets('editing a task saves without controller disposal errors',
+      (tester) async {
+    final repository = FakeTaskRepository(
+      tasks: [taskRow(id: 1, title: 'Original task', dueDate: today)],
+    );
+    final state = TaskState(
+      repository: repository,
+      autoLoad: false,
+    );
+    await state.loadTasks();
+    await _pumpTaskScreen(tester, state);
+
+    await tester.tap(find.byTooltip('Task actions for Original task'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Edit'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Edit task'), findsOneWidget);
+    await tester.enterText(find.byType(TextField).last, 'Renamed task');
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    expect(repository.taskRows.single['title'], 'Renamed task');
+    expect(find.text('Renamed task'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('stuck flow saves friction, adds a tiny step, and starts timer',
+      (tester) async {
+    final repository = FakeTaskRepository(
+      tasks: [taskRow(id: 1, title: 'Hard task', dueDate: today)],
+    );
+    final state = TaskState(repository: repository, autoLoad: false);
+    final timerState = TimerState(
+      notificationService: FakeTimerNotificationService(),
+      sessionRepository: FakeTimerSessionRepository(),
+    );
+    addTearDown(timerState.dispose);
+    await state.loadTasks();
+    await _pumpTaskScreen(tester, state, timerState: timerState);
+
+    await tester.tap(find.byTooltip('Task actions for Hard task'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text("I'm stuck"));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('friction-unclear')));
+    await tester.pump();
+    expect(repository.taskRows.single['friction'], 'unclear');
+    expect(find.text('Clarity first. Action second.'), findsOneWidget);
+
+    await tester.ensureVisible(find.byKey(const Key('add-tiny-step')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('add-tiny-step')));
+    await tester.pump();
+    expect(repository.subtaskRows[1], hasLength(1));
+
+    await tester.ensureVisible(find.byKey(const ValueKey('quick-focus-2')));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('quick-focus-2')));
+    await tester.pump();
+    expect(timerState.isTimerRunning, isTrue);
+    expect(timerState.timerDisplay, '02:00');
+    timerState.stopTimer();
   });
 
   testWidgets('deletion offers undo and restores the task', (tester) async {

@@ -22,7 +22,7 @@ void main() {
 
     tearDown(() => helper.close());
 
-    test('creates all tables and indexes at version 7', () async {
+    test('creates all tables and indexes at version 8', () async {
       final db = await helper.database;
       final objects = await db.query(
         'sqlite_master',
@@ -51,7 +51,7 @@ void main() {
           'idx_timer_sessions_ended_at',
         ]),
       );
-      expect(await db.getVersion(), 7);
+      expect(await db.getVersion(), 8);
     });
 
     test('enforces due dates and foreign keys', () async {
@@ -100,6 +100,28 @@ void main() {
       expect(row['completed_at'], isNull);
     });
 
+    test('persists task support metadata', () async {
+      final tasks = TaskDatabase(dbHelper: helper);
+      final taskId = await tasks.insertTask(
+        'Task',
+        DateTime(2026, 6, 24).toIso8601String(),
+      );
+
+      await tasks.updateTaskSupport(
+        taskId,
+        friction: 'anxious',
+        energyLevel: 'low',
+        timeEstimate: 'twoMinutes',
+        anxietyLevel: 'high',
+      );
+
+      final row = (await tasks.fetchTasks()).single;
+      expect(row['friction'], 'anxious');
+      expect(row['energy_level'], 'low');
+      expect(row['time_estimate'], 'twoMinutes');
+      expect(row['anxiety_level'], 'high');
+    });
+
     test('settings use replace semantics', () async {
       final settings = SettingsDatabase(dbHelper: helper);
 
@@ -142,7 +164,7 @@ void main() {
     });
   });
 
-  test('version 7 repairs a version 4 database with missing objects', () async {
+  test('version 8 repairs a version 4 database with missing objects', () async {
     final directory = await Directory.systemTemp.createTemp('focusflow_test_');
     final path = '${directory.path}${Platform.pathSeparator}repair.db';
     final oldDb = await databaseFactoryFfi.openDatabase(
@@ -189,12 +211,22 @@ void main() {
     );
     final tableNames = tables.map((row) => row['name']);
 
-    expect(columnNames, containsAll(['status', 'completed_at']));
+    expect(
+      columnNames,
+      containsAll([
+        'status',
+        'completed_at',
+        'friction',
+        'energy_level',
+        'time_estimate',
+        'anxiety_level',
+      ]),
+    );
     expect(
       tableNames,
       containsAll(['subtasks', 'moods', 'settings', 'timer_sessions']),
     );
     expect((await db.query('tasks')).single['due_date'], isNotNull);
-    expect(await db.getVersion(), 7);
+    expect(await db.getVersion(), 8);
   });
 }

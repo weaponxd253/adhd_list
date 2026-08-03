@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 
 import '../../models/subtask.dart';
 import '../../models/task.dart';
+import '../../models/task_support.dart';
 import '../../providers/task_state.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/task_support_sheet.dart';
 
 class TaskListSection extends StatefulWidget {
   const TaskListSection({super.key, required this.taskState});
@@ -185,6 +187,12 @@ class _TaskListSectionState extends State<TaskListSection> {
                                     style:
                                         Theme.of(context).textTheme.bodySmall,
                                   ),
+                                if (task.friction != null)
+                                  _StatusBadge(
+                                    label: task.friction!.label,
+                                    color: colorScheme.secondary,
+                                    icon: Icons.psychology_alt_outlined,
+                                  ),
                               ],
                             ),
                           ],
@@ -198,10 +206,20 @@ class _TaskListSectionState extends State<TaskListSection> {
                       icon: const Icon(Icons.more_horiz_rounded),
                       enabled: !busy,
                       onSelected: (value) {
+                        if (value == 'stuck') {
+                          showTaskSupportSheet(context: context, task: task);
+                        }
                         if (value == 'edit') _showEditTask(task);
                         if (value == 'delete') _deleteWithUndo(task);
                       },
                       itemBuilder: (_) => [
+                        const PopupMenuItem(
+                          value: 'stuck',
+                          child: ListTile(
+                            leading: Icon(Icons.psychology_alt_outlined),
+                            title: Text("I'm stuck"),
+                          ),
+                        ),
                         const PopupMenuItem(
                           value: 'edit',
                           child: ListTile(
@@ -222,6 +240,18 @@ class _TaskListSectionState extends State<TaskListSection> {
                       ],
                     )
                   else ...[
+                    IconButton(
+                      tooltip: "I'm stuck on ${task.title}",
+                      onPressed: busy
+                          ? null
+                          : () => showTaskSupportSheet(
+                                context: context,
+                                task: task,
+                              ),
+                      icon: const Icon(Icons.psychology_alt_outlined),
+                      iconSize: 22,
+                      visualDensity: VisualDensity.compact,
+                    ),
                     IconButton(
                       tooltip: 'Edit ${task.title}',
                       onPressed: busy ? null : () => _showEditTask(task),
@@ -396,105 +426,31 @@ class _TaskListSectionState extends State<TaskListSection> {
   }
 
   void _showEditTask(Task task) {
-    final controller = TextEditingController(text: task.title);
-    var selectedDate = task.dueDate;
     showDialog<void>(
       context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Edit task'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: controller,
-                autofocus: true,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: const InputDecoration(labelText: 'Task name'),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              OutlinedButton.icon(
-                onPressed: () async {
-                  final picked = await showDatePicker(
-                    context: context,
-                    initialDate: selectedDate,
-                    firstDate: DateUtils.dateOnly(DateTime.now()),
-                    lastDate: DateTime(2100),
-                  );
-                  if (picked != null) {
-                    setDialogState(() => selectedDate = picked);
-                  }
-                },
-                icon: const Icon(Icons.calendar_today_outlined),
-                label: Text(
-                  '${selectedDate.month}/${selectedDate.day}/${selectedDate.year}',
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () async {
-                final title = controller.text.trim();
-                if (title.isEmpty) {
-                  _message('Task name cannot be blank');
-                  return;
-                }
-                final success = await _run(
-                  () => widget.taskState.editTask(task.id, title, selectedDate),
-                );
-                if (success && dialogContext.mounted) {
-                  Navigator.pop(dialogContext);
-                }
-              },
-              child: const Text('Save'),
-            ),
-          ],
-        ),
+      builder: (_) => _EditTaskDialog(
+        task: task,
+        onSave: (title, dueDate) {
+          return _run(
+            () => widget.taskState.editTask(task.id, title, dueDate),
+          );
+        },
       ),
-    ).whenComplete(controller.dispose);
+    );
   }
 
   void _showEditSubtask(Task task, Subtask subtask) {
-    final controller = TextEditingController(text: subtask.title);
     showDialog<void>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Edit step'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          textCapitalization: TextCapitalization.sentences,
-          decoration: const InputDecoration(labelText: 'Step name'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              final title = controller.text.trim();
-              if (title.isEmpty) {
-                _message('Step name cannot be blank');
-                return;
-              }
-              final success = await _run(
-                () => widget.taskState.editSubtask(task.id, subtask.id, title),
-              );
-              if (success && dialogContext.mounted) {
-                Navigator.pop(dialogContext);
-              }
-            },
-            child: const Text('Save'),
-          ),
-        ],
+      builder: (_) => _EditSubtaskDialog(
+        subtask: subtask,
+        onSave: (title) {
+          return _run(
+            () => widget.taskState.editSubtask(task.id, subtask.id, title),
+          );
+        },
       ),
-    ).whenComplete(controller.dispose);
+    );
   }
 
   void _message(String message) {
@@ -526,6 +482,189 @@ class _TaskListSectionState extends State<TaskListSection> {
     if (difference == 0) return 'due today';
     if (difference == 1) return 'due tomorrow';
     return 'due ${task.dueDate.month}/${task.dueDate.day}';
+  }
+}
+
+class _EditTaskDialog extends StatefulWidget {
+  const _EditTaskDialog({
+    required this.task,
+    required this.onSave,
+  });
+
+  final Task task;
+  final Future<bool> Function(String title, DateTime dueDate) onSave;
+
+  @override
+  State<_EditTaskDialog> createState() => _EditTaskDialogState();
+}
+
+class _EditTaskDialogState extends State<_EditTaskDialog> {
+  late final TextEditingController _controller;
+  late DateTime _selectedDate;
+  String? _errorText;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.task.title);
+    _selectedDate = widget.task.dueDate;
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateUtils.dateOnly(DateTime.now()),
+      lastDate: DateTime(2100),
+    );
+    if (picked != null && mounted) {
+      setState(() => _selectedDate = picked);
+    }
+  }
+
+  Future<void> _save() async {
+    final title = _controller.text.trim();
+    if (title.isEmpty) {
+      setState(() => _errorText = 'Task name cannot be blank');
+      return;
+    }
+
+    setState(() {
+      _errorText = null;
+      _saving = true;
+    });
+    final success = await widget.onSave(title, _selectedDate);
+    if (!mounted) return;
+    setState(() => _saving = false);
+    if (success) Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Edit task'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _controller,
+            autofocus: true,
+            enabled: !_saving,
+            textCapitalization: TextCapitalization.sentences,
+            decoration: InputDecoration(
+              labelText: 'Task name',
+              errorText: _errorText,
+            ),
+            onChanged: (_) {
+              if (_errorText != null) setState(() => _errorText = null);
+            },
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          OutlinedButton.icon(
+            onPressed: _saving ? null : _pickDate,
+            icon: const Icon(Icons.calendar_today_outlined),
+            label: Text(
+              '${_selectedDate.month}/${_selectedDate.day}/${_selectedDate.year}',
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: _saving ? null : () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _saving ? null : _save,
+          child: Text(_saving ? 'Saving' : 'Save'),
+        ),
+      ],
+    );
+  }
+}
+
+class _EditSubtaskDialog extends StatefulWidget {
+  const _EditSubtaskDialog({
+    required this.subtask,
+    required this.onSave,
+  });
+
+  final Subtask subtask;
+  final Future<bool> Function(String title) onSave;
+
+  @override
+  State<_EditSubtaskDialog> createState() => _EditSubtaskDialogState();
+}
+
+class _EditSubtaskDialogState extends State<_EditSubtaskDialog> {
+  late final TextEditingController _controller;
+  String? _errorText;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.subtask.title);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final title = _controller.text.trim();
+    if (title.isEmpty) {
+      setState(() => _errorText = 'Step name cannot be blank');
+      return;
+    }
+
+    setState(() {
+      _errorText = null;
+      _saving = true;
+    });
+    final success = await widget.onSave(title);
+    if (!mounted) return;
+    setState(() => _saving = false);
+    if (success) Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Edit step'),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        enabled: !_saving,
+        textCapitalization: TextCapitalization.sentences,
+        decoration: InputDecoration(
+          labelText: 'Step name',
+          errorText: _errorText,
+        ),
+        onChanged: (_) {
+          if (_errorText != null) setState(() => _errorText = null);
+        },
+      ),
+      actions: [
+        TextButton(
+          onPressed: _saving ? null : () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _saving ? null : _save,
+          child: Text(_saving ? 'Saving' : 'Save'),
+        ),
+      ],
+    );
   }
 }
 
@@ -619,12 +758,16 @@ class _StatusBadge extends StatelessWidget {
         children: [
           Icon(icon, size: 14, color: color),
           const SizedBox(width: AppSpacing.xxs),
-          Text(
-            label,
-            style: TextStyle(
-              color: color,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: color,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ],

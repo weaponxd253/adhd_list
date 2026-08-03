@@ -3,6 +3,13 @@ abstract interface class TaskRepository {
   Future<List<Map<String, dynamic>>> fetchTasks();
   Future<void> editTask(int id, String title, String dueDate);
   Future<void> updateTaskStatus(int taskId, String status);
+  Future<void> updateTaskSupport(
+    int taskId, {
+    String? friction,
+    String? energyLevel,
+    String? timeEstimate,
+    String? anxietyLevel,
+  });
   Future<void> deleteTask(int id);
   Future<void> clearTasks();
   Future<int> insertSubtask(int taskId, String title);

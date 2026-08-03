@@ -2,7 +2,7 @@ import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
 class DatabaseHelper {
-  static const _schemaVersion = 7;
+  static const _schemaVersion = 8;
   static final DatabaseHelper instance = DatabaseHelper._();
 
   DatabaseHelper._({
@@ -135,6 +135,10 @@ class DatabaseHelper {
       "status TEXT DEFAULT 'pending'",
     );
     await _ensureColumn(db, 'tasks', 'completed_at', 'completed_at TEXT');
+    await _ensureColumn(db, 'tasks', 'friction', 'friction TEXT');
+    await _ensureColumn(db, 'tasks', 'energy_level', 'energy_level TEXT');
+    await _ensureColumn(db, 'tasks', 'time_estimate', 'time_estimate TEXT');
+    await _ensureColumn(db, 'tasks', 'anxiety_level', 'anxiety_level TEXT');
     await db.update(
       'tasks',
       {
@@ -158,7 +162,11 @@ class DatabaseHelper {
         due_date TEXT NOT NULL,
         is_completed INTEGER DEFAULT 0,
         status TEXT DEFAULT 'pending',
-        completed_at TEXT
+        completed_at TEXT,
+        friction TEXT,
+        energy_level TEXT,
+        time_estimate TEXT,
+        anxiety_level TEXT
       )
     ''');
 

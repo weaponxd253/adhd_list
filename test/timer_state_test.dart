@@ -79,6 +79,19 @@ void main() {
       expect(state.timerDisplay, '10:00');
     });
 
+    test('quick focus starts a short focus session without changing settings',
+        () {
+      final state = TimerState();
+      addTearDown(state.dispose);
+
+      state.startQuickFocus(5);
+
+      expect(state.currentMode, 'Focus');
+      expect(state.timerDisplay, '05:00');
+      expect(state.isTimerRunning, isTrue);
+      expect(state.focusDuration, 25);
+    });
+
     test('completes a session by switching to the next ready mode', () {
       fakeAsync((async) {
         final startedAt = DateTime(2026, 6, 23, 9);

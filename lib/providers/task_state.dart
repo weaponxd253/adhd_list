@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import '../database/task_database.dart';
 import '../models/subtask.dart';
 import '../models/task.dart';
+import '../models/task_support.dart';
 import '../repositories/repositories.dart';
 
 class TaskState extends ChangeNotifier {
@@ -64,6 +65,12 @@ class TaskState extends ChangeNotifier {
             completedAt: row['completed_at'] == null
                 ? null
                 : DateTime.tryParse(row['completed_at'] as String),
+            friction: taskFrictionFromId(row['friction'] as String?),
+            energyLevel: taskEnergyLevelFromId(row['energy_level'] as String?),
+            timeEstimate:
+                taskTimeEstimateFromId(row['time_estimate'] as String?),
+            anxietyLevel:
+                taskAnxietyLevelFromId(row['anxiety_level'] as String?),
             subtasks: subtaskRows.map(Subtask.fromMap).toList(),
           ),
         );
@@ -126,6 +133,13 @@ class TaskState extends ChangeNotifier {
       if (task.isCompleted) {
         await _repository.updateTaskStatus(taskId, 'completed');
       }
+      await _repository.updateTaskSupport(
+        taskId,
+        friction: task.friction?.id,
+        energyLevel: task.energyLevel?.id,
+        timeEstimate: task.timeEstimate?.id,
+        anxietyLevel: task.anxietyLevel?.id,
+      );
       for (final subtask in task.subtasks) {
         final subtaskId =
             await _repository.insertSubtask(taskId, subtask.title);
@@ -147,6 +161,29 @@ class TaskState extends ChangeNotifier {
       await _repository.updateTaskStatus(taskId, status);
       task.status = status;
       task.completedAt = status == 'completed' ? _now() : null;
+    });
+  }
+
+  Future<void> updateTaskSupport(
+    int taskId, {
+    TaskFriction? friction,
+    TaskEnergyLevel? energyLevel,
+    TaskTimeEstimate? timeEstimate,
+    TaskAnxietyLevel? anxietyLevel,
+  }) async {
+    final task = _requireTask(taskId);
+    await _runTaskMutation(taskId, () async {
+      await _repository.updateTaskSupport(
+        taskId,
+        friction: friction?.id,
+        energyLevel: energyLevel?.id,
+        timeEstimate: timeEstimate?.id,
+        anxietyLevel: anxietyLevel?.id,
+      );
+      task.friction = friction;
+      task.energyLevel = energyLevel;
+      task.timeEstimate = timeEstimate;
+      task.anxietyLevel = anxietyLevel;
     });
   }
 
@@ -211,6 +248,10 @@ class TaskState extends ChangeNotifier {
       dueDate: task.dueDate,
       status: task.status,
       completedAt: task.completedAt,
+      friction: task.friction,
+      energyLevel: task.energyLevel,
+      timeEstimate: task.timeEstimate,
+      anxietyLevel: task.anxietyLevel,
       subtasks: task.subtasks
           .map(
             (subtask) => Subtask(

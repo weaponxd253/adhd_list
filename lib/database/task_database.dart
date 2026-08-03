@@ -24,6 +24,10 @@ class TaskDatabase implements TaskRepository {
         'is_completed': 0,
         'status': 'pending',
         'completed_at': null,
+        'friction': null,
+        'energy_level': null,
+        'time_estimate': null,
+        'anxiety_level': null,
       },
     );
   }
@@ -64,6 +68,29 @@ class TaskDatabase implements TaskRepository {
       whereArgs: [taskId],
     );
     _requireAffectedRow(count, 'Updating task $taskId');
+  }
+
+  @override
+  Future<void> updateTaskSupport(
+    int taskId, {
+    String? friction,
+    String? energyLevel,
+    String? timeEstimate,
+    String? anxietyLevel,
+  }) async {
+    final db = await dbHelper.database;
+    final count = await db.update(
+      'tasks',
+      {
+        'friction': friction,
+        'energy_level': energyLevel,
+        'time_estimate': timeEstimate,
+        'anxiety_level': anxietyLevel,
+      },
+      where: 'id = ?',
+      whereArgs: [taskId],
+    );
+    _requireAffectedRow(count, 'Updating task support for $taskId');
   }
 
   @override

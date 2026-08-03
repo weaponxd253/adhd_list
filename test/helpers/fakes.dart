@@ -120,6 +120,22 @@ class FakeTaskRepository implements TaskRepository {
     row['status'] = status;
     row['is_completed'] = status == 'completed' ? 1 : 0;
   }
+
+  @override
+  Future<void> updateTaskSupport(
+    int taskId, {
+    String? friction,
+    String? energyLevel,
+    String? timeEstimate,
+    String? anxietyLevel,
+  }) async {
+    if (failWrites) _failure();
+    final row = taskRows.firstWhere((row) => row['id'] == taskId);
+    row['friction'] = friction;
+    row['energy_level'] = energyLevel;
+    row['time_estimate'] = timeEstimate;
+    row['anxiety_level'] = anxietyLevel;
+  }
 }
 
 class FakeMoodRepository implements MoodRepository {
@@ -258,6 +274,10 @@ Map<String, dynamic> taskRow({
     'is_completed': completed ? 1 : 0,
     'status': completed ? 'completed' : 'pending',
     'completed_at': completedAt?.toIso8601String(),
+    'friction': null,
+    'energy_level': null,
+    'time_estimate': null,
+    'anxiety_level': null,
   };
 }
 

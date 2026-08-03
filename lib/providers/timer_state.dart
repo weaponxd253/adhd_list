@@ -114,6 +114,20 @@ class TimerState extends ChangeNotifier {
     notifyListeners();
   }
 
+  void startQuickFocus(int minutes) {
+    if (minutes <= 0) {
+      throw ArgumentError.value(minutes, 'minutes', 'Must be greater than 0');
+    }
+    _timer?.cancel();
+    _timer = null;
+    _clearCompletionState();
+    _clearSessionTracking();
+    currentMode = 'Focus';
+    _currentDuration = minutes * 60;
+    remainingTime = _currentDuration;
+    startTimer();
+  }
+
   void stopTimer() {
     _timer?.cancel();
     _timer = null;

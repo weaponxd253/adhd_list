@@ -8,6 +8,7 @@ import '../../providers/timer_state.dart';
 import '../../models/task.dart';
 import '../../features/settings/settings_screen.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/task_support_sheet.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -63,8 +64,10 @@ class DashboardScreen extends StatelessWidget {
           Text(
             greeting,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color:
-                      Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.5),
                   fontSize: 12,
                 ),
           ),
@@ -179,7 +182,79 @@ class _FocusNowCard extends StatelessWidget {
             ),
           ],
         ]),
+        const SizedBox(height: 14),
+        Wrap(
+          spacing: AppSpacing.xs,
+          runSpacing: AppSpacing.xs,
+          children: [
+            _FocusNowButton(
+              label: "I'm stuck",
+              icon: Icons.psychology_alt_outlined,
+              onTap: () => showTaskSupportSheet(context: context, task: task),
+            ),
+            _FocusNowButton(
+              label: 'Make smaller',
+              icon: Icons.call_split_rounded,
+              onTap: () => _addTinyStep(context, task),
+            ),
+            _FocusNowButton(
+              label: 'Start 5m',
+              icon: Icons.play_arrow_rounded,
+              onTap: () {
+                context.read<TimerState>().startQuickFocus(5);
+                ScaffoldMessenger.of(context)
+                  ..hideCurrentSnackBar()
+                  ..showSnackBar(
+                    const SnackBar(content: Text('5 minute focus started')),
+                  );
+              },
+            ),
+          ],
+        ),
       ],
+    );
+  }
+
+  Future<void> _addTinyStep(BuildContext context, Task task) async {
+    final step = task.tinyNextStep ??
+        'Open "${task.title}" and do one visible next step.';
+    try {
+      await context.read<TaskState>().addSubtask(task.id, step);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(content: Text('Tiny step added')));
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not add the tiny step.')),
+      );
+    }
+  }
+}
+
+class _FocusNowButton extends StatelessWidget {
+  const _FocusNowButton({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton.icon(
+      onPressed: onTap,
+      icon: Icon(icon, size: 18),
+      label: Text(label),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: Colors.white,
+        side: const BorderSide(color: Colors.white54),
+        backgroundColor: Colors.white.withValues(alpha: 0.10),
+      ),
     );
   }
 }
@@ -222,7 +297,8 @@ class _StatsRow extends StatelessWidget {
             borderRadius: BorderRadius.circular(6),
             child: Container(
               height: 8,
-              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
+              color:
+                  Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: AnimatedContainer(
@@ -335,8 +411,10 @@ class _MoodCard extends StatelessWidget {
               ),
             ),
             Icon(Icons.chevron_right_rounded,
-                color:
-                    Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3)),
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.3)),
           ],
         ),
       ),
@@ -527,8 +605,10 @@ class _UpcomingSectionState extends State<_UpcomingSection> {
                   _expanded
                       ? Icons.keyboard_arrow_up_rounded
                       : Icons.keyboard_arrow_down_rounded,
-                  color:
-                      Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.4),
                 ),
               ],
             ),

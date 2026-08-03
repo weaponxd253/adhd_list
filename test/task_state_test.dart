@@ -1,4 +1,5 @@
 import 'package:adhd_list/providers/task_state.dart';
+import 'package:adhd_list/models/task_support.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'helpers/fakes.dart';
@@ -186,6 +187,30 @@ void main() {
       expect(state.tasks.single.isCompleted, isTrue);
       expect(state.tasks.single.subtasks.single.title, 'Recovered step');
       expect(state.tasks.single.subtasks.single.isCompleted, isTrue);
+    });
+
+    test('saves support metadata and exposes a tiny next step', () async {
+      final repository = FakeTaskRepository(
+        tasks: [taskRow(id: 12, title: 'Write report', dueDate: today)],
+      );
+      final state = TaskState(repository: repository, autoLoad: false);
+      await state.loadTasks();
+
+      await state.updateTaskSupport(
+        12,
+        friction: TaskFriction.tooBig,
+        energyLevel: TaskEnergyLevel.low,
+        timeEstimate: TaskTimeEstimate.fiveMinutes,
+        anxietyLevel: TaskAnxietyLevel.tense,
+      );
+
+      final task = state.tasks.single;
+      expect(task.friction, TaskFriction.tooBig);
+      expect(task.energyLevel, TaskEnergyLevel.low);
+      expect(task.timeEstimate, TaskTimeEstimate.fiveMinutes);
+      expect(task.anxietyLevel, TaskAnxietyLevel.tense);
+      expect(task.tinyNextStep, contains('Write report'));
+      expect(repository.taskRows.single['friction'], 'tooBig');
     });
   });
 }
