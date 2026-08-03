@@ -15,13 +15,6 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
 
-  static const _screens = [
-    DashboardScreen(),
-    TaskScreen(),
-    TimerScreen(),
-    MoodTrackerScreen(),
-  ];
-
   static const _destinations = [
     NavigationDestination(
       key: Key('navigation-home'),
@@ -55,10 +48,20 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final screens = [
+      DashboardScreen(
+        onOpenMood: () => setState(() => _selectedIndex = 3),
+        onOpenTimer: () => setState(() => _selectedIndex = 2),
+      ),
+      const TaskScreen(),
+      const TimerScreen(),
+      const MoodTrackerScreen(),
+    ];
+
     return Scaffold(
       body: IndexedStack(
         index: _selectedIndex,
-        children: _screens,
+        children: screens,
       ),
       bottomNavigationBar: DecoratedBox(
         decoration: BoxDecoration(

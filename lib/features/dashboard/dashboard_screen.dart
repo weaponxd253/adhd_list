@@ -1,50 +1,53 @@
-// lib/features/dashboard/dashboard_screen.dart
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+
+import '../../features/mood_tracker/mood_tracker_screen.dart';
+import '../../features/settings/settings_screen.dart';
+import '../../models/task.dart';
+import '../../models/task_support.dart';
 import '../../providers/mood_state.dart';
 import '../../providers/task_state.dart';
 import '../../providers/timer_state.dart';
-import '../../models/task.dart';
-import '../../features/settings/settings_screen.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/task_support_sheet.dart';
 
 class DashboardScreen extends StatelessWidget {
-  const DashboardScreen({super.key});
+  const DashboardScreen({super.key, this.onOpenMood, this.onOpenTimer});
+
+  final VoidCallback? onOpenMood;
+  final VoidCallback? onOpenTimer;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: _buildAppBar(context),
-      body: ListView(
-        padding: AppInsets.screenScrollPadding(
-          context,
-          left: AppSpacing.md,
-          top: AppSpacing.xs,
-          right: AppSpacing.md,
-        ),
-        children: [
-          Consumer<TaskState>(
-            builder: (_, state, __) => _FocusNowCard(taskState: state),
-          ),
-          const SizedBox(height: 16),
-          Consumer<TaskState>(
-            builder: (_, state, __) => _StatsRow(taskState: state),
-          ),
-          const SizedBox(height: 16),
-          Consumer<MoodState>(
-            builder: (_, state, __) => _MoodCard(moodState: state),
-          ),
-          const SizedBox(height: 16),
-          Consumer<TimerState>(
-            builder: (_, state, __) => _TimerCard(timerState: state),
-          ),
-          const SizedBox(height: 16),
-          Consumer<TaskState>(
-            builder: (_, state, __) => _UpcomingSection(taskState: state),
-          ),
-        ],
+      body: Consumer3<TaskState, MoodState, TimerState>(
+        builder: (context, taskState, moodState, timerState, _) {
+          final nowTask = taskState.upcomingTasks.isEmpty
+              ? null
+              : taskState.upcomingTasks.first;
+
+          return ListView(
+            padding: AppInsets.screenScrollPadding(
+              context,
+              left: AppSpacing.md,
+              top: AppSpacing.xs,
+              right: AppSpacing.md,
+            ),
+            children: [
+              _NowCard(task: nowTask, onOpenTimer: onOpenTimer),
+              const SizedBox(height: AppSpacing.md),
+              _TodayStrip(taskState: taskState, timerState: timerState),
+              const SizedBox(height: AppSpacing.md),
+              _MoodCard(moodState: moodState, onOpenMood: onOpenMood),
+              const SizedBox(height: AppSpacing.md),
+              _TimerSummaryCard(timerState: timerState, task: nowTask),
+              const SizedBox(height: AppSpacing.md),
+              _UpcomingPreview(taskState: taskState, nowTask: nowTask),
+            ],
+          );
+        },
       ),
     );
   }
@@ -71,8 +74,10 @@ class DashboardScreen extends StatelessWidget {
                   fontSize: 12,
                 ),
           ),
-          const Text('FocusFlow',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
+          const Text(
+            'FocusFlow',
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+          ),
         ],
       ),
       actions: [
@@ -89,31 +94,30 @@ class DashboardScreen extends StatelessWidget {
   }
 }
 
-// ─── Focus Now card ───────────────────────────────────────────────────────────
+class _NowCard extends StatelessWidget {
+  const _NowCard({required this.task, required this.onOpenTimer});
 
-class _FocusNowCard extends StatelessWidget {
-  final TaskState taskState;
-  const _FocusNowCard({required this.taskState});
+  final Task? task;
+  final VoidCallback? onOpenTimer;
 
   @override
   Widget build(BuildContext context) {
-    final nextTask =
-        taskState.upcomingTasks.isEmpty ? null : taskState.upcomingTasks.first;
     final cs = Theme.of(context).colorScheme;
+    final task = this.task;
 
-    return Container(
+    return DecoratedBox(
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [cs.primary, Color.lerp(cs.primary, Colors.black, 0.18)!],
+          colors: [cs.primary, Color.lerp(cs.primary, Colors.black, 0.16)!],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppRadii.card),
       ),
-      padding: const EdgeInsets.all(20),
-      child: nextTask == null
-          ? _emptyState(context)
-          : _taskState(context, nextTask, cs),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: task == null ? _emptyState(context) : _taskState(context, task),
+      ),
     );
   }
 
@@ -121,93 +125,121 @@ class _FocusNowCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(children: [
-          const Text('🎯', style: TextStyle(fontSize: 20)),
-          const SizedBox(width: 8),
-          Text('All caught up!',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleMedium
-                  ?.copyWith(color: Colors.white70)),
-        ]),
-        const SizedBox(height: 6),
+        Text(
+          'Now',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Colors.white70,
+                fontWeight: FontWeight.w700,
+              ),
+        ),
+        const SizedBox(height: AppSpacing.xs),
         const Text(
-          'No pending tasks. Add a new one to get started.',
-          style: TextStyle(color: Colors.white60, fontSize: 14),
+          'All caught up',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.xxs),
+        const Text(
+          'Add a task when you are ready for the next tiny move.',
+          style: TextStyle(color: Colors.white70, fontSize: 14),
         ),
       ],
     );
   }
 
-  Widget _taskState(BuildContext context, Task task, ColorScheme cs) {
+  Widget _taskState(BuildContext context, Task task) {
     final dueStr = DateFormat.MMMd().format(task.dueDate);
+    final completedSteps = task.subtasks.where((s) => s.isCompleted).length;
+    final totalSteps = task.subtasks.length;
+
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(children: [
-          const Text('🎯', style: TextStyle(fontSize: 18)),
-          const SizedBox(width: 8),
-          Text(
-            'Focus now',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Colors.white60,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0),
-          ),
-        ]),
-        const SizedBox(height: 10),
+        Row(
+          children: [
+            const Icon(Icons.flag_rounded, color: Colors.white70, size: 18),
+            const SizedBox(width: AppSpacing.xs),
+            Text(
+              'Now',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Colors.white70,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0,
+                  ),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.sm),
         Text(
           task.title,
           style: const TextStyle(
-              color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700),
+            color: Colors.white,
+            fontSize: 21,
+            fontWeight: FontWeight.w800,
+          ),
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
         ),
-        const SizedBox(height: 6),
-        Row(children: [
-          const Icon(Icons.calendar_today_outlined,
-              color: Colors.white60, size: 13),
-          const SizedBox(width: 4),
-          Text(dueStr,
-              style: const TextStyle(color: Colors.white60, fontSize: 13)),
-          if (task.subtasks.isNotEmpty) ...[
-            const SizedBox(width: 12),
-            const Icon(Icons.checklist_rounded,
-                color: Colors.white60, size: 13),
-            const SizedBox(width: 4),
-            Text(
-              '${task.subtasks.where((s) => s.isCompleted).length}/${task.subtasks.length} steps',
-              style: const TextStyle(color: Colors.white60, fontSize: 13),
-            ),
-          ],
-        ]),
-        const SizedBox(height: 14),
+        const SizedBox(height: AppSpacing.xs),
         Wrap(
-          spacing: AppSpacing.xs,
-          runSpacing: AppSpacing.xs,
+          spacing: AppSpacing.sm,
+          runSpacing: AppSpacing.xxs,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            _FocusNowButton(
-              label: "I'm stuck",
-              icon: Icons.psychology_alt_outlined,
-              onTap: () => showTaskSupportSheet(context: context, task: task),
+            _NowMeta(icon: Icons.calendar_today_outlined, label: dueStr),
+            _NowMeta(
+              icon: Icons.checklist_rounded,
+              label: '$completedSteps/$totalSteps steps',
             ),
-            _FocusNowButton(
-              label: 'Make smaller',
-              icon: Icons.call_split_rounded,
-              onTap: () => _addTinyStep(context, task),
+            if (task.friction != null)
+              _NowMeta(
+                icon: Icons.psychology_alt_outlined,
+                label: task.friction!.label,
+              ),
+          ],
+        ),
+        if (task.tinyNextStep != null) ...[
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            task.tinyNextStep!,
+            style: const TextStyle(color: Colors.white70, fontSize: 13),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+        const SizedBox(height: AppSpacing.md),
+        FilledButton.icon(
+          key: const Key('dashboard-start-5'),
+          onPressed: () => _startFocus(context, 5),
+          icon: const Icon(Icons.play_arrow_rounded),
+          label: const Text('Start 5 min'),
+          style: FilledButton.styleFrom(
+            backgroundColor: Colors.white,
+            foregroundColor: Theme.of(context).colorScheme.primary,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Row(
+          children: [
+            Expanded(
+              child: _NowSecondaryButton(
+                key: const Key('dashboard-stuck'),
+                label: "I'm stuck",
+                icon: Icons.psychology_alt_outlined,
+                onTap: () => showTaskSupportSheet(context: context, task: task),
+              ),
             ),
-            _FocusNowButton(
-              label: 'Start 5m',
-              icon: Icons.play_arrow_rounded,
-              onTap: () {
-                context.read<TimerState>().startQuickFocus(5);
-                ScaffoldMessenger.of(context)
-                  ..hideCurrentSnackBar()
-                  ..showSnackBar(
-                    const SnackBar(content: Text('5 minute focus started')),
-                  );
-              },
+            const SizedBox(width: AppSpacing.xs),
+            Expanded(
+              child: _NowSecondaryButton(
+                key: const Key('dashboard-tiny-step'),
+                label: 'Tiny step',
+                icon: Icons.call_split_rounded,
+                onTap: () => _addTinyStep(context, task),
+              ),
             ),
           ],
         ),
@@ -231,10 +263,47 @@ class _FocusNowCard extends StatelessWidget {
       );
     }
   }
+
+  void _startFocus(BuildContext context, int minutes) {
+    context.read<TimerState>().startQuickFocus(minutes);
+    onOpenTimer?.call();
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(content: Text('$minutes minute focus started')),
+      );
+  }
 }
 
-class _FocusNowButton extends StatelessWidget {
-  const _FocusNowButton({
+class _NowMeta extends StatelessWidget {
+  const _NowMeta({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, color: Colors.white70, size: 14),
+        const SizedBox(width: AppSpacing.xxs),
+        Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white70,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _NowSecondaryButton extends StatelessWidget {
+  const _NowSecondaryButton({
+    super.key,
     required this.label,
     required this.icon,
     required this.onTap,
@@ -249,7 +318,7 @@ class _FocusNowButton extends StatelessWidget {
     return OutlinedButton.icon(
       onPressed: onTap,
       icon: Icon(icon, size: 18),
-      label: Text(label),
+      label: Text(label, overflow: TextOverflow.ellipsis),
       style: OutlinedButton.styleFrom(
         foregroundColor: Colors.white,
         side: const BorderSide(color: Colors.white54),
@@ -259,231 +328,239 @@ class _FocusNowButton extends StatelessWidget {
   }
 }
 
-// ─── Stats row ────────────────────────────────────────────────────────────────
+class _TodayStrip extends StatelessWidget {
+  const _TodayStrip({
+    required this.taskState,
+    required this.timerState,
+  });
 
-class _StatsRow extends StatelessWidget {
   final TaskState taskState;
-  const _StatsRow({required this.taskState});
+  final TimerState timerState;
 
   @override
   Widget build(BuildContext context) {
-    final total = taskState.totalTasks;
-    final completed = taskState.completedTasks;
-    final progress = total == 0 ? 0.0 : completed / total;
-
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Text('Today', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: AppSpacing.xs),
         Row(
           children: [
-            _StatPill(
-                label: 'Total',
-                value: '$total',
-                color: Theme.of(context).colorScheme.primary),
-            const SizedBox(width: 8),
-            _StatPill(
-                label: 'Done',
-                value: '$completed',
-                color: const Color(0xFF16A34A)),
-            const SizedBox(width: 8),
-            _StatPill(
-                label: 'Remaining',
-                value: '${taskState.pendingTasks}',
-                color: const Color(0xFFD97706)),
-          ],
-        ),
-        const SizedBox(height: 12),
-        LayoutBuilder(builder: (context, c) {
-          return ClipRRect(
-            borderRadius: BorderRadius.circular(6),
-            child: Container(
-              height: 8,
-              color:
-                  Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 600),
-                  curve: Curves.easeOut,
-                  width: progress * c.maxWidth,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        Theme.of(context).colorScheme.primary,
-                        const Color(0xFF16A34A),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
+            _TodayMetric(
+              value: '${timerState.focusMinutesToday}m',
+              label: 'focus',
             ),
-          );
-        }),
-        const SizedBox(height: 6),
-        Align(
-          alignment: Alignment.centerRight,
-          child: Text(
-            total == 0
-                ? 'No tasks yet'
-                : '${(progress * 100).round()}% complete',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
+            _TodayMetric(
+              value: '${timerState.completedSessionsToday}',
+              label: 'started',
+            ),
+            _TodayMetric(
+              value: '${taskState.completedTasks}',
+              label: 'done',
+            ),
+          ],
         ),
       ],
     );
   }
 }
 
-class _StatPill extends StatelessWidget {
-  final String label;
+class _TodayMetric extends StatelessWidget {
+  const _TodayMetric({required this.value, required this.label});
+
   final String value;
-  final Color color;
-  const _StatPill(
-      {required this.label, required this.value, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withValues(alpha: 0.2)),
-        ),
-        child: Column(
-          children: [
-            Text(value,
-                style: TextStyle(
-                    fontSize: 22, fontWeight: FontWeight.w800, color: color)),
-            const SizedBox(height: 2),
-            Text(label,
-                style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: color.withValues(alpha: 0.7))),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Mood card ────────────────────────────────────────────────────────────────
-
-class _MoodCard extends StatelessWidget {
-  final MoodState moodState;
-  const _MoodCard({required this.moodState});
-
-  @override
-  Widget build(BuildContext context) {
-    final hasMood = moodState.selectedMood.isNotEmpty;
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Text(
-              hasMood ? moodState.selectedMoodEmoji : '😶',
-              style: const TextStyle(fontSize: 32),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    hasMood ? moodState.selectedMood : 'How are you feeling?',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  if (hasMood)
-                    Text(
-                      moodState.moodMessage,
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodyMedium
-                          ?.copyWith(fontSize: 12),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                ],
-              ),
-            ),
-            Icon(Icons.chevron_right_rounded,
-                color: Theme.of(context)
-                    .colorScheme
-                    .onSurface
-                    .withValues(alpha: 0.3)),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Compact timer card ───────────────────────────────────────────────────────
-
-class _TimerCard extends StatelessWidget {
-  final TimerState timerState;
-  const _TimerCard({required this.timerState});
+  final String label;
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    return Expanded(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          border: Border(
+            right: BorderSide(color: cs.outlineVariant),
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+          child: Column(
+            children: [
+              Text(
+                value,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: cs.primary,
+                      fontWeight: FontWeight.w800,
+                    ),
+              ),
+              Text(label, style: Theme.of(context).textTheme.bodySmall),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MoodCard extends StatelessWidget {
+  const _MoodCard({required this.moodState, required this.onOpenMood});
+
+  final MoodState moodState;
+  final VoidCallback? onOpenMood;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasMood = moodState.selectedMood.isNotEmpty;
+    return Card(
+      child: InkWell(
+        key: const Key('dashboard-mood-card'),
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        onTap: onOpenMood ??
+            () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const MoodTrackerScreen()),
+                ),
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Row(
+            children: [
+              Text(
+                hasMood ? moodState.selectedMoodEmoji : ':|',
+                style: const TextStyle(fontSize: 32),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      hasMood ? moodState.selectedMood : 'How are you feeling?',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    if (hasMood)
+                      Text(
+                        moodState.moodMessage,
+                        style: Theme.of(context).textTheme.bodySmall,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.3),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TimerSummaryCard extends StatelessWidget {
+  const _TimerSummaryCard({required this.timerState, required this.task});
+
+  final TimerState timerState;
+  final Task? task;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final description = timerState.isTimerRunning
+        ? '${timerState.currentMode} in progress'
+        : task == null
+            ? 'Ready for a focus session'
+            : 'Ready to focus on ${task!.title}';
+
     return Card(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        child: Row(
-          children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: cs.primary.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final stacked = MediaQuery.textScalerOf(context).scale(1) > 1.3 ||
+                constraints.maxWidth < 340;
+            final controls = [
+              _TimerButton(
+                label: timerState.isTimerRunning ? 'Pause' : 'Start',
+                onTap: timerState.isTimerRunning
+                    ? timerState.pauseTimer
+                    : timerState.startTimer,
+                primary: !timerState.isTimerRunning,
               ),
-              child: Icon(Icons.timer_rounded, color: cs.primary, size: 22),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              _TimerButton(
+                label: 'Reset',
+                onTap: timerState.resetTimer,
+                primary: false,
+              ),
+            ];
+
+            final summary = Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: cs.primary.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.timer_rounded, color: cs.primary, size: 22),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        timerState.timerDisplay,
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              color: cs.primary,
+                              fontWeight: FontWeight.w800,
+                            ),
+                      ),
+                      Text(
+                        description,
+                        style: Theme.of(context).textTheme.bodySmall,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            );
+
+            if (stacked) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(timerState.timerDisplay,
-                      style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w800,
-                          color: cs.primary)),
-                  Text(timerState.currentMode,
-                      style: Theme.of(context).textTheme.bodySmall),
-                  Text(
-                    timerState.completedSessionsToday == 0
-                        ? 'No sessions today'
-                        : '${timerState.focusMinutesToday}m focus today • ${timerState.completedSessionsToday} sessions',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: cs.onSurfaceVariant,
-                        ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  summary,
+                  const SizedBox(height: AppSpacing.sm),
+                  Wrap(
+                    spacing: AppSpacing.xs,
+                    runSpacing: AppSpacing.xs,
+                    children: controls,
                   ),
                 ],
-              ),
-            ),
-            _TimerButton(
-              label: timerState.isTimerRunning ? 'Pause' : 'Start',
-              onTap: timerState.isTimerRunning
-                  ? timerState.pauseTimer
-                  : timerState.startTimer,
-              primary: !timerState.isTimerRunning,
-            ),
-            const SizedBox(width: 8),
-            _TimerButton(
-              label: 'Reset',
-              onTap: timerState.resetTimer,
-              primary: false,
-            ),
-          ],
+              );
+            }
+
+            return Row(
+              children: [
+                Expanded(child: summary),
+                const SizedBox(width: AppSpacing.sm),
+                ...controls.expand(
+                  (button) => [
+                    button,
+                    const SizedBox(width: AppSpacing.xs),
+                  ],
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -491,11 +568,15 @@ class _TimerCard extends StatelessWidget {
 }
 
 class _TimerButton extends StatelessWidget {
+  const _TimerButton({
+    required this.label,
+    required this.onTap,
+    required this.primary,
+  });
+
   final String label;
   final VoidCallback onTap;
   final bool primary;
-  const _TimerButton(
-      {required this.label, required this.onTap, required this.primary});
 
   @override
   Widget build(BuildContext context) {
@@ -510,10 +591,13 @@ class _TimerButton extends StatelessWidget {
         child: GestureDetector(
           onTap: onTap,
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.sm,
+              vertical: AppSpacing.xs,
+            ),
             decoration: BoxDecoration(
               color: primary ? cs.primary : cs.primary.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(AppRadii.control),
             ),
             child: Text(
               label,
@@ -530,17 +614,170 @@ class _TimerButton extends StatelessWidget {
   }
 }
 
-// ─── Upcoming tasks ───────────────────────────────────────────────────────────
+class _UpcomingPreview extends StatefulWidget {
+  const _UpcomingPreview({required this.taskState, required this.nowTask});
 
-class _UpcomingSection extends StatefulWidget {
   final TaskState taskState;
-  const _UpcomingSection({required this.taskState});
+  final Task? nowTask;
+
   @override
-  State<_UpcomingSection> createState() => _UpcomingSectionState();
+  State<_UpcomingPreview> createState() => _UpcomingPreviewState();
 }
 
-class _UpcomingSectionState extends State<_UpcomingSection> {
+class _UpcomingPreviewState extends State<_UpcomingPreview> {
   bool _expanded = true;
+
+  @override
+  Widget build(BuildContext context) {
+    final tasks = widget.taskState.upcomingTasks
+        .where((task) => task.id != widget.nowTask?.id)
+        .take(3)
+        .toList();
+
+    return Column(
+      children: [
+        Semantics(
+          button: true,
+          expanded: _expanded,
+          label: 'Upcoming tasks, ${tasks.length}',
+          child: InkWell(
+            key: const Key('dashboard-upcoming-toggle'),
+            borderRadius: BorderRadius.circular(AppRadii.control),
+            onTap: () => setState(() => _expanded = !_expanded),
+            child: SizedBox(
+              height: AppSizes.minimumTouchTarget,
+              child: Row(
+                children: [
+                  Text(
+                    'Upcoming',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  if (tasks.isNotEmpty) ...[
+                    const SizedBox(width: AppSpacing.xs),
+                    _CountPill(count: tasks.length),
+                  ],
+                  const Spacer(),
+                  Icon(
+                    _expanded
+                        ? Icons.keyboard_arrow_up_rounded
+                        : Icons.keyboard_arrow_down_rounded,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        if (_expanded) ...[
+          if (tasks.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+              child: Text(
+                'Nothing else waiting right now.',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            )
+          else
+            ...tasks.map(
+              (task) => Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+                child: _UpcomingTile(task: task),
+              ),
+            ),
+        ],
+      ],
+    );
+  }
+}
+
+class _CountPill extends StatelessWidget {
+  const _CountPill({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.xs,
+        vertical: 2,
+      ),
+      decoration: BoxDecoration(
+        color: cs.primary.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(AppRadii.pill),
+      ),
+      child: Text(
+        '$count',
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: cs.primary,
+        ),
+      ),
+    );
+  }
+}
+
+class _UpcomingTile extends StatelessWidget {
+  const _UpcomingTile({required this.task});
+
+  final Task task;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _urgencyColor(task.dueDate);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardTheme.color,
+        borderRadius: BorderRadius.circular(AppRadii.control),
+        border: Border.all(color: color.withValues(alpha: 0.22)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: AppSpacing.xs,
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 4,
+              height: 38,
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(AppRadii.pill),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    task.title,
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodyLarge
+                        ?.copyWith(fontWeight: FontWeight.w700),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    '${DateFormat.MMMd().format(task.dueDate)} - ${_countdown(task.dueDate)}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: color,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   int _calendarDayDifference(DateTime date) {
     final today = DateUtils.dateOnly(DateTime.now());
@@ -549,10 +786,10 @@ class _UpcomingSectionState extends State<_UpcomingSection> {
 
   String _countdown(DateTime due) {
     final diff = _calendarDayDifference(due);
-    if (diff < 0) return 'Overdue';
-    if (diff == 0) return 'Due today';
-    if (diff == 1) return 'Due tomorrow';
-    return 'In $diff days';
+    if (diff < 0) return 'overdue';
+    if (diff == 0) return 'today';
+    if (diff == 1) return 'tomorrow';
+    return 'in $diff days';
   }
 
   Color _urgencyColor(DateTime due) {
@@ -560,143 +797,5 @@ class _UpcomingSectionState extends State<_UpcomingSection> {
     if (diff < 0) return const Color(0xFFDC2626);
     if (diff <= 1) return const Color(0xFFD97706);
     return const Color(0xFF16A34A);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final tasks = widget.taskState.upcomingTasks;
-    return Column(
-      children: [
-        Semantics(
-          button: true,
-          expanded: _expanded,
-          label: 'Upcoming tasks, ${tasks.length}',
-          child: GestureDetector(
-            onTap: () => setState(() => _expanded = !_expanded),
-            behavior: HitTestBehavior.opaque,
-            child: Row(
-              children: [
-                Text('Upcoming',
-                    style: Theme.of(context).textTheme.titleMedium),
-                if (tasks.isNotEmpty) ...[
-                  const SizedBox(width: 8),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .primary
-                          .withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      '${tasks.length}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                  ),
-                ],
-                const Spacer(),
-                Icon(
-                  _expanded
-                      ? Icons.keyboard_arrow_up_rounded
-                      : Icons.keyboard_arrow_down_rounded,
-                  color: Theme.of(context)
-                      .colorScheme
-                      .onSurface
-                      .withValues(alpha: 0.4),
-                ),
-              ],
-            ),
-          ),
-        ),
-        if (_expanded) ...[
-          const SizedBox(height: 10),
-          if (tasks.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              child: Text('Nothing coming up — enjoy the moment!',
-                  style: Theme.of(context).textTheme.bodyMedium),
-            )
-          else
-            ...tasks.map((t) => Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: _UpcomingTile(
-                      task: t,
-                      countdown: _countdown,
-                      urgencyColor: _urgencyColor),
-                )),
-        ],
-      ],
-    );
-  }
-}
-
-class _UpcomingTile extends StatelessWidget {
-  final Task task;
-  final String Function(DateTime) countdown;
-  final Color Function(DateTime) urgencyColor;
-  const _UpcomingTile(
-      {required this.task,
-      required this.countdown,
-      required this.urgencyColor});
-
-  @override
-  Widget build(BuildContext context) {
-    final dueDate = task.dueDate;
-    final color = urgencyColor(dueDate);
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardTheme.color,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.25)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 4,
-            height: 52,
-            decoration: BoxDecoration(
-              color: color,
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(12),
-                bottomLeft: Radius.circular(12),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(task.title,
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodyLarge
-                          ?.copyWith(fontWeight: FontWeight.w600),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${DateFormat.MMMd().format(dueDate)} · ${countdown(dueDate)}',
-                    style: TextStyle(
-                        fontSize: 12,
-                        color: color,
-                        fontWeight: FontWeight.w600),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-        ],
-      ),
-    );
   }
 }
