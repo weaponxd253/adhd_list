@@ -325,9 +325,9 @@ class _TaskListSectionState extends State<TaskListSection> {
                   backgroundColor: colorScheme.primary,
                   foregroundColor: colorScheme.onPrimary,
                   disabledBackgroundColor:
-                      colorScheme.onSurface.withOpacity(0.12),
+                      colorScheme.onSurface.withValues(alpha: 0.12),
                   disabledForegroundColor:
-                      colorScheme.onSurface.withOpacity(0.38),
+                      colorScheme.onSurface.withValues(alpha: 0.38),
                   minimumSize: const Size(44, 44),
                   fixedSize: const Size(44, 44),
                 ),
@@ -611,7 +611,7 @@ class _StatusBadge extends StatelessWidget {
         vertical: AppSpacing.xxs,
       ),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(AppRadii.pill),
       ),
       child: Row(

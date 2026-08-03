@@ -64,7 +64,7 @@ class DashboardScreen extends StatelessWidget {
             greeting,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color:
-                      Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                      Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                   fontSize: 12,
                 ),
           ),
@@ -222,7 +222,7 @@ class _StatsRow extends StatelessWidget {
             borderRadius: BorderRadius.circular(6),
             child: Container(
               height: 8,
-              color: Theme.of(context).colorScheme.primary.withOpacity(0.12),
+              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: AnimatedContainer(
@@ -271,9 +271,9 @@ class _StatPill extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.08),
+          color: color.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withOpacity(0.2)),
+          border: Border.all(color: color.withValues(alpha: 0.2)),
         ),
         child: Column(
           children: [
@@ -285,7 +285,7 @@ class _StatPill extends StatelessWidget {
                 style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
-                    color: color.withOpacity(0.7))),
+                    color: color.withValues(alpha: 0.7))),
           ],
         ),
       ),
@@ -336,7 +336,7 @@ class _MoodCard extends StatelessWidget {
             ),
             Icon(Icons.chevron_right_rounded,
                 color:
-                    Theme.of(context).colorScheme.onSurface.withOpacity(0.3)),
+                    Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3)),
           ],
         ),
       ),
@@ -362,7 +362,7 @@ class _TimerCard extends StatelessWidget {
               width: 42,
               height: 42,
               decoration: BoxDecoration(
-                color: cs.primary.withOpacity(0.1),
+                color: cs.primary.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(Icons.timer_rounded, color: cs.primary, size: 22),
@@ -434,7 +434,7 @@ class _TimerButton extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             decoration: BoxDecoration(
-              color: primary ? cs.primary : cs.primary.withOpacity(0.08),
+              color: primary ? cs.primary : cs.primary.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Text(
@@ -509,7 +509,7 @@ class _UpcomingSectionState extends State<_UpcomingSection> {
                       color: Theme.of(context)
                           .colorScheme
                           .primary
-                          .withOpacity(0.12),
+                          .withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
@@ -528,7 +528,7 @@ class _UpcomingSectionState extends State<_UpcomingSection> {
                       ? Icons.keyboard_arrow_up_rounded
                       : Icons.keyboard_arrow_down_rounded,
                   color:
-                      Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
+                      Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
                 ),
               ],
             ),
@@ -573,7 +573,7 @@ class _UpcomingTile extends StatelessWidget {
       decoration: BoxDecoration(
         color: Theme.of(context).cardTheme.color,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.25)),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
       ),
       child: Row(
         children: [

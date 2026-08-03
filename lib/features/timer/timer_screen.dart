@@ -145,7 +145,7 @@ class _TimerStatusChip extends StatelessWidget {
       child: Center(
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: color.withOpacity(0.10),
+            color: color.withValues(alpha: 0.10),
             borderRadius: BorderRadius.circular(AppRadii.pill),
           ),
           child: Padding(
@@ -191,7 +191,7 @@ class _ModeSelector extends StatelessWidget {
       decoration: BoxDecoration(
         color: cs.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(AppRadii.control),
-        border: Border.all(color: cs.outlineVariant.withOpacity(0.6)),
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.6)),
       ),
       padding: const EdgeInsets.all(AppSpacing.xxs),
       child: Row(
@@ -216,7 +216,7 @@ class _ModeSelector extends StatelessWidget {
                     boxShadow: selected
                         ? [
                             BoxShadow(
-                              color: color.withOpacity(0.28),
+                              color: color.withValues(alpha: 0.28),
                               blurRadius: 10,
                               offset: const Offset(0, 3),
                             ),
@@ -269,7 +269,7 @@ class _TimerRing extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final trackColor = color.withOpacity(isDark ? 0.22 : 0.16);
+    final trackColor = color.withValues(alpha: isDark ? 0.22 : 0.16);
 
     return Semantics(
       liveRegion: timerState.isTimerRunning,
@@ -290,7 +290,7 @@ class _TimerRing extends StatelessWidget {
                       height: size + pulse.value * 16,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: color.withOpacity(0.06 * pulse.value),
+                        color: color.withValues(alpha: 0.06 * pulse.value),
                       ),
                     ),
                   ),
@@ -321,7 +321,7 @@ class _TimerRing extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: color.withOpacity(0.78),
+                        color: color.withValues(alpha: 0.78),
                         letterSpacing: 0,
                       ),
                     ),
@@ -356,7 +356,7 @@ class _TimerControls extends StatelessWidget {
           icon: Icons.refresh_rounded,
           label: 'Reset timer',
           onTap: timerState.resetTimer,
-          color: cs.onSurface.withOpacity(0.08),
+          color: cs.onSurface.withValues(alpha: 0.08),
           iconColor: cs.onSurfaceVariant,
           size: 52,
         ),
@@ -378,7 +378,7 @@ class _TimerControls extends StatelessWidget {
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: color.withOpacity(0.36),
+                      color: color.withValues(alpha: 0.36),
                       blurRadius: 16,
                       offset: const Offset(0, 4),
                     ),
@@ -400,7 +400,7 @@ class _TimerControls extends StatelessWidget {
           icon: Icons.skip_next_rounded,
           label: 'Skip to next mode',
           onTap: timerState.switchToNextMode,
-          color: cs.onSurface.withOpacity(0.08),
+          color: cs.onSurface.withValues(alpha: 0.08),
           iconColor: cs.onSurfaceVariant,
           size: 52,
         ),
@@ -475,7 +475,7 @@ class _RingPainter extends CustomPainter {
       ..shader = SweepGradient(
         startAngle: -math.pi / 2,
         endAngle: -math.pi / 2 + sweep,
-        colors: [color.withOpacity(0.72), color],
+        colors: [color.withValues(alpha: 0.72), color],
       ).createShader(rect)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 12
@@ -550,7 +550,7 @@ class _InfoChip extends StatelessWidget {
         vertical: AppSpacing.xs,
       ),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
+        color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(AppRadii.pill),
       ),
       child: Row(
@@ -568,7 +568,7 @@ class _InfoChip extends StatelessWidget {
             label,
             style: TextStyle(
               fontSize: 12,
-              color: color.withOpacity(0.68),
+              color: color.withValues(alpha: 0.68),
             ),
           ),
         ],

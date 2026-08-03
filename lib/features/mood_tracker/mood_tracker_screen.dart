@@ -86,9 +86,9 @@ class MoodTrackerScreen extends StatelessWidget {
                   ),
                   padding: const EdgeInsets.all(AppSpacing.sm),
                   decoration: BoxDecoration(
-                    color: cs.primary.withOpacity(0.08),
+                    color: cs.primary.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(AppRadii.card),
-                    border: Border.all(color: cs.primary.withOpacity(0.2)),
+                    border: Border.all(color: cs.primary.withValues(alpha: 0.2)),
                   ),
                   child: Row(
                     children: [
@@ -225,7 +225,7 @@ class _MoodCell extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final selectedFill = Color.alphaBlend(
-      cs.primary.withOpacity(isDark ? 0.18 : 0.10),
+      cs.primary.withValues(alpha: isDark ? 0.18 : 0.10),
       cs.surface,
     );
 
@@ -267,7 +267,7 @@ class _MoodCell extends StatelessWidget {
                           : Theme.of(context)
                               .colorScheme
                               .onSurface
-                              .withOpacity(0.7),
+                              .withValues(alpha: 0.7),
                     ),
                     textAlign: TextAlign.center,
                     maxLines: 2,

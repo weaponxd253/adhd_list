@@ -91,6 +91,11 @@ Future<void> _pumpAppFrame(WidgetTester tester) async {
   await tester.pump(const Duration(milliseconds: 350));
 }
 
+Future<void> _pumpRoutePop(WidgetTester tester) async {
+  await tester.pump();
+  await tester.pump(const Duration(seconds: 1));
+}
+
 void main() {
   testWidgets('critical app flow stays wired together', (tester) async {
     final semantics = tester.ensureSemantics();
@@ -150,7 +155,7 @@ void main() {
       await _pumpAppFrame(tester);
       expect(find.text('Timer History'), findsOneWidget);
       await tester.pageBack();
-      await _pumpAppFrame(tester);
+      await _pumpRoutePop(tester);
 
       await tester.tap(find.byKey(const Key('navigation-mood')));
       await _pumpAppFrame(tester);
@@ -164,7 +169,7 @@ void main() {
       expect(find.text('Mood History'), findsOneWidget);
       expect(find.text('Calm'), findsWidgets);
       await tester.pageBack();
-      await _pumpAppFrame(tester);
+      await _pumpRoutePop(tester);
 
       await tester.tap(find.byKey(const Key('navigation-home')));
       await _pumpAppFrame(tester);
