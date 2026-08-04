@@ -153,6 +153,83 @@ void main() {
       expect(state.tomorrowStarterTask?.title, 'First task');
     });
 
+    test('task completion, later moves, and deletion cancel reminders',
+        () async {
+      final taskRepository = FakeTaskRepository(
+        tasks: [
+          taskRow(id: 1, title: 'Finish me', dueDate: today),
+          taskRow(id: 2, title: 'Move me', dueDate: today),
+          taskRow(id: 3, title: 'Delete me', dueDate: today),
+        ],
+      );
+      final reminderRepository = FakeTaskReminderRepository(
+        reminders: [
+          {
+            'task_id': 1,
+            'style': 'gentle',
+            'scheduled_at': today.toIso8601String(),
+            'enabled': 1,
+          },
+          {
+            'task_id': 2,
+            'style': 'gentle',
+            'scheduled_at': today.toIso8601String(),
+            'enabled': 1,
+          },
+          {
+            'task_id': 3,
+            'style': 'gentle',
+            'scheduled_at': today.toIso8601String(),
+            'enabled': 1,
+          },
+        ],
+      );
+      final notificationService = FakeTaskReminderNotificationService();
+      final state = TaskState(
+        repository: taskRepository,
+        taskReminderRepository: reminderRepository,
+        taskReminderNotificationService: notificationService,
+        now: () => today,
+        autoLoad: false,
+      );
+      await state.loadTasks();
+
+      await state.toggleTaskCompletion(1);
+      await state.moveTaskToLater(2);
+      await state.deleteTask(3);
+
+      expect(notificationService.canceledTaskIds, containsAll([1, 2, 3]));
+      expect(reminderRepository.reminderRows, isEmpty);
+    });
+
+    test('clearing task history cancels all reminders', () async {
+      final reminderRepository = FakeTaskReminderRepository(
+        reminders: [
+          {
+            'task_id': 1,
+            'style': 'gentle',
+            'scheduled_at': today.toIso8601String(),
+            'enabled': 1,
+          },
+        ],
+      );
+      final notificationService = FakeTaskReminderNotificationService();
+      final state = TaskState(
+        repository: FakeTaskRepository(
+          tasks: [taskRow(id: 1, title: 'Clear me', dueDate: today)],
+        ),
+        taskReminderRepository: reminderRepository,
+        taskReminderNotificationService: notificationService,
+        autoLoad: false,
+      );
+      await state.loadTasks();
+
+      await state.clearTaskHistory();
+
+      expect(notificationService.cancelAllCount, 1);
+      expect(reminderRepository.reminderRows, isEmpty);
+    });
+
     test('calculates task, subtask, points, and streak statistics', () async {
       final repository = FakeTaskRepository(
         tasks: [

@@ -1,4 +1,5 @@
 import 'package:adhd_list/providers/settings_state.dart';
+import 'package:adhd_list/models/task_reminder.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -39,6 +40,8 @@ void main() {
           SettingsState.longBreakDurationKey: '20',
           SettingsState.defaultDueDateOffsetKey: '7',
           SettingsState.timerNotificationsEnabledKey: 'true',
+          SettingsState.taskRemindersEnabledKey: 'true',
+          SettingsState.taskReminderStyleKey: 'tinyStep',
         },
       );
       final state = SettingsState(repository: repository, autoLoad: false);
@@ -50,6 +53,8 @@ void main() {
       expect(state.longBreakDuration, 20);
       expect(state.defaultDueDateOffsetDays, 7);
       expect(state.timerNotificationsEnabled, isTrue);
+      expect(state.taskRemindersEnabled, isTrue);
+      expect(state.taskReminderStyle, TaskReminderStyle.tinyStep);
     });
 
     test('persists timer durations together', () async {
@@ -91,6 +96,19 @@ void main() {
         'true',
       );
       expect(state.timerNotificationsEnabled, isTrue);
+    });
+
+    test('persists task reminder preferences', () async {
+      final repository = FakeSettingsRepository();
+      final state = SettingsState(repository: repository, autoLoad: false);
+
+      await state.setTaskRemindersEnabled(true);
+      await state.setTaskReminderStyle(TaskReminderStyle.direct);
+
+      expect(repository.values[SettingsState.taskRemindersEnabledKey], 'true');
+      expect(repository.values[SettingsState.taskReminderStyleKey], 'direct');
+      expect(state.taskRemindersEnabled, isTrue);
+      expect(state.taskReminderStyle, TaskReminderStyle.direct);
     });
 
     test('applies timer presets through duration persistence', () async {

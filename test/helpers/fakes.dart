@@ -1,4 +1,5 @@
 import 'package:adhd_list/repositories/repositories.dart';
+import 'package:adhd_list/services/task_reminder_notification_service.dart';
 import 'package:adhd_list/services/timer_notification_service.dart';
 
 class FakeTaskRepository implements TaskRepository {
@@ -138,6 +139,61 @@ class FakeTaskRepository implements TaskRepository {
   }
 }
 
+class FakeTaskReminderRepository implements TaskReminderRepository {
+  FakeTaskReminderRepository({List<Map<String, dynamic>>? reminders})
+      : reminderRows = reminders ?? [];
+
+  List<Map<String, dynamic>> reminderRows;
+  bool failReads = false;
+  bool failWrites = false;
+
+  Never _failure() => throw StateError('task reminder failure');
+
+  @override
+  Future<void> clearTaskReminders() async {
+    if (failWrites) _failure();
+    reminderRows = [];
+  }
+
+  @override
+  Future<void> deleteTaskReminder(int taskId) async {
+    if (failWrites) _failure();
+    reminderRows.removeWhere((row) => row['task_id'] == taskId);
+  }
+
+  @override
+  Future<Map<String, dynamic>?> fetchTaskReminder(int taskId) async {
+    if (failReads) _failure();
+    for (final row in reminderRows) {
+      if (row['task_id'] == taskId) return Map<String, dynamic>.from(row);
+    }
+    return null;
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> fetchTaskReminders() async {
+    if (failReads) _failure();
+    return reminderRows.map(Map<String, dynamic>.from).toList();
+  }
+
+  @override
+  Future<void> upsertTaskReminder({
+    required int taskId,
+    required String style,
+    required String scheduledAt,
+    bool enabled = true,
+  }) async {
+    if (failWrites) _failure();
+    reminderRows.removeWhere((row) => row['task_id'] == taskId);
+    reminderRows.add({
+      'task_id': taskId,
+      'style': style,
+      'scheduled_at': scheduledAt,
+      'enabled': enabled ? 1 : 0,
+    });
+  }
+}
+
 class FakeMoodRepository implements MoodRepository {
   FakeMoodRepository({List<Map<String, dynamic>>? entries})
       : entries = entries ?? [];
@@ -253,6 +309,46 @@ class FakeTimerNotificationService implements TimerNotificationService {
     required String body,
   }) async {
     scheduled.add({
+      'when': when,
+      'title': title,
+      'body': body,
+    });
+  }
+}
+
+class FakeTaskReminderNotificationService
+    implements TaskReminderNotificationService {
+  bool permissionGranted = true;
+  int permissionRequests = 0;
+  int cancelAllCount = 0;
+  final canceledTaskIds = <int>[];
+  final scheduled = <Map<String, Object?>>[];
+
+  @override
+  Future<void> cancelAllTaskReminders() async {
+    cancelAllCount++;
+  }
+
+  @override
+  Future<void> cancelTaskReminder(int taskId) async {
+    canceledTaskIds.add(taskId);
+  }
+
+  @override
+  Future<bool> requestPermission() async {
+    permissionRequests++;
+    return permissionGranted;
+  }
+
+  @override
+  Future<void> scheduleTaskReminder({
+    required int taskId,
+    required DateTime when,
+    required String title,
+    required String body,
+  }) async {
+    scheduled.add({
+      'taskId': taskId,
       'when': when,
       'title': title,
       'body': body,

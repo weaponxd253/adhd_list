@@ -1,6 +1,8 @@
 import 'package:adhd_list/features/settings/settings_screen.dart';
+import 'package:adhd_list/models/task_reminder.dart';
 import 'package:adhd_list/providers/mood_state.dart';
 import 'package:adhd_list/providers/settings_state.dart';
+import 'package:adhd_list/providers/task_reminder_state.dart';
 import 'package:adhd_list/providers/task_state.dart';
 import 'package:adhd_list/providers/timer_state.dart';
 import 'package:adhd_list/theme/app_theme.dart';
@@ -15,6 +17,7 @@ Future<void> _pumpSettingsScreen(
   required SettingsState settings,
   TaskState? taskState,
   MoodState? moodState,
+  TaskReminderState? taskReminderState,
   TimerState? timerState,
 }) async {
   tester.view.physicalSize = const Size(400, 1000);
@@ -27,6 +30,13 @@ Future<void> _pumpSettingsScreen(
         sessionRepository: FakeTimerSessionRepository(),
       );
   addTearDown(resolvedTimerState.dispose);
+  final resolvedTaskReminderState = taskReminderState ??
+      TaskReminderState(
+        repository: FakeTaskReminderRepository(),
+        notificationService: FakeTaskReminderNotificationService(),
+        autoLoad: false,
+      );
+  addTearDown(resolvedTaskReminderState.dispose);
 
   await tester.pumpWidget(
     MultiProvider(
@@ -46,6 +56,7 @@ Future<void> _pumpSettingsScreen(
                 autoLoad: false,
               ),
         ),
+        ChangeNotifierProvider.value(value: resolvedTaskReminderState),
         ChangeNotifierProvider.value(value: resolvedTimerState),
       ],
       child: MaterialApp(
@@ -69,9 +80,20 @@ void main() {
     expect(find.text('Appearance'), findsOneWidget);
     expect(find.text('Timer'), findsOneWidget);
     expect(find.text('Tasks'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('Data'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
     expect(find.text('Data'), findsOneWidget);
 
-    await tester.drag(find.byType(ListView), const Offset(0, -500));
+    await tester.scrollUntilVisible(
+      find.text('About'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.pumpAndSettle();
     expect(find.text('About'), findsOneWidget);
   });
@@ -80,6 +102,13 @@ void main() {
     final repository = FakeSettingsRepository();
     final settings = SettingsState(repository: repository, autoLoad: false);
     final notificationService = FakeTimerNotificationService();
+    final taskReminderNotificationService =
+        FakeTaskReminderNotificationService();
+    final taskReminderState = TaskReminderState(
+      repository: FakeTaskReminderRepository(),
+      notificationService: taskReminderNotificationService,
+      autoLoad: false,
+    );
     final timerState = TimerState(
       notificationService: notificationService,
       sessionRepository: FakeTimerSessionRepository(),
@@ -88,6 +117,7 @@ void main() {
     await _pumpSettingsScreen(
       tester,
       settings: settings,
+      taskReminderState: taskReminderState,
       timerState: timerState,
     );
 
@@ -115,6 +145,27 @@ void main() {
       repository.values[SettingsState.timerNotificationsEnabledKey],
       'true',
     );
+
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('task-reminders-toggle')),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('task-reminders-toggle')));
+    await tester.pump();
+    expect(settings.taskRemindersEnabled, isTrue);
+    expect(taskReminderNotificationService.permissionRequests, 1);
+    expect(taskReminderState.notificationPermissionGranted, isTrue);
+    expect(
+      repository.values[SettingsState.taskRemindersEnabledKey],
+      'true',
+    );
+
+    await tester.tap(find.text('Direct'));
+    await tester.pump();
+    expect(settings.taskReminderStyle, TaskReminderStyle.direct);
+    expect(repository.values[SettingsState.taskReminderStyleKey], 'direct');
 
     await tester.tap(find.text('7 days'));
     await tester.pump();
@@ -157,7 +208,7 @@ void main() {
     expect(settings.timerNotificationsEnabled, isFalse);
     expect(timerState.notificationsEnabled, isFalse);
     expect(notificationService.cancelCount, greaterThanOrEqualTo(1));
-    expect(find.text('Off'), findsOneWidget);
+    expect(find.text('Off'), findsWidgets);
 
     timerState.resetTimer();
     await tester.pump();
@@ -189,7 +240,11 @@ void main() {
       taskState: taskState,
     );
 
-    await tester.ensureVisible(find.byTooltip('Clear task history'));
+    await tester.scrollUntilVisible(
+      find.byTooltip('Clear task history'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.pump();
     await tester.tap(find.byTooltip('Clear task history'));
     await tester.pumpAndSettle();

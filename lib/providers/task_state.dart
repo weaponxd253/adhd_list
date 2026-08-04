@@ -8,18 +8,25 @@ import '../models/subtask.dart';
 import '../models/task.dart';
 import '../models/task_support.dart';
 import '../repositories/repositories.dart';
+import '../services/task_reminder_notification_service.dart';
 
 class TaskState extends ChangeNotifier {
   TaskState({
     TaskRepository? repository,
+    TaskReminderRepository? taskReminderRepository,
+    TaskReminderNotificationService? taskReminderNotificationService,
     DateTime Function()? now,
     bool autoLoad = true,
   })  : _repository = repository ?? TaskDatabase(),
+        _taskReminderRepository = taskReminderRepository,
+        _taskReminderNotificationService = taskReminderNotificationService,
         _now = now ?? DateTime.now {
     if (autoLoad) unawaited(loadTasks());
   }
 
   final TaskRepository _repository;
+  final TaskReminderRepository? _taskReminderRepository;
+  final TaskReminderNotificationService? _taskReminderNotificationService;
   final DateTime Function() _now;
   List<Task> _tasks = [];
   final Set<int> _busyTaskIds = {};
@@ -98,6 +105,7 @@ class TaskState extends ChangeNotifier {
   }
 
   Future<void> clearTaskHistory() async {
+    await _cancelAllTaskReminders();
     await _repository.clearTasks();
     _tasks = [];
     _tomorrowStarterTaskId = null;
@@ -118,6 +126,7 @@ class TaskState extends ChangeNotifier {
   Future<Task> deleteTask(int taskId) async {
     final task = _copyTask(_requireTask(taskId));
     await _runTaskMutation(taskId, () async {
+      await _cancelReminderForTask(taskId);
       await _repository.deleteTask(taskId);
       _tasks = _tasks.where((item) => item.id != taskId).toList();
       if (_tomorrowStarterTaskId == taskId) _tomorrowStarterTaskId = null;
@@ -167,6 +176,7 @@ class TaskState extends ChangeNotifier {
       if (task.isCompleted && _tomorrowStarterTaskId == taskId) {
         _tomorrowStarterTaskId = null;
       }
+      if (task.isCompleted) await _cancelReminderForTask(taskId);
     });
   }
 
@@ -176,7 +186,11 @@ class TaskState extends ChangeNotifier {
     final later = DateTime(now.year, now.month, now.day).add(
       Duration(days: days),
     );
-    await editTask(taskId, task.title, later);
+    await _runTaskMutation(taskId, () async {
+      await _repository.editTask(taskId, task.title, later.toIso8601String());
+      await _cancelReminderForTask(taskId);
+      await loadTasks();
+    });
   }
 
   void setTomorrowStarter(int taskId) {
@@ -284,6 +298,32 @@ class TaskState extends ChangeNotifier {
       _busyTaskIds.remove(taskId);
       notifyListeners();
     }
+  }
+
+  Future<void> _cancelReminderForTask(int taskId) async {
+    final notificationService = _taskReminderNotificationService;
+    final reminderRepository = _taskReminderRepository;
+
+    try {
+      await notificationService?.cancelTaskReminder(taskId);
+    } catch (_) {}
+
+    try {
+      await reminderRepository?.deleteTaskReminder(taskId);
+    } catch (_) {}
+  }
+
+  Future<void> _cancelAllTaskReminders() async {
+    final notificationService = _taskReminderNotificationService;
+    final reminderRepository = _taskReminderRepository;
+
+    try {
+      await notificationService?.cancelAllTaskReminders();
+    } catch (_) {}
+
+    try {
+      await reminderRepository?.clearTaskReminders();
+    } catch (_) {}
   }
 
   Task _copyTask(Task task) {

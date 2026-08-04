@@ -3,8 +3,10 @@ import 'package:provider/provider.dart';
 
 import '../../providers/mood_state.dart';
 import '../../providers/settings_state.dart';
+import '../../providers/task_reminder_state.dart';
 import '../../providers/task_state.dart';
 import '../../providers/timer_state.dart';
+import '../../models/task_reminder.dart';
 import '../../theme/app_theme.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -74,6 +76,10 @@ class SettingsScreen extends StatelessWidget {
           _SettingsSection(
             title: 'Tasks',
             children: [
+              _TaskNudgesRow(settings: settings),
+              _SettingsDivider(),
+              _TaskReminderStyleControl(settings: settings),
+              _SettingsDivider(),
               _DueDateDefaultControl(settings: settings),
             ],
           ),
@@ -333,6 +339,116 @@ class _DueDateDefaultControl extends StatelessWidget {
             if (!context.mounted) return;
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Could not save task setting.')),
+            );
+          }
+        },
+      ),
+    );
+  }
+}
+
+class _TaskNudgesRow extends StatelessWidget {
+  const _TaskNudgesRow({required this.settings});
+
+  final SettingsState settings;
+
+  @override
+  Widget build(BuildContext context) {
+    final reminderState = context.watch<TaskReminderState>();
+
+    return _SettingsRow(
+      icon: Icons.notifications_none_rounded,
+      label: 'Task nudges',
+      subtitle: _statusText(reminderState),
+      trailing: Switch(
+        key: const Key('task-reminders-toggle'),
+        value: settings.taskRemindersEnabled,
+        onChanged: (enabled) async {
+          try {
+            await context
+                .read<SettingsState>()
+                .setTaskRemindersEnabled(enabled);
+            if (!context.mounted) return;
+
+            final updatedSettings = context.read<SettingsState>();
+            final reminders = context.read<TaskReminderState>();
+            reminders.updateSettings(
+              remindersEnabled: enabled,
+              defaultStyle: updatedSettings.taskReminderStyle,
+            );
+            if (enabled) {
+              await reminders.requestNotificationPermission();
+            } else {
+              await reminders.cancelAllReminders();
+            }
+          } catch (_) {
+            if (!context.mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Could not save task nudges.')),
+            );
+          }
+        },
+      ),
+    );
+  }
+
+  String _statusText(TaskReminderState reminderState) {
+    if (!settings.taskRemindersEnabled) return 'Off';
+    if (!reminderState.notificationPermissionGranted) {
+      return 'Permission needed';
+    }
+    if (reminderState.activeReminderCount == 1) return '1 nudge set';
+    if (reminderState.activeReminderCount > 1) {
+      return '${reminderState.activeReminderCount} nudges set';
+    }
+    return 'Enabled';
+  }
+}
+
+class _TaskReminderStyleControl extends StatelessWidget {
+  const _TaskReminderStyleControl({required this.settings});
+
+  final SettingsState settings;
+
+  @override
+  Widget build(BuildContext context) {
+    return _SettingsControlBlock(
+      icon: Icons.record_voice_over_outlined,
+      label: 'Nudge style',
+      control: SegmentedButton<TaskReminderStyle>(
+        key: const Key('task-reminder-style'),
+        segments: const [
+          ButtonSegment(
+            value: TaskReminderStyle.gentle,
+            icon: Icon(Icons.spa_outlined),
+            label: Text('Gentle'),
+          ),
+          ButtonSegment(
+            value: TaskReminderStyle.direct,
+            icon: Icon(Icons.arrow_forward_rounded),
+            label: Text('Direct'),
+          ),
+          ButtonSegment(
+            value: TaskReminderStyle.tinyStep,
+            icon: Icon(Icons.call_split_rounded),
+            label: Text('Tiny step'),
+          ),
+        ],
+        selected: {settings.taskReminderStyle},
+        showSelectedIcon: false,
+        onSelectionChanged: (selection) async {
+          final style = selection.first;
+          try {
+            await context.read<SettingsState>().setTaskReminderStyle(style);
+            if (!context.mounted) return;
+            context.read<TaskReminderState>().updateSettings(
+                  remindersEnabled: settings.taskRemindersEnabled,
+                  defaultStyle: style,
+                );
+          } catch (_) {
+            if (!context.mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Could not save nudge style.')),
             );
           }
         },

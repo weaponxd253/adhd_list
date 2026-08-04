@@ -1,5 +1,7 @@
 import 'package:adhd_list/features/task_breakdown/task_screen.dart';
+import 'package:adhd_list/models/task_reminder.dart';
 import 'package:adhd_list/providers/settings_state.dart';
+import 'package:adhd_list/providers/task_reminder_state.dart';
 import 'package:adhd_list/providers/task_state.dart';
 import 'package:adhd_list/providers/timer_state.dart';
 import 'package:adhd_list/theme/app_theme.dart';
@@ -13,23 +15,36 @@ Future<void> _pumpTaskScreen(
   WidgetTester tester,
   TaskState state, {
   SettingsState? settings,
+  TaskReminderState? taskReminderState,
   TimerState? timerState,
 }) async {
   tester.view.physicalSize = const Size(400, 1000);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
+  final resolvedSettings = settings ??
+      SettingsState(
+        repository: FakeSettingsRepository(),
+        autoLoad: false,
+      );
+  final resolvedTaskReminderState = taskReminderState ??
+      TaskReminderState(
+        repository: FakeTaskReminderRepository(),
+        notificationService: FakeTaskReminderNotificationService(),
+        autoLoad: false,
+      );
+  resolvedTaskReminderState.updateSettings(
+    remindersEnabled: resolvedSettings.taskRemindersEnabled,
+    defaultStyle: resolvedSettings.taskReminderStyle,
+  );
+  addTearDown(resolvedTaskReminderState.dispose);
+
   await tester.pumpWidget(
     MultiProvider(
       providers: [
         ChangeNotifierProvider.value(value: state),
-        ChangeNotifierProvider.value(
-          value: settings ??
-              SettingsState(
-                repository: FakeSettingsRepository(),
-                autoLoad: false,
-              ),
-        ),
+        ChangeNotifierProvider.value(value: resolvedSettings),
+        ChangeNotifierProvider.value(value: resolvedTaskReminderState),
         ChangeNotifierProvider.value(
           value: timerState ??
               TimerState(
@@ -189,6 +204,8 @@ void main() {
 
     expect(find.text("I'm stuck"), findsOneWidget);
     expect(find.text('Start tiny'), findsOneWidget);
+    expect(find.text('Remind later'), findsOneWidget);
+    expect(find.text('Remind tomorrow'), findsOneWidget);
     expect(find.text('Edit'), findsOneWidget);
     expect(find.text('Delete'), findsOneWidget);
   });
@@ -217,6 +234,46 @@ void main() {
     expect(timerState.timerDisplay, '02:00');
     expect(find.text('2 minute tiny focus started'), findsOneWidget);
     timerState.stopTimer();
+  });
+
+  testWidgets('task actions can schedule a reminder', (tester) async {
+    final state = TaskState(
+      repository: FakeTaskRepository(
+        tasks: [taskRow(id: 1, title: 'Reminder task', dueDate: today)],
+      ),
+      autoLoad: false,
+    );
+    final settings = SettingsState(
+      repository: FakeSettingsRepository(),
+      autoLoad: false,
+    );
+    await settings.setTaskRemindersEnabled(true);
+    await settings.setTaskReminderStyle(TaskReminderStyle.direct);
+    final reminderRepository = FakeTaskReminderRepository();
+    final reminderNotificationService = FakeTaskReminderNotificationService();
+    final reminderState = TaskReminderState(
+      repository: reminderRepository,
+      notificationService: reminderNotificationService,
+      now: () => DateTime(2026, 6, 23, 14),
+      autoLoad: false,
+    );
+    await state.loadTasks();
+    await _pumpTaskScreen(
+      tester,
+      state,
+      settings: settings,
+      taskReminderState: reminderState,
+    );
+
+    await tester.tap(find.byTooltip('Task actions for Reminder task'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Remind tomorrow'));
+    await tester.pump();
+
+    expect(reminderNotificationService.permissionRequests, 1);
+    expect(reminderNotificationService.scheduled.single['taskId'], 1);
+    expect(reminderRepository.reminderRows.single['style'], 'direct');
+    expect(find.text('Reminder set for tomorrow'), findsOneWidget);
   });
 
   testWidgets('editing a task saves without controller disposal errors',
@@ -343,6 +400,13 @@ void main() {
             ChangeNotifierProvider(
               create: (_) => SettingsState(
                 repository: FakeSettingsRepository(),
+                autoLoad: false,
+              ),
+            ),
+            ChangeNotifierProvider(
+              create: (_) => TaskReminderState(
+                repository: FakeTaskReminderRepository(),
+                notificationService: FakeTaskReminderNotificationService(),
                 autoLoad: false,
               ),
             ),

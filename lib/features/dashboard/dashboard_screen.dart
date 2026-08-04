@@ -5,9 +5,12 @@ import 'package:provider/provider.dart';
 import '../../features/mood_tracker/mood_tracker_screen.dart';
 import '../../features/settings/settings_screen.dart';
 import '../../models/task.dart';
+import '../../models/task_reminder.dart';
 import '../../models/task_support.dart';
 import '../../providers/mood_state.dart';
 import '../../providers/task_state.dart';
+import '../../providers/settings_state.dart';
+import '../../providers/task_reminder_state.dart';
 import '../../providers/timer_state.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/task_support_sheet.dart';
@@ -22,8 +25,17 @@ class DashboardScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: _buildAppBar(context),
-      body: Consumer3<TaskState, MoodState, TimerState>(
-        builder: (context, taskState, moodState, timerState, _) {
+      body: Consumer5<TaskState, MoodState, TimerState, SettingsState,
+          TaskReminderState>(
+        builder: (
+          context,
+          taskState,
+          moodState,
+          timerState,
+          settingsState,
+          reminderState,
+          _,
+        ) {
           final nowTask = taskState.nowTask;
           final waitingTask = taskState.waitingTask;
 
@@ -54,6 +66,9 @@ class DashboardScreen extends StatelessWidget {
                 _WaitingTaskCard(
                   taskState: taskState,
                   timerState: timerState,
+                  reminderState: reminderState,
+                  remindersEnabled: settingsState.taskRemindersEnabled,
+                  reminderStyle: settingsState.taskReminderStyle,
                   task: waitingTask,
                   onOpenTimer: onOpenTimer,
                 ),
@@ -71,6 +86,8 @@ class DashboardScreen extends StatelessWidget {
               _DailyReviewCard(
                 taskState: taskState,
                 timerState: timerState,
+                settingsState: settingsState,
+                reminderState: reminderState,
               ),
               const SizedBox(height: AppSpacing.md),
               _TimerSummaryCard(timerState: timerState, task: nowTask),
@@ -540,12 +557,18 @@ class _WaitingTaskCard extends StatefulWidget {
   const _WaitingTaskCard({
     required this.taskState,
     required this.timerState,
+    required this.reminderState,
+    required this.remindersEnabled,
+    required this.reminderStyle,
     required this.task,
     required this.onOpenTimer,
   });
 
   final TaskState taskState;
   final TimerState timerState;
+  final TaskReminderState reminderState;
+  final bool remindersEnabled;
+  final TaskReminderStyle reminderStyle;
   final Task task;
   final VoidCallback? onOpenTimer;
 
@@ -562,6 +585,7 @@ class _WaitingTaskCardState extends State<_WaitingTaskCard> {
     final cs = Theme.of(context).colorScheme;
     final task = widget.task;
     final tinyStep = widget.taskState.tinyStepSuggestionFor(task);
+    final reminder = widget.reminderState.reminderFor(task.id);
 
     return Card(
       child: Padding(
@@ -622,6 +646,10 @@ class _WaitingTaskCardState extends State<_WaitingTaskCard> {
               _nudgeCopy(tinyStep),
               style: Theme.of(context).textTheme.bodyMedium,
             ),
+            if (reminder != null) ...[
+              const SizedBox(height: AppSpacing.xs),
+              _ReminderStatusLine(reminder: reminder),
+            ],
             const SizedBox(height: AppSpacing.sm),
             Wrap(
               spacing: AppSpacing.xs,
@@ -645,6 +673,25 @@ class _WaitingTaskCardState extends State<_WaitingTaskCard> {
                   icon: const Icon(Icons.bolt_rounded),
                   label: const Text('Start tiny'),
                 ),
+                OutlinedButton.icon(
+                  key: const Key('waiting-remind-later'),
+                  onPressed: _saving ? null : () => _scheduleReminder(false),
+                  icon: const Icon(Icons.notifications_none_rounded),
+                  label: const Text('Remind later'),
+                ),
+                OutlinedButton.icon(
+                  key: const Key('waiting-remind-tomorrow'),
+                  onPressed: _saving ? null : () => _scheduleReminder(true),
+                  icon: const Icon(Icons.event_available_outlined),
+                  label: const Text('Remind tomorrow'),
+                ),
+                if (reminder != null)
+                  TextButton.icon(
+                    key: const Key('waiting-cancel-reminder'),
+                    onPressed: _saving ? null : _cancelReminder,
+                    icon: const Icon(Icons.notifications_off_outlined),
+                    label: const Text('Cancel nudge'),
+                  ),
               ],
             ),
             if (_saving) ...[
@@ -655,6 +702,17 @@ class _WaitingTaskCardState extends State<_WaitingTaskCard> {
         ),
       ),
     );
+  }
+
+  TaskReminderStyle get _selectedReminderStyle {
+    switch (_style) {
+      case _NudgeStyle.gentle:
+        return TaskReminderStyle.gentle;
+      case _NudgeStyle.direct:
+        return TaskReminderStyle.direct;
+      case _NudgeStyle.tinyStep:
+        return TaskReminderStyle.tinyStep;
+    }
   }
 
   String _nudgeCopy(String tinyStep) {
@@ -700,10 +758,101 @@ class _WaitingTaskCardState extends State<_WaitingTaskCard> {
     _message('2 minute tiny focus started');
   }
 
+  Future<void> _scheduleReminder(bool tomorrow) async {
+    if (!widget.remindersEnabled) {
+      _message('Turn on Task nudges in Settings first.');
+      return;
+    }
+
+    setState(() => _saving = true);
+    try {
+      final tinyStep = widget.taskState.tinyStepSuggestionFor(widget.task);
+      final style = _selectedReminderStyle == widget.reminderStyle
+          ? widget.reminderStyle
+          : _selectedReminderStyle;
+      final scheduled = tomorrow
+          ? await widget.reminderState.remindTomorrow(
+              widget.task,
+              tinyStep: tinyStep,
+              style: style,
+            )
+          : await widget.reminderState.remindLater(
+              widget.task,
+              tinyStep: tinyStep,
+              style: style,
+            );
+      if (!mounted) return;
+      _message(
+        scheduled
+            ? tomorrow
+                ? 'Reminder set for tomorrow'
+                : 'Reminder set for later'
+            : widget.reminderState.lastError ?? 'Could not set reminder.',
+      );
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _cancelReminder() async {
+    setState(() => _saving = true);
+    try {
+      await widget.reminderState.cancelReminder(widget.task.id);
+      if (mounted) _message('Reminder canceled');
+    } catch (_) {
+      if (mounted) _message('Could not cancel that reminder.');
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
   void _message(String message) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(message)));
+  }
+}
+
+class _ReminderStatusLine extends StatelessWidget {
+  const _ReminderStatusLine({required this.reminder});
+
+  final TaskReminder reminder;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: cs.secondary.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(AppRadii.control),
+        border: Border.all(color: cs.secondary.withOpacity(0.18)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: AppSpacing.xs,
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.notifications_active_outlined,
+              size: 18,
+              color: cs.secondary,
+            ),
+            const SizedBox(width: AppSpacing.xs),
+            Expanded(
+              child: Text(
+                'Nudge set ${DateFormat.MMMd().add_jm().format(reminder.scheduledAt)} (${reminder.style.label})',
+                style: Theme.of(context).textTheme.bodySmall,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -912,17 +1061,24 @@ class _DailyReviewCard extends StatelessWidget {
   const _DailyReviewCard({
     required this.taskState,
     required this.timerState,
+    required this.settingsState,
+    required this.reminderState,
   });
 
   final TaskState taskState;
   final TimerState timerState;
+  final SettingsState settingsState;
+  final TaskReminderState reminderState;
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final tomorrowStart = _tomorrowStart();
+    final starterTask = taskState.tomorrowStarterTask;
     final starterOptions = taskState.tomorrowStarterOptions;
     final selectedStarter = taskState.selectedTomorrowStarterTask;
+    final starterReminder =
+        starterTask == null ? null : reminderState.reminderFor(starterTask.id);
 
     return Card(
       child: Padding(
@@ -985,6 +1141,33 @@ class _DailyReviewCard extends StatelessWidget {
                 },
               ),
             ],
+            if (starterTask != null) ...[
+              const SizedBox(height: AppSpacing.sm),
+              if (starterReminder != null) ...[
+                _ReminderStatusLine(reminder: starterReminder),
+                const SizedBox(height: AppSpacing.xs),
+              ],
+              Wrap(
+                spacing: AppSpacing.xs,
+                runSpacing: AppSpacing.xs,
+                children: [
+                  FilledButton.icon(
+                    key: const Key('daily-review-remind-tomorrow'),
+                    onPressed: () => _remindTomorrow(context, starterTask),
+                    icon: const Icon(Icons.notifications_none_rounded),
+                    label: const Text('Remind tomorrow'),
+                  ),
+                  if (starterReminder != null)
+                    OutlinedButton.icon(
+                      key: const Key('daily-review-cancel-reminder'),
+                      onPressed: () =>
+                          _cancelReminder(context, starterReminder.taskId),
+                      icon: const Icon(Icons.notifications_off_outlined),
+                      label: const Text('Cancel nudge'),
+                    ),
+                ],
+              ),
+            ],
           ],
         ),
       ),
@@ -1006,6 +1189,42 @@ class _DailyReviewCard extends StatelessWidget {
 
   String _tomorrowStart() {
     return taskState.tomorrowStarterTask?.title ?? 'a mood check-in';
+  }
+
+  Future<void> _remindTomorrow(BuildContext context, Task task) async {
+    if (!settingsState.taskRemindersEnabled) {
+      _message(context, 'Turn on Task nudges in Settings first.');
+      return;
+    }
+
+    final tinyStep = taskState.tinyStepSuggestionFor(task);
+    final scheduled = await reminderState.remindTomorrow(
+      task,
+      tinyStep: tinyStep,
+      style: settingsState.taskReminderStyle,
+    );
+    if (!context.mounted) return;
+    _message(
+      context,
+      scheduled
+          ? 'Reminder set for tomorrow'
+          : reminderState.lastError ?? 'Could not set reminder.',
+    );
+  }
+
+  Future<void> _cancelReminder(BuildContext context, int taskId) async {
+    try {
+      await reminderState.cancelReminder(taskId);
+      if (context.mounted) _message(context, 'Reminder canceled');
+    } catch (_) {
+      if (context.mounted) _message(context, 'Could not cancel that reminder.');
+    }
+  }
+
+  void _message(BuildContext context, String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 }
 

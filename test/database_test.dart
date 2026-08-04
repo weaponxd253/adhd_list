@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:adhd_list/database/database_helper.dart';
 import 'package:adhd_list/database/settings_database.dart';
 import 'package:adhd_list/database/task_database.dart';
+import 'package:adhd_list/database/task_reminder_database.dart';
 import 'package:adhd_list/database/timer_session_database.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -22,7 +23,7 @@ void main() {
 
     tearDown(() => helper.close());
 
-    test('creates all tables and indexes at version 8', () async {
+    test('creates all tables and indexes at version 9', () async {
       final db = await helper.database;
       final objects = await db.query(
         'sqlite_master',
@@ -40,6 +41,7 @@ void main() {
           'moods',
           'settings',
           'timer_sessions',
+          'task_reminders',
         ]),
       );
       expect(
@@ -49,9 +51,10 @@ void main() {
           'idx_subtasks_task_id',
           'idx_moods_date',
           'idx_timer_sessions_ended_at',
+          'idx_task_reminders_scheduled_at',
         ]),
       );
-      expect(await db.getVersion(), 8);
+      expect(await db.getVersion(), 9);
     });
 
     test('enforces due dates and foreign keys', () async {
@@ -73,13 +76,20 @@ void main() {
 
     test('deleting a task cascades to its subtasks', () async {
       final tasks = TaskDatabase(dbHelper: helper);
+      final reminders = TaskReminderDatabase(dbHelper: helper);
       final taskId = await tasks.insertTask(
           'Task', DateTime(2026, 6, 24).toIso8601String());
       await tasks.insertSubtask(taskId, 'Step');
+      await reminders.upsertTaskReminder(
+        taskId: taskId,
+        style: 'gentle',
+        scheduledAt: DateTime(2026, 6, 24, 9).toIso8601String(),
+      );
 
       await tasks.deleteTask(taskId);
 
       expect(await tasks.fetchSubtasks(taskId), isEmpty);
+      expect(await reminders.fetchTaskReminders(), isEmpty);
     });
 
     test('keeps completion columns synchronized', () async {
@@ -133,6 +143,32 @@ void main() {
       expect(await db.query('settings'), hasLength(1));
     });
 
+    test('task reminders use replace semantics', () async {
+      final tasks = TaskDatabase(dbHelper: helper);
+      final reminders = TaskReminderDatabase(dbHelper: helper);
+      final taskId = await tasks.insertTask(
+        'Task',
+        DateTime(2026, 6, 24).toIso8601String(),
+      );
+
+      await reminders.upsertTaskReminder(
+        taskId: taskId,
+        style: 'gentle',
+        scheduledAt: DateTime(2026, 6, 24, 9).toIso8601String(),
+      );
+      await reminders.upsertTaskReminder(
+        taskId: taskId,
+        style: 'direct',
+        scheduledAt: DateTime(2026, 6, 24, 12).toIso8601String(),
+      );
+
+      final rows = await reminders.fetchTaskReminders();
+      expect(rows, hasLength(1));
+      expect(rows.single['style'], 'direct');
+      expect(rows.single['scheduled_at'],
+          DateTime(2026, 6, 24, 12).toIso8601String());
+    });
+
     test('timer sessions persist and clear', () async {
       final sessions = TimerSessionDatabase(dbHelper: helper);
 
@@ -164,7 +200,7 @@ void main() {
     });
   });
 
-  test('version 8 repairs a version 4 database with missing objects', () async {
+  test('version 9 repairs a version 4 database with missing objects', () async {
     final directory = await Directory.systemTemp.createTemp('focusflow_test_');
     final path = '${directory.path}${Platform.pathSeparator}repair.db';
     final oldDb = await databaseFactoryFfi.openDatabase(
@@ -223,10 +259,15 @@ void main() {
       ]),
     );
     expect(
-      tableNames,
-      containsAll(['subtasks', 'moods', 'settings', 'timer_sessions']),
-    );
+        tableNames,
+        containsAll([
+          'subtasks',
+          'moods',
+          'settings',
+          'timer_sessions',
+          'task_reminders',
+        ]));
     expect((await db.query('tasks')).single['due_date'], isNotNull);
-    expect(await db.getVersion(), 8);
+    expect(await db.getVersion(), 9);
   });
 }

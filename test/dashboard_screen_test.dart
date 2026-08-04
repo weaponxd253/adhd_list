@@ -1,5 +1,8 @@
 import 'package:adhd_list/features/dashboard/dashboard_screen.dart';
+import 'package:adhd_list/models/task_reminder.dart';
 import 'package:adhd_list/providers/mood_state.dart';
+import 'package:adhd_list/providers/settings_state.dart';
+import 'package:adhd_list/providers/task_reminder_state.dart';
 import 'package:adhd_list/providers/task_state.dart';
 import 'package:adhd_list/providers/timer_state.dart';
 import 'package:adhd_list/theme/app_theme.dart';
@@ -22,7 +25,10 @@ class _DashboardHarness {
           subtasks: subtasks,
         ),
         moodRepository = FakeMoodRepository(entries: moods),
+        settingsRepository = FakeSettingsRepository(),
+        taskReminderRepository = FakeTaskReminderRepository(),
         timerSessionRepository = FakeTimerSessionRepository(),
+        taskReminderNotificationService = FakeTaskReminderNotificationService(),
         notificationService = FakeTimerNotificationService() {
     taskState = TaskState(
       repository: taskRepository,
@@ -30,6 +36,16 @@ class _DashboardHarness {
       autoLoad: false,
     );
     moodState = MoodState(repository: moodRepository, autoLoad: false);
+    settingsState = SettingsState(
+      repository: settingsRepository,
+      autoLoad: false,
+    );
+    taskReminderState = TaskReminderState(
+      repository: taskReminderRepository,
+      notificationService: taskReminderNotificationService,
+      now: now,
+      autoLoad: false,
+    );
     timerState = TimerState(
       notificationService: notificationService,
       sessionRepository: timerSessionRepository,
@@ -38,18 +54,25 @@ class _DashboardHarness {
 
   final FakeTaskRepository taskRepository;
   final FakeMoodRepository moodRepository;
+  final FakeSettingsRepository settingsRepository;
+  final FakeTaskReminderRepository taskReminderRepository;
   final FakeTimerSessionRepository timerSessionRepository;
+  final FakeTaskReminderNotificationService taskReminderNotificationService;
   final FakeTimerNotificationService notificationService;
   final VoidCallback? onOpenMood;
   final VoidCallback? onOpenTimer;
 
   late final TaskState taskState;
   late final MoodState moodState;
+  late final SettingsState settingsState;
+  late final TaskReminderState taskReminderState;
   late final TimerState timerState;
 
   void dispose() {
     taskState.dispose();
     moodState.dispose();
+    settingsState.dispose();
+    taskReminderState.dispose();
     timerState.dispose();
   }
 }
@@ -62,6 +85,8 @@ Future<_DashboardHarness> _pumpDashboard(
   DateTime Function()? now,
   VoidCallback? onOpenMood,
   VoidCallback? onOpenTimer,
+  bool taskRemindersEnabled = false,
+  TaskReminderStyle taskReminderStyle = TaskReminderStyle.gentle,
   TextScaler textScaler = TextScaler.noScaling,
 }) async {
   tester.view.physicalSize = const Size(430, 930);
@@ -81,6 +106,14 @@ Future<_DashboardHarness> _pumpDashboard(
 
   await harness.taskState.loadTasks();
   await harness.moodState.load();
+  if (taskRemindersEnabled) {
+    await harness.settingsState.setTaskRemindersEnabled(true);
+  }
+  await harness.settingsState.setTaskReminderStyle(taskReminderStyle);
+  harness.taskReminderState.updateSettings(
+    remindersEnabled: harness.settingsState.taskRemindersEnabled,
+    defaultStyle: harness.settingsState.taskReminderStyle,
+  );
 
   await tester.pumpWidget(
     MediaQuery(
@@ -89,6 +122,8 @@ Future<_DashboardHarness> _pumpDashboard(
         providers: [
           ChangeNotifierProvider.value(value: harness.taskState),
           ChangeNotifierProvider.value(value: harness.moodState),
+          ChangeNotifierProvider.value(value: harness.settingsState),
+          ChangeNotifierProvider.value(value: harness.taskReminderState),
           ChangeNotifierProvider.value(value: harness.timerState),
         ],
         child: MaterialApp(
@@ -248,7 +283,12 @@ void main() {
       findsOneWidget,
     );
 
-    await tester.tap(find.text('Tiny step'));
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const Key('waiting-nudge-style')),
+        matching: find.text('Tiny step'),
+      ),
+    );
     await tester.pump();
     expect(
       find.textContaining('Only do this next tiny step'),
@@ -271,6 +311,51 @@ void main() {
       harness.taskRepository.taskRows.first['due_date'] as String,
     );
     expect(dueDate, DateTime(today.year, today.month, today.day + 7));
+  });
+
+  testWidgets('dashboard waiting card can schedule and cancel a reminder',
+      (tester) async {
+    final harness = await _pumpDashboard(
+      tester,
+      now: () => today,
+      taskRemindersEnabled: true,
+      tasks: [
+        taskRow(
+          id: 1,
+          title: 'Old paperwork',
+          dueDate: today.subtract(const Duration(days: 3)),
+        ),
+      ],
+    );
+
+    await tester.scrollUntilVisible(find.text('This has been waiting'), 320);
+    await tester.pump();
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const Key('waiting-nudge-style')),
+        matching: find.text('Tiny step'),
+      ),
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('waiting-remind-tomorrow')));
+    await tester.pump();
+
+    expect(harness.taskReminderNotificationService.permissionRequests, 1);
+    expect(
+      harness.taskReminderRepository.reminderRows.single['style'],
+      'tinyStep',
+    );
+    expect(find.text('Reminder set for tomorrow'), findsOneWidget);
+    expect(find.textContaining('Nudge set'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('waiting-cancel-reminder')));
+    await tester.pump();
+
+    expect(harness.taskReminderRepository.reminderRows, isEmpty);
+    expect(
+      harness.taskReminderNotificationService.canceledTaskIds,
+      contains(1),
+    );
   });
 
   testWidgets('dashboard adapts now guidance to anxious mood', (tester) async {

@@ -1,6 +1,7 @@
 import 'package:adhd_list/features/home/home_screen.dart';
 import 'package:adhd_list/providers/mood_state.dart';
 import 'package:adhd_list/providers/settings_state.dart';
+import 'package:adhd_list/providers/task_reminder_state.dart';
 import 'package:adhd_list/providers/task_state.dart';
 import 'package:adhd_list/providers/timer_state.dart';
 import 'package:adhd_list/theme/app_theme.dart';
@@ -15,7 +16,9 @@ class _SmokeHarness {
       : taskRepository = FakeTaskRepository(),
         moodRepository = FakeMoodRepository(),
         settingsRepository = FakeSettingsRepository(),
+        taskReminderRepository = FakeTaskReminderRepository(),
         timerSessionRepository = FakeTimerSessionRepository(),
+        taskReminderNotificationService = FakeTaskReminderNotificationService(),
         notificationService = FakeTimerNotificationService() {
     taskState = TaskState(
       repository: taskRepository,
@@ -29,6 +32,11 @@ class _SmokeHarness {
       repository: settingsRepository,
       autoLoad: false,
     );
+    taskReminderState = TaskReminderState(
+      repository: taskReminderRepository,
+      notificationService: taskReminderNotificationService,
+      autoLoad: false,
+    );
     timerState = TimerState(
       notificationService: notificationService,
       sessionRepository: timerSessionRepository,
@@ -38,18 +46,22 @@ class _SmokeHarness {
   final FakeTaskRepository taskRepository;
   final FakeMoodRepository moodRepository;
   final FakeSettingsRepository settingsRepository;
+  final FakeTaskReminderRepository taskReminderRepository;
   final FakeTimerSessionRepository timerSessionRepository;
+  final FakeTaskReminderNotificationService taskReminderNotificationService;
   final FakeTimerNotificationService notificationService;
 
   late final TaskState taskState;
   late final MoodState moodState;
   late final SettingsState settingsState;
+  late final TaskReminderState taskReminderState;
   late final TimerState timerState;
 
   void dispose() {
     taskState.dispose();
     moodState.dispose();
     settingsState.dispose();
+    taskReminderState.dispose();
     timerState.dispose();
   }
 }
@@ -72,6 +84,7 @@ Future<_SmokeHarness> _pumpSmokeApp(
         ChangeNotifierProvider.value(value: harness.taskState),
         ChangeNotifierProvider.value(value: harness.moodState),
         ChangeNotifierProvider.value(value: harness.settingsState),
+        ChangeNotifierProvider.value(value: harness.taskReminderState),
         ChangeNotifierProvider.value(value: harness.timerState),
       ],
       child: MaterialApp(
@@ -188,7 +201,7 @@ void main() {
       expect(harness.settingsState.timerNotificationsEnabled, isFalse);
       expect(harness.timerState.notificationsEnabled, isFalse);
       expect(harness.notificationService.cancelCount, greaterThanOrEqualTo(1));
-      expect(find.text('Off'), findsOneWidget);
+      expect(find.text('Off'), findsWidgets);
 
       expect(tester.takeException(), isNull);
     } finally {

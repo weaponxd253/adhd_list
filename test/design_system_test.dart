@@ -1,6 +1,7 @@
 import 'package:adhd_list/features/home/home_screen.dart';
 import 'package:adhd_list/providers/mood_state.dart';
 import 'package:adhd_list/providers/settings_state.dart';
+import 'package:adhd_list/providers/task_reminder_state.dart';
 import 'package:adhd_list/providers/task_state.dart';
 import 'package:adhd_list/providers/timer_state.dart';
 import 'package:adhd_list/theme/app_theme.dart';
@@ -29,6 +30,13 @@ Widget _testApp({ThemeData? theme}) {
       ChangeNotifierProvider(
         create: (_) => SettingsState(
           repository: FakeSettingsRepository(),
+          autoLoad: false,
+        ),
+      ),
+      ChangeNotifierProvider(
+        create: (_) => TaskReminderState(
+          repository: FakeTaskReminderRepository(),
+          notificationService: FakeTaskReminderNotificationService(),
           autoLoad: false,
         ),
       ),

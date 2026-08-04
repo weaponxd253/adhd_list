@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../database/settings_database.dart';
+import '../models/task_reminder.dart';
 import '../repositories/repositories.dart';
 
 @immutable
@@ -34,6 +35,8 @@ class SettingsState extends ChangeNotifier {
   static const longBreakDurationKey = 'long_break_duration_minutes';
   static const defaultDueDateOffsetKey = 'default_due_date_offset_days';
   static const timerNotificationsEnabledKey = 'timer_notifications_enabled';
+  static const taskRemindersEnabledKey = 'task_reminders_enabled';
+  static const taskReminderStyleKey = 'task_reminder_style';
 
   static const minTimerMinutes = 1;
   static const maxTimerMinutes = 180;
@@ -42,6 +45,8 @@ class SettingsState extends ChangeNotifier {
   static const defaultLongBreakDuration = 15;
   static const defaultDueDateOffset = 30;
   static const defaultTimerNotificationsEnabled = false;
+  static const defaultTaskRemindersEnabled = false;
+  static const defaultTaskReminderStyle = TaskReminderStyle.gentle;
   static const dueDateOffsetOptions = [1, 7, 30];
   static const timerPresets = [
     TimerPreset(
@@ -71,6 +76,8 @@ class SettingsState extends ChangeNotifier {
   int _longBreakDuration = defaultLongBreakDuration;
   int _defaultDueDateOffsetDays = defaultDueDateOffset;
   bool _timerNotificationsEnabled = defaultTimerNotificationsEnabled;
+  bool _taskRemindersEnabled = defaultTaskRemindersEnabled;
+  TaskReminderStyle _taskReminderStyle = defaultTaskReminderStyle;
 
   ThemeMode get themeMode => _themeMode;
   int get focusDuration => _focusDuration;
@@ -78,6 +85,8 @@ class SettingsState extends ChangeNotifier {
   int get longBreakDuration => _longBreakDuration;
   int get defaultDueDateOffsetDays => _defaultDueDateOffsetDays;
   bool get timerNotificationsEnabled => _timerNotificationsEnabled;
+  bool get taskRemindersEnabled => _taskRemindersEnabled;
+  TaskReminderStyle get taskReminderStyle => _taskReminderStyle;
 
   Future<void> load() async {
     _themeMode = _themeModeFromValue(await _repository.read(themeModeKey));
@@ -111,6 +120,13 @@ class SettingsState extends ChangeNotifier {
     _timerNotificationsEnabled = _boolFromValue(
       await _repository.read(timerNotificationsEnabledKey),
       defaultTimerNotificationsEnabled,
+    );
+    _taskRemindersEnabled = _boolFromValue(
+      await _repository.read(taskRemindersEnabledKey),
+      defaultTaskRemindersEnabled,
+    );
+    _taskReminderStyle = TaskReminderStyle.fromId(
+      await _repository.read(taskReminderStyleKey),
     );
     notifyListeners();
   }
@@ -173,6 +189,22 @@ class SettingsState extends ChangeNotifier {
 
     await _repository.write(timerNotificationsEnabledKey, '$enabled');
     _timerNotificationsEnabled = enabled;
+    notifyListeners();
+  }
+
+  Future<void> setTaskRemindersEnabled(bool enabled) async {
+    if (enabled == _taskRemindersEnabled) return;
+
+    await _repository.write(taskRemindersEnabledKey, '$enabled');
+    _taskRemindersEnabled = enabled;
+    notifyListeners();
+  }
+
+  Future<void> setTaskReminderStyle(TaskReminderStyle style) async {
+    if (style == _taskReminderStyle) return;
+
+    await _repository.write(taskReminderStyleKey, style.id);
+    _taskReminderStyle = style;
     notifyListeners();
   }
 

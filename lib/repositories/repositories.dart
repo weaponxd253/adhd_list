@@ -19,6 +19,19 @@ abstract interface class TaskRepository {
   Future<void> deleteSubtask(int subtaskId);
 }
 
+abstract interface class TaskReminderRepository {
+  Future<List<Map<String, dynamic>>> fetchTaskReminders();
+  Future<Map<String, dynamic>?> fetchTaskReminder(int taskId);
+  Future<void> upsertTaskReminder({
+    required int taskId,
+    required String style,
+    required String scheduledAt,
+    bool enabled = true,
+  });
+  Future<void> deleteTaskReminder(int taskId);
+  Future<void> clearTaskReminders();
+}
+
 abstract interface class MoodRepository {
   Future<Map<String, dynamic>?> fetchLastMood();
   Future<int> insertMood(String mood, String emoji);

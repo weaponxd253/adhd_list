@@ -6,6 +6,8 @@ import 'package:provider/provider.dart';
 import '../../models/subtask.dart';
 import '../../models/task.dart';
 import '../../models/task_support.dart';
+import '../../providers/settings_state.dart';
+import '../../providers/task_reminder_state.dart';
 import '../../providers/task_state.dart';
 import '../../providers/timer_state.dart';
 import '../../theme/app_theme.dart';
@@ -125,6 +127,9 @@ class _TaskListSectionState extends State<TaskListSection> {
   Widget _buildTaskCard(Task task) {
     final expanded = _expandedTaskIds.contains(task.id);
     final busy = widget.taskState.isTaskBusy(task.id);
+    final settingsState = context.watch<SettingsState>();
+    final reminderState = context.watch<TaskReminderState>();
+    final reminder = reminderState.reminderFor(task.id);
     final colorScheme = Theme.of(context).colorScheme;
     final semantic = Theme.of(context).extension<AppSemanticColors>()!;
     final statusColor = task.isCompleted
@@ -222,6 +227,12 @@ class _TaskListSectionState extends State<TaskListSection> {
                                     color: colorScheme.secondary,
                                     icon: Icons.psychology_alt_outlined,
                                   ),
+                                if (reminder != null)
+                                  _StatusBadge(
+                                    label: 'Nudge set',
+                                    color: colorScheme.secondary,
+                                    icon: Icons.notifications_active_outlined,
+                                  ),
                               ],
                             ),
                           ],
@@ -238,6 +249,25 @@ class _TaskListSectionState extends State<TaskListSection> {
                         if (value == 'startTiny') _startTinyFocus(task);
                         if (value == 'stuck') {
                           showTaskSupportSheet(context: context, task: task);
+                        }
+                        if (value == 'remindLater') {
+                          _remindTask(
+                            task,
+                            tomorrow: false,
+                            settings: settingsState,
+                            reminders: reminderState,
+                          );
+                        }
+                        if (value == 'remindTomorrow') {
+                          _remindTask(
+                            task,
+                            tomorrow: true,
+                            settings: settingsState,
+                            reminders: reminderState,
+                          );
+                        }
+                        if (value == 'cancelReminder') {
+                          _cancelReminder(task, reminderState);
                         }
                         if (value == 'edit') _showEditTask(task);
                         if (value == 'delete') _deleteWithUndo(task);
@@ -257,6 +287,30 @@ class _TaskListSectionState extends State<TaskListSection> {
                             title: Text("I'm stuck"),
                           ),
                         ),
+                        if (!task.isCompleted)
+                          const PopupMenuItem(
+                            value: 'remindLater',
+                            child: ListTile(
+                              leading: Icon(Icons.notifications_none_rounded),
+                              title: Text('Remind later'),
+                            ),
+                          ),
+                        if (!task.isCompleted)
+                          const PopupMenuItem(
+                            value: 'remindTomorrow',
+                            child: ListTile(
+                              leading: Icon(Icons.event_available_outlined),
+                              title: Text('Remind tomorrow'),
+                            ),
+                          ),
+                        if (reminder != null)
+                          const PopupMenuItem(
+                            value: 'cancelReminder',
+                            child: ListTile(
+                              leading: Icon(Icons.notifications_off_outlined),
+                              title: Text('Cancel nudge'),
+                            ),
+                          ),
                         const PopupMenuItem(
                           value: 'edit',
                           child: ListTile(
@@ -294,6 +348,32 @@ class _TaskListSectionState extends State<TaskListSection> {
                                 task: task,
                               ),
                       icon: const Icon(Icons.psychology_alt_outlined),
+                      iconSize: 22,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    IconButton(
+                      tooltip: reminder == null
+                          ? 'Remind later for ${task.title}'
+                          : 'Cancel nudge for ${task.title}',
+                      onPressed: busy
+                          ? null
+                          : () {
+                              if (reminder == null) {
+                                _remindTask(
+                                  task,
+                                  tomorrow: false,
+                                  settings: settingsState,
+                                  reminders: reminderState,
+                                );
+                              } else {
+                                _cancelReminder(task, reminderState);
+                              }
+                            },
+                      icon: Icon(
+                        reminder == null
+                            ? Icons.notifications_none_rounded
+                            : Icons.notifications_active_outlined,
+                      ),
                       iconSize: 22,
                       visualDensity: VisualDensity.compact,
                     ),
@@ -430,6 +510,52 @@ class _TaskListSectionState extends State<TaskListSection> {
   void _startTinyFocus(Task task) {
     context.read<TimerState>().startQuickFocus(2);
     _message('2 minute tiny focus started');
+  }
+
+  Future<void> _remindTask(
+    Task task, {
+    required bool tomorrow,
+    required SettingsState settings,
+    required TaskReminderState reminders,
+  }) async {
+    if (!settings.taskRemindersEnabled) {
+      _message('Turn on Task nudges in Settings first.');
+      return;
+    }
+
+    final tinyStep = widget.taskState.tinyStepSuggestionFor(task);
+    final scheduled = tomorrow
+        ? await reminders.remindTomorrow(
+            task,
+            tinyStep: tinyStep,
+            style: settings.taskReminderStyle,
+          )
+        : await reminders.remindLater(
+            task,
+            tinyStep: tinyStep,
+            style: settings.taskReminderStyle,
+          );
+
+    if (!mounted) return;
+    _message(
+      scheduled
+          ? tomorrow
+              ? 'Reminder set for tomorrow'
+              : 'Reminder set for later'
+          : reminders.lastError ?? 'Could not set reminder.',
+    );
+  }
+
+  Future<void> _cancelReminder(
+    Task task,
+    TaskReminderState reminders,
+  ) async {
+    try {
+      await reminders.cancelReminder(task.id);
+      if (mounted) _message('Reminder canceled');
+    } catch (_) {
+      if (mounted) _message('Could not cancel that reminder.');
+    }
   }
 
   Future<void> _deleteWithUndo(Task task) async {

@@ -2,7 +2,7 @@ import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
 class DatabaseHelper {
-  static const _schemaVersion = 8;
+  static const _schemaVersion = 9;
   static final DatabaseHelper instance = DatabaseHelper._();
 
   DatabaseHelper._({
@@ -100,6 +100,10 @@ class DatabaseHelper {
       'CREATE INDEX IF NOT EXISTS idx_timer_sessions_ended_at '
       'ON timer_sessions(ended_at)',
     );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_task_reminders_scheduled_at '
+      'ON task_reminders(scheduled_at)',
+    );
   }
 
   Future<void> _createSettingsTable(DatabaseExecutor db) async {
@@ -120,6 +124,18 @@ class DatabaseHelper {
         ended_at TEXT NOT NULL,
         duration_seconds INTEGER NOT NULL,
         completed INTEGER DEFAULT 1
+      )
+    ''');
+  }
+
+  Future<void> _createTaskRemindersTable(DatabaseExecutor db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS task_reminders (
+        task_id INTEGER PRIMARY KEY,
+        style TEXT NOT NULL,
+        scheduled_at TEXT NOT NULL,
+        enabled INTEGER DEFAULT 1,
+        FOREIGN KEY (task_id) REFERENCES tasks (id) ON DELETE CASCADE
       )
     ''');
   }
@@ -151,6 +167,7 @@ class DatabaseHelper {
     await _createMoodsTable(db);
     await _createSettingsTable(db);
     await _createTimerSessionsTable(db);
+    await _createTaskRemindersTable(db);
     await _createIndexes(db);
   }
 
@@ -174,6 +191,7 @@ class DatabaseHelper {
     await _createMoodsTable(db);
     await _createSettingsTable(db);
     await _createTimerSessionsTable(db);
+    await _createTaskRemindersTable(db);
     await _createIndexes(db);
   }
 }
