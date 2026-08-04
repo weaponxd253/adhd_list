@@ -195,6 +195,18 @@ class TaskState extends ChangeNotifier {
     });
   }
 
+  Future<bool> addTinyStep(int taskId) async {
+    final task = _requireTask(taskId);
+    final title = _tinyStepTitle(task);
+    if (_hasSubtaskTitle(task, title)) return false;
+
+    await _runTaskMutation(taskId, () async {
+      final id = await _repository.insertSubtask(taskId, title);
+      task.subtasks.add(Subtask(id: id, title: title));
+    });
+    return true;
+  }
+
   Future<void> editSubtask(
     int taskId,
     int subtaskId,
@@ -264,18 +276,68 @@ class TaskState extends ChangeNotifier {
     );
   }
 
+  List<Task> _sortedPendingTasks() {
+    return _tasks.where((task) => !task.isCompleted).toList()
+      ..sort((a, b) {
+        final byDueDate = a.dueDate.compareTo(b.dueDate);
+        if (byDueDate != 0) return byDueDate;
+        return a.id.compareTo(b.id);
+      });
+  }
+
+  List<Task> _sortedCompletedTasks() {
+    return _tasks.where((task) => task.isCompleted).toList()
+      ..sort((a, b) {
+        final aDate = a.completedAt ?? DateTime(1970);
+        final bDate = b.completedAt ?? DateTime(1970);
+        final byCompletedDate = bDate.compareTo(aDate);
+        if (byCompletedDate != 0) return byCompletedDate;
+        return b.id.compareTo(a.id);
+      });
+  }
+
+  String _tinyStepTitle(Task task) {
+    return task.tinyNextStep ??
+        'Open "${task.title}" and do one visible next step.';
+  }
+
+  bool _hasSubtaskTitle(Task task, String title) {
+    final normalized = title.trim().toLowerCase();
+    return task.subtasks.any(
+      (subtask) => subtask.title.trim().toLowerCase() == normalized,
+    );
+  }
+
   int get totalTasks => _tasks.length;
   int get completedTasks => _tasks.where((task) => task.isCompleted).length;
   int get pendingTasks => _tasks.where((task) => !task.isCompleted).length;
 
+  List<Task> get pendingTaskList => List.unmodifiable(_sortedPendingTasks());
+
+  Task? get nowTask {
+    final pending = _sortedPendingTasks();
+    return pending.isEmpty ? null : pending.first;
+  }
+
+  List<Task> get nextTasks {
+    final pending = _sortedPendingTasks();
+    return List.unmodifiable(pending.skip(1).take(2));
+  }
+
+  List<Task> get laterTasks {
+    final pending = _sortedPendingTasks();
+    return List.unmodifiable(pending.skip(3));
+  }
+
+  int get laterTaskCount => laterTasks.length;
+
   List<Task> get upcomingTasks {
-    final pending = _tasks.where((task) => !task.isCompleted).toList()
-      ..sort((a, b) => a.dueDate.compareTo(b.dueDate));
+    final pending = _sortedPendingTasks();
     return List.unmodifiable(pending.take(3));
   }
 
   List<Task> get completedTaskList =>
-      List.unmodifiable(_tasks.where((task) => task.isCompleted));
+      List.unmodifiable(_sortedCompletedTasks());
 
   int get completedSubtasks => _tasks.fold(
         0,

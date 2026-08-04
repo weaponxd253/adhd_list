@@ -1,4 +1,4 @@
-import 'dart:ui' show Tristate;
+import 'dart:ui' show SemanticsFlag;
 
 import 'package:adhd_list/features/mood_tracker/mood_tracker_screen.dart';
 import 'package:adhd_list/providers/mood_state.dart';
@@ -45,7 +45,7 @@ void main() {
       final calmFinder = find.bySemanticsLabel('Select Calm mood');
       expect(calmFinder, findsOneWidget);
       expect(
-        tester.getSemantics(calmFinder).flagsCollection.isButton,
+        tester.getSemantics(calmFinder).hasFlag(SemanticsFlag.isButton),
         isTrue,
       );
 
@@ -53,8 +53,8 @@ void main() {
       await tester.pump();
 
       expect(
-        tester.getSemantics(calmFinder).flagsCollection.isSelected,
-        Tristate.isTrue,
+        tester.getSemantics(calmFinder).hasFlag(SemanticsFlag.isSelected),
+        isTrue,
       );
     } finally {
       semantics.dispose();

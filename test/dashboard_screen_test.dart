@@ -102,7 +102,7 @@ Future<_DashboardHarness> _pumpDashboard(
 void main() {
   final today = DateTime(2026, 8, 3);
 
-  testWidgets('now card prioritizes the first task and upcoming excludes it',
+  testWidgets('now card prioritizes the first task and next excludes it',
       (tester) async {
     await _pumpDashboard(
       tester,
@@ -125,7 +125,7 @@ void main() {
     expect(find.text('Do homework'), findsOneWidget);
     expect(find.text('Pack backpack'), findsOneWidget);
     expect(find.text('0/2 steps'), findsOneWidget);
-    expect(find.text('Upcoming'), findsOneWidget);
+    expect(find.text('Next'), findsOneWidget);
   });
 
   testWidgets('dashboard quick start begins a five minute focus session',
@@ -160,6 +160,21 @@ void main() {
       harness.taskRepository.subtaskRows[1]!.single['title'],
       contains('Do homework'),
     );
+  });
+
+  testWidgets('dashboard tiny step does not add duplicates', (tester) async {
+    final harness = await _pumpDashboard(
+      tester,
+      tasks: [taskRow(id: 1, title: 'Do homework', dueDate: today)],
+    );
+
+    await tester.tap(find.byKey(const Key('dashboard-tiny-step')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('dashboard-tiny-step')));
+    await tester.pump();
+
+    expect(harness.taskRepository.subtaskRows[1], hasLength(1));
+    expect(find.text('Tiny step is already there'), findsOneWidget);
   });
 
   testWidgets('dashboard stuck button opens support sheet', (tester) async {

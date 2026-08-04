@@ -39,6 +39,39 @@ void main() {
       );
     });
 
+    test('groups pending tasks into now, next, and later', () async {
+      final repository = FakeTaskRepository(tasks: [
+        taskRow(
+            id: 1,
+            title: 'Fourth',
+            dueDate: today.add(const Duration(days: 4))),
+        taskRow(
+            id: 2, title: 'First', dueDate: today.add(const Duration(days: 1))),
+        taskRow(
+            id: 3, title: 'Third', dueDate: today.add(const Duration(days: 3))),
+        taskRow(
+            id: 4,
+            title: 'Second',
+            dueDate: today.add(const Duration(days: 2))),
+        taskRow(
+            id: 5, title: 'Fifth', dueDate: today.add(const Duration(days: 5))),
+        taskRow(
+          id: 6,
+          title: 'Completed',
+          dueDate: today,
+          completed: true,
+          completedAt: today,
+        ),
+      ]);
+      final state = TaskState(repository: repository, autoLoad: false);
+      await state.loadTasks();
+
+      expect(state.nowTask?.title, 'First');
+      expect(state.nextTasks.map((task) => task.title), ['Second', 'Third']);
+      expect(state.laterTasks.map((task) => task.title), ['Fourth', 'Fifth']);
+      expect(state.laterTaskCount, 2);
+    });
+
     test('calculates task, subtask, points, and streak statistics', () async {
       final repository = FakeTaskRepository(
         tasks: [
@@ -211,6 +244,23 @@ void main() {
       expect(task.anxietyLevel, TaskAnxietyLevel.tense);
       expect(task.tinyNextStep, contains('Write report'));
       expect(repository.taskRows.single['friction'], 'tooBig');
+    });
+
+    test('adds a tiny step only once', () async {
+      final repository = FakeTaskRepository(
+        tasks: [taskRow(id: 14, title: 'Start essay', dueDate: today)],
+      );
+      final state = TaskState(repository: repository, autoLoad: false);
+      await state.loadTasks();
+
+      expect(await state.addTinyStep(14), isTrue);
+      expect(await state.addTinyStep(14), isFalse);
+
+      expect(repository.subtaskRows[14], hasLength(1));
+      expect(
+        repository.subtaskRows[14]!.single['title'],
+        'Open "Start essay" and do one visible next step.',
+      );
     });
   });
 }

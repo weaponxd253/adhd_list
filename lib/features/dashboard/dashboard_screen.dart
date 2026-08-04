@@ -24,9 +24,7 @@ class DashboardScreen extends StatelessWidget {
       appBar: _buildAppBar(context),
       body: Consumer3<TaskState, MoodState, TimerState>(
         builder: (context, taskState, moodState, timerState, _) {
-          final nowTask = taskState.upcomingTasks.isEmpty
-              ? null
-              : taskState.upcomingTasks.first;
+          final nowTask = taskState.nowTask;
 
           return ListView(
             padding: AppInsets.screenScrollPadding(
@@ -44,7 +42,7 @@ class DashboardScreen extends StatelessWidget {
               const SizedBox(height: AppSpacing.md),
               _TimerSummaryCard(timerState: timerState, task: nowTask),
               const SizedBox(height: AppSpacing.md),
-              _UpcomingPreview(taskState: taskState, nowTask: nowTask),
+              _NextPreview(taskState: taskState),
             ],
           );
         },
@@ -67,10 +65,8 @@ class DashboardScreen extends StatelessWidget {
           Text(
             greeting,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .onSurface
-                      .withOpacity(0.5),
+                  color:
+                      Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
                   fontSize: 12,
                 ),
           ),
@@ -134,7 +130,7 @@ class _NowCard extends StatelessWidget {
         ),
         const SizedBox(height: AppSpacing.xs),
         const Text(
-          'All caught up',
+          'Nothing urgent',
           style: TextStyle(
             color: Colors.white,
             fontSize: 22,
@@ -143,7 +139,7 @@ class _NowCard extends StatelessWidget {
         ),
         const SizedBox(height: AppSpacing.xxs),
         const Text(
-          'Add a task when you are ready for the next tiny move.',
+          "Pick one small thing when you're ready.",
           style: TextStyle(color: Colors.white70, fontSize: 14),
         ),
       ],
@@ -248,14 +244,18 @@ class _NowCard extends StatelessWidget {
   }
 
   Future<void> _addTinyStep(BuildContext context, Task task) async {
-    final step = task.tinyNextStep ??
-        'Open "${task.title}" and do one visible next step.';
     try {
-      await context.read<TaskState>().addSubtask(task.id, step);
+      final added = await context.read<TaskState>().addTinyStep(task.id);
       if (!context.mounted) return;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(const SnackBar(content: Text('Tiny step added')));
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              added ? 'Tiny step added' : 'Tiny step is already there',
+            ),
+          ),
+        );
     } catch (_) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -352,7 +352,7 @@ class _TodayStrip extends StatelessWidget {
             ),
             _TodayMetric(
               value: '${timerState.completedSessionsToday}',
-              label: 'started',
+              label: 'sessions',
             ),
             _TodayMetric(
               value: '${taskState.completedTasks}',
@@ -448,10 +448,7 @@ class _MoodCard extends StatelessWidget {
               ),
               Icon(
                 Icons.chevron_right_rounded,
-                color: Theme.of(context)
-                    .colorScheme
-                    .onSurface
-                    .withOpacity(0.3),
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.3),
               ),
             ],
           ),
@@ -614,34 +611,32 @@ class _TimerButton extends StatelessWidget {
   }
 }
 
-class _UpcomingPreview extends StatefulWidget {
-  const _UpcomingPreview({required this.taskState, required this.nowTask});
+class _NextPreview extends StatefulWidget {
+  const _NextPreview({required this.taskState});
 
   final TaskState taskState;
-  final Task? nowTask;
 
   @override
-  State<_UpcomingPreview> createState() => _UpcomingPreviewState();
+  State<_NextPreview> createState() => _NextPreviewState();
 }
 
-class _UpcomingPreviewState extends State<_UpcomingPreview> {
+class _NextPreviewState extends State<_NextPreview> {
   bool _expanded = true;
 
   @override
   Widget build(BuildContext context) {
-    final tasks = widget.taskState.upcomingTasks
-        .where((task) => task.id != widget.nowTask?.id)
-        .take(3)
-        .toList();
+    final tasks = widget.taskState.nextTasks;
+    final laterCount = widget.taskState.laterTaskCount;
 
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Semantics(
           button: true,
           expanded: _expanded,
-          label: 'Upcoming tasks, ${tasks.length}',
+          label: 'Next tasks, ${tasks.length}',
           child: InkWell(
-            key: const Key('dashboard-upcoming-toggle'),
+            key: const Key('dashboard-next-toggle'),
             borderRadius: BorderRadius.circular(AppRadii.control),
             onTap: () => setState(() => _expanded = !_expanded),
             child: SizedBox(
@@ -649,7 +644,7 @@ class _UpcomingPreviewState extends State<_UpcomingPreview> {
               child: Row(
                 children: [
                   Text(
-                    'Upcoming',
+                    'Next',
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   if (tasks.isNotEmpty) ...[
@@ -685,7 +680,49 @@ class _UpcomingPreviewState extends State<_UpcomingPreview> {
               ),
             ),
         ],
+        if (laterCount > 0) ...[
+          const SizedBox(height: AppSpacing.xs),
+          _LaterSummary(count: laterCount),
+        ],
       ],
+    );
+  }
+}
+
+class _LaterSummary extends StatelessWidget {
+  const _LaterSummary({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: Border.all(color: cs.outlineVariant),
+        borderRadius: BorderRadius.circular(AppRadii.control),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: AppSpacing.xs,
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.inventory_2_outlined, color: cs.onSurfaceVariant),
+            const SizedBox(width: AppSpacing.xs),
+            Text('Later', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(width: AppSpacing.xs),
+            _CountPill(count: count),
+            const Spacer(),
+            Text(
+              'tucked away',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

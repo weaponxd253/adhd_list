@@ -85,14 +85,16 @@ class _TaskSupportSheetState extends State<_TaskSupportSheet> {
   }
 
   Future<void> _addTinyStep() async {
-    final step = _friction?.tinyStepFor(_task.title) ??
-        'Open "${_task.title}" and do one visible next step.';
     setState(() => _saving = true);
     try {
-      await context.read<TaskState>().addSubtask(_task.id, step);
+      final added = await context.read<TaskState>().addTinyStep(_task.id);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Tiny step added')),
+        SnackBar(
+          content: Text(
+            added ? 'Tiny step added' : 'Tiny step is already there',
+          ),
+        ),
       );
     } catch (_) {
       if (!mounted) return;

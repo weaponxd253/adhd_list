@@ -21,6 +21,7 @@ class TaskListSection extends StatefulWidget {
 class _TaskListSectionState extends State<TaskListSection> {
   final Map<int, TextEditingController> _subtaskControllers = {};
   final Set<int> _expandedTaskIds = {};
+  bool _showLater = false;
   bool _showCompleted = false;
 
   @override
@@ -40,19 +41,12 @@ class _TaskListSectionState extends State<TaskListSection> {
 
   @override
   Widget build(BuildContext context) {
-    final pending = widget.taskState.tasks
-        .where((task) => !task.isCompleted)
-        .toList()
-      ..sort((a, b) => a.dueDate.compareTo(b.dueDate));
-    final completed =
-        widget.taskState.tasks.where((task) => task.isCompleted).toList()
-          ..sort((a, b) {
-            final aDate = a.completedAt ?? DateTime(1970);
-            final bDate = b.completedAt ?? DateTime(1970);
-            return bDate.compareTo(aDate);
-          });
+    final nowTask = widget.taskState.nowTask;
+    final nextTasks = widget.taskState.nextTasks;
+    final laterTasks = widget.taskState.laterTasks;
+    final completed = widget.taskState.completedTaskList;
 
-    if (pending.isEmpty && completed.isEmpty) {
+    if (widget.taskState.tasks.isEmpty) {
       return const _EmptyTasks();
     }
 
@@ -66,28 +60,61 @@ class _TaskListSectionState extends State<TaskListSection> {
       ),
       children: [
         _SectionHeader(
-          title: 'To do',
-          count: pending.length,
-          icon: Icons.radio_button_unchecked_rounded,
+          title: 'Now',
+          count: nowTask == null ? 0 : 1,
+          icon: Icons.flag_outlined,
         ),
         const SizedBox(height: AppSpacing.xs),
-        if (pending.isEmpty)
-          const _SectionEmpty(message: 'Everything is complete for now.')
+        if (nowTask == null)
+          const _SectionEmpty(
+            message: "Nothing urgent. Pick one small thing when you're ready.",
+          )
         else
-          ...pending.map(_buildTaskCard),
-        if (completed.isNotEmpty) ...[
+          _buildTaskCard(nowTask),
+        const SizedBox(height: AppSpacing.md),
+        _SectionHeader(
+          title: 'Next',
+          count: nextTasks.length,
+          icon: Icons.playlist_add_check_rounded,
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        if (nextTasks.isEmpty)
+          const _SectionEmpty(message: 'Nothing else waiting right now.')
+        else
+          ...nextTasks.map(_buildTaskCard),
+        if (laterTasks.isNotEmpty) ...[
           const SizedBox(height: AppSpacing.md),
           _SectionHeader(
-            title: 'Completed',
-            count: completed.length,
-            icon: Icons.check_circle_outline_rounded,
-            expanded: _showCompleted,
-            onTap: () => setState(() => _showCompleted = !_showCompleted),
+            title: 'Later',
+            count: laterTasks.length,
+            icon: Icons.inventory_2_outlined,
+            expanded: _showLater,
+            onTap: () => setState(() => _showLater = !_showLater),
           ),
-          if (_showCompleted) ...[
+          if (_showLater) ...[
             const SizedBox(height: AppSpacing.xs),
+            ...laterTasks.map(_buildTaskCard),
+          ] else
+            _SectionEmpty(
+              message: '${laterTasks.length} tasks tucked away.',
+            ),
+        ],
+        const SizedBox(height: AppSpacing.md),
+        _SectionHeader(
+          title: 'Done',
+          count: completed.length,
+          icon: Icons.check_circle_outline_rounded,
+          expanded: _showCompleted,
+          onTap: () => setState(() => _showCompleted = !_showCompleted),
+        ),
+        if (_showCompleted) ...[
+          const SizedBox(height: AppSpacing.xs),
+          if (completed.isEmpty)
+            const _SectionEmpty(
+              message: 'Completed tasks will show here.',
+            )
+          else
             ...completed.map(_buildTaskCard),
-          ],
         ],
       ],
     );

@@ -112,11 +112,31 @@ void main() {
     expect(dueDay.difference(beforeSubmit).inDays, 7);
   });
 
-  testWidgets('separates pending and completed tasks', (tester) async {
+  testWidgets('groups pending tasks and keeps done collapsed', (tester) async {
     final state = TaskState(
       repository: FakeTaskRepository(
         tasks: [
-          taskRow(id: 1, title: 'Pending task', dueDate: today),
+          taskRow(id: 1, title: 'Now task', dueDate: today),
+          taskRow(
+            id: 3,
+            title: 'Next task',
+            dueDate: today.add(const Duration(days: 1)),
+          ),
+          taskRow(
+            id: 4,
+            title: 'Second next task',
+            dueDate: today.add(const Duration(days: 4)),
+          ),
+          taskRow(
+            id: 5,
+            title: 'Later task',
+            dueDate: today.add(const Duration(days: 5)),
+          ),
+          taskRow(
+            id: 6,
+            title: 'Another later task',
+            dueDate: today.add(const Duration(days: 6)),
+          ),
           taskRow(
             id: 2,
             title: 'Finished task',
@@ -131,10 +151,21 @@ void main() {
     await state.loadTasks();
     await _pumpTaskScreen(tester, state);
 
-    expect(find.text('Pending task'), findsOneWidget);
+    expect(find.text('Now'), findsOneWidget);
+    expect(find.text('Next'), findsOneWidget);
+    expect(find.text('Later'), findsOneWidget);
+    expect(find.text('Done'), findsOneWidget);
+    expect(find.text('Now task'), findsOneWidget);
+    expect(find.text('Next task'), findsOneWidget);
+    expect(find.text('Second next task'), findsOneWidget);
+    expect(find.text('Later task'), findsNothing);
     expect(find.text('Finished task'), findsNothing);
 
-    await tester.tap(find.text('Completed'));
+    await tester.tap(find.text('Later'));
+    await tester.pump();
+    expect(find.text('Later task'), findsOneWidget);
+
+    await tester.tap(find.text('Done'));
     await tester.pump();
 
     expect(find.text('Finished task'), findsOneWidget);
