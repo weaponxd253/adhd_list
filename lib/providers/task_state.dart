@@ -23,6 +23,7 @@ class TaskState extends ChangeNotifier {
   final DateTime Function() _now;
   List<Task> _tasks = [];
   final Set<int> _busyTaskIds = {};
+  int? _tomorrowStarterTaskId;
   bool _isLoading = false;
   bool _isCreating = false;
   String? _loadError;
@@ -99,6 +100,7 @@ class TaskState extends ChangeNotifier {
   Future<void> clearTaskHistory() async {
     await _repository.clearTasks();
     _tasks = [];
+    _tomorrowStarterTaskId = null;
     notifyListeners();
   }
 
@@ -118,6 +120,7 @@ class TaskState extends ChangeNotifier {
     await _runTaskMutation(taskId, () async {
       await _repository.deleteTask(taskId);
       _tasks = _tasks.where((item) => item.id != taskId).toList();
+      if (_tomorrowStarterTaskId == taskId) _tomorrowStarterTaskId = null;
     });
     return task;
   }
@@ -161,7 +164,35 @@ class TaskState extends ChangeNotifier {
       await _repository.updateTaskStatus(taskId, status);
       task.status = status;
       task.completedAt = status == 'completed' ? _now() : null;
+      if (task.isCompleted && _tomorrowStarterTaskId == taskId) {
+        _tomorrowStarterTaskId = null;
+      }
     });
+  }
+
+  Future<void> moveTaskToLater(int taskId, {int days = 7}) async {
+    final task = _requireTask(taskId);
+    final now = _now();
+    final later = DateTime(now.year, now.month, now.day).add(
+      Duration(days: days),
+    );
+    await editTask(taskId, task.title, later);
+  }
+
+  void setTomorrowStarter(int taskId) {
+    final task = _requireTask(taskId);
+    if (task.isCompleted) {
+      throw StateError('Completed tasks cannot be tomorrow starters.');
+    }
+    if (_tomorrowStarterTaskId == taskId) return;
+    _tomorrowStarterTaskId = taskId;
+    notifyListeners();
+  }
+
+  void clearTomorrowStarter() {
+    if (_tomorrowStarterTaskId == null) return;
+    _tomorrowStarterTaskId = null;
+    notifyListeners();
   }
 
   Future<void> updateTaskSupport(
@@ -320,11 +351,67 @@ class TaskState extends ChangeNotifier {
     );
   }
 
+  bool _isSameDay(DateTime first, DateTime second) {
+    return first.year == second.year &&
+        first.month == second.month &&
+        first.day == second.day;
+  }
+
+  int _calendarDayDifference(DateTime date) {
+    final now = _now();
+    final today = DateTime(now.year, now.month, now.day);
+    return DateTime(date.year, date.month, date.day).difference(today).inDays;
+  }
+
+  bool _hasCompletedSubtask(Task task) {
+    return task.subtasks.any((subtask) => subtask.isCompleted);
+  }
+
+  bool _isWaitingTask(Task task) {
+    return !task.isCompleted &&
+        _calendarDayDifference(task.dueDate) <= -2 &&
+        !_hasCompletedSubtask(task);
+  }
+
   int get totalTasks => _tasks.length;
   int get completedTasks => _tasks.where((task) => task.isCompleted).length;
   int get pendingTasks => _tasks.where((task) => !task.isCompleted).length;
+  int get completedTasksToday {
+    final today = _now();
+    return _tasks.where((task) {
+      final completedAt = task.completedAt;
+      return task.isCompleted &&
+          completedAt != null &&
+          _isSameDay(completedAt, today);
+    }).length;
+  }
 
   List<Task> get pendingTaskList => List.unmodifiable(_sortedPendingTasks());
+
+  Task? get waitingTask {
+    for (final task in _sortedPendingTasks()) {
+      if (_isWaitingTask(task)) return task;
+    }
+    return null;
+  }
+
+  List<Task> get tomorrowStarterOptions =>
+      List.unmodifiable(_sortedPendingTasks().take(5));
+
+  Task? get selectedTomorrowStarterTask {
+    final taskId = _tomorrowStarterTaskId;
+    if (taskId == null) return null;
+    for (final task in _tasks) {
+      if (task.id == taskId && !task.isCompleted) return task;
+    }
+    return null;
+  }
+
+  Task? get tomorrowStarterTask {
+    final selected = selectedTomorrowStarterTask;
+    if (selected != null) return selected;
+    return nowTask ?? (nextTasks.isEmpty ? null : nextTasks.first);
+  }
 
   Task? get nowTask {
     final pending = _sortedPendingTasks();
@@ -355,6 +442,11 @@ class TaskState extends ChangeNotifier {
         0,
         (sum, task) =>
             sum + task.subtasks.where((subtask) => subtask.isCompleted).length,
+      );
+
+  int get totalSubtasks => _tasks.fold(
+        0,
+        (sum, task) => sum + task.subtasks.length,
       );
 
   int get totalPoints => (completedTasks * 10) + (completedSubtasks * 5);

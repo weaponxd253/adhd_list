@@ -42,6 +42,27 @@ void main() {
       expect(state.moodHistoryList, isEmpty);
     });
 
+    test('maps moods to planning suggestions and now-task guidance', () async {
+      final repository = FakeMoodRepository();
+      final state = MoodState(repository: repository, autoLoad: false);
+
+      await state.setMood('Anxious', ':(');
+      expect(
+        state.moodPlanSuggestion,
+        'Try a 2-minute tiny start and do the safest version that counts.',
+      );
+      expect(state.nowTaskGuidance, 'Do the safest version that counts.');
+      expect(state.recommendsRecoveryMode, isTrue);
+
+      await state.setMood('Distracted', ':|');
+      expect(
+        state.moodPlanSuggestion,
+        'Choose one task, hide the rest, and give it one focus session.',
+      );
+      expect(state.nowTaskGuidance, 'Start with the first visible step.');
+      expect(state.recommendsRecoveryMode, isFalse);
+    });
+
     test('failed save preserves the current selection', () async {
       final repository = FakeMoodRepository(entries: [
         {

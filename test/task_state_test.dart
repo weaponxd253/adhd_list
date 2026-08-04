@@ -72,6 +72,87 @@ void main() {
       expect(state.laterTaskCount, 2);
     });
 
+    test('finds overdue untouched tasks as waiting tasks', () async {
+      final repository = FakeTaskRepository(
+        tasks: [
+          taskRow(
+            id: 1,
+            title: 'Waiting task',
+            dueDate: today.subtract(const Duration(days: 3)),
+          ),
+          taskRow(
+            id: 2,
+            title: 'Touched task',
+            dueDate: today.subtract(const Duration(days: 4)),
+          ),
+        ],
+        subtasks: {
+          2: [
+            subtaskRow(
+              id: 20,
+              taskId: 2,
+              title: 'Done step',
+              completed: true,
+            ),
+          ],
+        },
+      );
+      final state = TaskState(
+        repository: repository,
+        now: () => today,
+        autoLoad: false,
+      );
+      await state.loadTasks();
+
+      expect(state.waitingTask?.title, 'Waiting task');
+    });
+
+    test('moves waiting tasks to later', () async {
+      final repository = FakeTaskRepository(
+        tasks: [
+          taskRow(
+            id: 1,
+            title: 'Waiting task',
+            dueDate: today.subtract(const Duration(days: 3)),
+          ),
+        ],
+      );
+      final state = TaskState(
+        repository: repository,
+        now: () => today,
+        autoLoad: false,
+      );
+      await state.loadTasks();
+
+      await state.moveTaskToLater(1);
+
+      final dueDate =
+          DateTime.parse(repository.taskRows.single['due_date'] as String);
+      expect(dueDate, DateTime(today.year, today.month, today.day + 7));
+      expect(state.waitingTask, isNull);
+    });
+
+    test('stores and clears a tomorrow starter selection', () async {
+      final repository = FakeTaskRepository(
+        tasks: [
+          taskRow(id: 1, title: 'First task', dueDate: today),
+          taskRow(id: 2, title: 'Chosen task', dueDate: today),
+        ],
+      );
+      final state = TaskState(repository: repository, autoLoad: false);
+      await state.loadTasks();
+
+      expect(state.tomorrowStarterTask?.title, 'First task');
+
+      state.setTomorrowStarter(2);
+      expect(state.selectedTomorrowStarterTask?.title, 'Chosen task');
+      expect(state.tomorrowStarterTask?.title, 'Chosen task');
+
+      await state.toggleTaskCompletion(2);
+      expect(state.selectedTomorrowStarterTask, isNull);
+      expect(state.tomorrowStarterTask?.title, 'First task');
+    });
+
     test('calculates task, subtask, points, and streak statistics', () async {
       final repository = FakeTaskRepository(
         tasks: [
@@ -117,8 +198,10 @@ void main() {
 
       expect(state.totalTasks, 4);
       expect(state.completedTasks, 3);
+      expect(state.completedTasksToday, 1);
       expect(state.pendingTasks, 1);
       expect(state.completedSubtasks, 2);
+      expect(state.totalSubtasks, 3);
       expect(state.totalPoints, 40);
       expect(state.currentStreak, 3);
     });

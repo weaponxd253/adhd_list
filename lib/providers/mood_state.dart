@@ -57,6 +57,78 @@ class MoodState extends ChangeNotifier {
   String get moodMessage =>
       _messages[_selectedMood] ?? 'Notice what you need in this moment.';
 
+  String get moodPlanSuggestion {
+    switch (_selectedMood) {
+      case 'Anxious':
+      case 'Worried':
+      case 'Triggered':
+        return 'Try a 2-minute tiny start and do the safest version that counts.';
+      case 'Distracted':
+        return 'Choose one task, hide the rest, and give it one focus session.';
+      case 'Burnt Out':
+      case 'Sad':
+      case 'Grieving':
+        return 'Keep it setup-only if that is all your system has today.';
+      case 'Hopeful':
+      case 'Optimistic':
+      case 'Inspired':
+      case 'Empowered':
+      case 'Excited':
+        return 'Aim that energy at one meaningful next step.';
+      case 'Calm':
+      case 'Relaxed':
+      case 'Grounded':
+      case 'Mindful':
+        return 'Use the steady feeling for one clear, unhurried action.';
+      case '':
+        return 'Check in with your mood to tune the plan.';
+      default:
+        return 'Choose one gentle next step that matches this moment.';
+    }
+  }
+
+  bool get recommendsRecoveryMode {
+    switch (_selectedMood) {
+      case 'Anxious':
+      case 'Worried':
+      case 'Triggered':
+      case 'Burnt Out':
+      case 'Sad':
+      case 'Grieving':
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  String get nowTaskGuidance {
+    switch (_selectedMood) {
+      case 'Anxious':
+      case 'Worried':
+      case 'Triggered':
+        return 'Do the safest version that counts.';
+      case 'Distracted':
+        return 'Start with the first visible step.';
+      case 'Burnt Out':
+      case 'Sad':
+      case 'Grieving':
+        return 'Setup counts.';
+      case 'Hopeful':
+      case 'Optimistic':
+      case 'Inspired':
+      case 'Empowered':
+      case 'Excited':
+        return 'Use this energy for one meaningful step.';
+      case 'Calm':
+      case 'Relaxed':
+      case 'Grounded':
+      case 'Mindful':
+        return 'Move gently and keep the task small.';
+      default:
+        return 'Match the task to your current capacity.';
+    }
+  }
+
   Future<void> load() async {
     final lastMood = await _repository.fetchLastMood();
     _history = await _repository.fetchMoods();

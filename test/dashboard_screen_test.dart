@@ -14,6 +14,7 @@ class _DashboardHarness {
     List<Map<String, dynamic>>? tasks,
     Map<int, List<Map<String, dynamic>>>? subtasks,
     List<Map<String, dynamic>>? moods,
+    DateTime Function()? now,
     this.onOpenMood,
     this.onOpenTimer,
   })  : taskRepository = FakeTaskRepository(
@@ -23,7 +24,11 @@ class _DashboardHarness {
         moodRepository = FakeMoodRepository(entries: moods),
         timerSessionRepository = FakeTimerSessionRepository(),
         notificationService = FakeTimerNotificationService() {
-    taskState = TaskState(repository: taskRepository, autoLoad: false);
+    taskState = TaskState(
+      repository: taskRepository,
+      now: now,
+      autoLoad: false,
+    );
     moodState = MoodState(repository: moodRepository, autoLoad: false);
     timerState = TimerState(
       notificationService: notificationService,
@@ -54,6 +59,7 @@ Future<_DashboardHarness> _pumpDashboard(
   List<Map<String, dynamic>>? tasks,
   Map<int, List<Map<String, dynamic>>>? subtasks,
   List<Map<String, dynamic>>? moods,
+  DateTime Function()? now,
   VoidCallback? onOpenMood,
   VoidCallback? onOpenTimer,
   TextScaler textScaler = TextScaler.noScaling,
@@ -67,6 +73,7 @@ Future<_DashboardHarness> _pumpDashboard(
     tasks: tasks,
     subtasks: subtasks,
     moods: moods,
+    now: now,
     onOpenMood: onOpenMood,
     onOpenTimer: onOpenTimer,
   );
@@ -209,6 +216,148 @@ void main() {
     expect(find.text('I am stuck'), findsOneWidget);
     expect(find.text("What's the blocker?"), findsOneWidget);
     expect(find.byKey(const ValueKey('friction-distracted')), findsOneWidget);
+  });
+
+  testWidgets('dashboard resurfaces a waiting task with gentle actions',
+      (tester) async {
+    var openedTimer = false;
+    final harness = await _pumpDashboard(
+      tester,
+      now: () => today,
+      onOpenTimer: () => openedTimer = true,
+      tasks: [
+        taskRow(
+          id: 1,
+          title: 'Old paperwork',
+          dueDate: today.subtract(const Duration(days: 3)),
+        ),
+        taskRow(
+          id: 2,
+          title: 'Fresh task',
+          dueDate: today.add(const Duration(days: 1)),
+        ),
+      ],
+    );
+
+    await tester.scrollUntilVisible(find.text('This has been waiting'), 320);
+    await tester.pump();
+
+    expect(find.text('Old paperwork'), findsOneWidget);
+    expect(
+      find.text('Still worth doing. Want to start tiny?'),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.text('Tiny step'));
+    await tester.pump();
+    expect(
+      find.textContaining('Only do this next tiny step'),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const Key('waiting-shrink-task')));
+    await tester.pump();
+    expect(harness.taskRepository.subtaskRows[1], hasLength(1));
+
+    await tester.tap(find.byKey(const Key('waiting-start-tiny')));
+    await tester.pump();
+    expect(harness.timerState.timerDisplay, '02:00');
+    expect(openedTimer, isTrue);
+    harness.timerState.stopTimer();
+
+    await tester.tap(find.byKey(const Key('waiting-move-later')));
+    await tester.pump();
+    final dueDate = DateTime.parse(
+      harness.taskRepository.taskRows.first['due_date'] as String,
+    );
+    expect(dueDate, DateTime(today.year, today.month, today.day + 7));
+  });
+
+  testWidgets('dashboard adapts now guidance to anxious mood', (tester) async {
+    await _pumpDashboard(
+      tester,
+      tasks: [taskRow(id: 1, title: 'Email professor', dueDate: today)],
+      moods: [
+        {
+          'id': 1,
+          'mood': 'Anxious',
+          'emoji': ':(',
+          'date': today.toIso8601String(),
+        },
+      ],
+    );
+
+    expect(find.text('Do the safest version that counts.'), findsOneWidget);
+    expect(
+      find.text(
+        'Try a 2-minute tiny start and do the safest version that counts.',
+      ),
+      findsWidgets,
+    );
+  });
+
+  testWidgets('dashboard capacity selector lowers the daily plan',
+      (tester) async {
+    await _pumpDashboard(
+      tester,
+      tasks: [taskRow(id: 1, title: 'Do homework', dueDate: today)],
+    );
+
+    expect(find.text('How much capacity do you have?'), findsOneWidget);
+    expect(find.text('One task plus one focus session is the plan.'),
+        findsOneWidget);
+
+    await tester.tap(find.text('Low'));
+    await tester.pump();
+
+    expect(find.text('One tiny task is enough today. Setup counts.'),
+        findsOneWidget);
+    expect(
+      find.text(
+        'Recovery mode: 1 tiny task, 1 mood check-in, optional 2-minute focus.',
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('dashboard shows a gentle daily review prompt', (tester) async {
+    await _pumpDashboard(
+      tester,
+      tasks: [taskRow(id: 1, title: 'Do homework', dueDate: today)],
+    );
+
+    await tester.scrollUntilVisible(find.text('What counted today?'), 320);
+    await tester.pump();
+
+    expect(find.text('What counted today?'), findsOneWidget);
+    expect(find.text('You showed up. That counted.'), findsOneWidget);
+    expect(find.text('What helped?'), findsOneWidget);
+    expect(find.text('Tomorrow start with Do homework.'), findsOneWidget);
+  });
+
+  testWidgets('dashboard can choose tomorrow starter', (tester) async {
+    final harness = await _pumpDashboard(
+      tester,
+      tasks: [
+        taskRow(id: 1, title: 'First task', dueDate: today),
+        taskRow(
+          id: 2,
+          title: 'Second task',
+          dueDate: today.add(const Duration(days: 1)),
+        ),
+      ],
+    );
+
+    await tester.scrollUntilVisible(
+        find.byKey(const Key('tomorrow-starter-menu')), 320);
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('tomorrow-starter-menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Second task').last);
+    await tester.pumpAndSettle();
+
+    expect(harness.taskState.tomorrowStarterTask?.title, 'Second task');
+    expect(find.text('Tomorrow start with Second task.'), findsOneWidget);
   });
 
   testWidgets('mood card is tappable', (tester) async {

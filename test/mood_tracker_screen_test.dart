@@ -61,6 +61,28 @@ void main() {
     }
   });
 
+  testWidgets('selected mood shows a matching support suggestion',
+      (tester) async {
+    final state = MoodState(
+      repository: FakeMoodRepository(),
+      autoLoad: false,
+    );
+
+    await _pumpMoodTracker(tester, state);
+
+    await tester.ensureVisible(find.text('Anxious'));
+    await tester.pump();
+    await tester.tap(find.text('Anxious'));
+    await tester.pump();
+
+    expect(
+      find.text(
+        'Try a 2-minute tiny start and do the safest version that counts.',
+      ),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('mood screen supports large text without overflow',
       (tester) async {
     final state = MoodState(

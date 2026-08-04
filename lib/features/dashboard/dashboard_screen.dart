@@ -25,6 +25,7 @@ class DashboardScreen extends StatelessWidget {
       body: Consumer3<TaskState, MoodState, TimerState>(
         builder: (context, taskState, moodState, timerState, _) {
           final nowTask = taskState.nowTask;
+          final waitingTask = taskState.waitingTask;
 
           return ListView(
             padding: AppInsets.screenScrollPadding(
@@ -36,17 +37,43 @@ class DashboardScreen extends StatelessWidget {
             children: [
               _NowCard(
                 taskState: taskState,
+                moodState: moodState,
                 task: nowTask,
                 onOpenTimer: onOpenTimer,
               ),
               const SizedBox(height: AppSpacing.md),
-              _TodayStrip(taskState: taskState, timerState: timerState),
+              _TodayStrip(
+                taskState: taskState,
+                timerState: timerState,
+                moodState: moodState,
+              ),
+              const SizedBox(height: AppSpacing.md),
+              _NextPreview(taskState: taskState),
+              if (waitingTask != null) ...[
+                const SizedBox(height: AppSpacing.md),
+                _WaitingTaskCard(
+                  taskState: taskState,
+                  timerState: timerState,
+                  task: waitingTask,
+                  onOpenTimer: onOpenTimer,
+                ),
+              ],
+              const SizedBox(height: AppSpacing.md),
+              _DailyResetCard(
+                moodState: moodState,
+                timerState: timerState,
+                onOpenMood: onOpenMood,
+                onOpenTimer: onOpenTimer,
+              ),
               const SizedBox(height: AppSpacing.md),
               _MoodCard(moodState: moodState, onOpenMood: onOpenMood),
               const SizedBox(height: AppSpacing.md),
-              _TimerSummaryCard(timerState: timerState, task: nowTask),
+              _DailyReviewCard(
+                taskState: taskState,
+                timerState: timerState,
+              ),
               const SizedBox(height: AppSpacing.md),
-              _NextPreview(taskState: taskState),
+              _TimerSummaryCard(timerState: timerState, task: nowTask),
             ],
           );
         },
@@ -97,11 +124,13 @@ class DashboardScreen extends StatelessWidget {
 class _NowCard extends StatelessWidget {
   const _NowCard({
     required this.taskState,
+    required this.moodState,
     required this.task,
     required this.onOpenTimer,
   });
 
   final TaskState taskState;
+  final MoodState moodState;
   final Task? task;
   final VoidCallback? onOpenTimer;
 
@@ -123,7 +152,7 @@ class _NowCard extends StatelessWidget {
         padding: const EdgeInsets.all(AppSpacing.md),
         child: task == null
             ? _emptyState(context)
-            : _taskState(context, task, taskState),
+            : _taskState(context, task, taskState, moodState),
       ),
     );
   }
@@ -157,7 +186,12 @@ class _NowCard extends StatelessWidget {
     );
   }
 
-  Widget _taskState(BuildContext context, Task task, TaskState taskState) {
+  Widget _taskState(
+    BuildContext context,
+    Task task,
+    TaskState taskState,
+    MoodState moodState,
+  ) {
     final dueStr = DateFormat.MMMd().format(task.dueDate);
     final completedSteps = task.subtasks.where((s) => s.isCompleted).length;
     final totalSteps = task.subtasks.length;
@@ -210,6 +244,17 @@ class _NowCard extends StatelessWidget {
           ],
         ),
         const SizedBox(height: AppSpacing.sm),
+        Text(
+          moodState.nowTaskGuidance,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+          ),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+        const SizedBox(height: AppSpacing.xxs),
         Text(
           tinyStep,
           style: const TextStyle(color: Colors.white70, fontSize: 13),
@@ -387,13 +432,17 @@ class _TodayStrip extends StatelessWidget {
   const _TodayStrip({
     required this.taskState,
     required this.timerState,
+    required this.moodState,
   });
 
   final TaskState taskState;
   final TimerState timerState;
+  final MoodState moodState;
 
   @override
   Widget build(BuildContext context) {
+    final supportLine = _supportLine();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -410,13 +459,42 @@ class _TodayStrip extends StatelessWidget {
               label: 'sessions',
             ),
             _TodayMetric(
-              value: '${taskState.completedTasks}',
-              label: 'done',
+              value: '${taskState.completedTasksToday}',
+              label: 'tasks',
+            ),
+            _TodayMetric(
+              value:
+                  '${taskState.completedSubtasks}/${taskState.totalSubtasks}',
+              label: 'steps',
             ),
           ],
         ),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          supportLine,
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
       ],
     );
+  }
+
+  String _supportLine() {
+    if (timerState.focusMinutesToday > 0) {
+      return 'You protected your focus today.';
+    }
+    if (taskState.completedTasksToday > 0) {
+      return 'You showed up and finished something.';
+    }
+    if (taskState.completedSubtasks > 0) {
+      return 'One step is still progress.';
+    }
+    if (moodState.selectedMood.isNotEmpty) {
+      return moodState.moodPlanSuggestion;
+    }
+    if (taskState.nowTask != null) {
+      return 'Tomorrow already has a starting point.';
+    }
+    return 'One small check-in counts.';
   }
 }
 
@@ -452,6 +530,506 @@ class _TodayMetric extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+enum _NudgeStyle { gentle, direct, tinyStep }
+
+class _WaitingTaskCard extends StatefulWidget {
+  const _WaitingTaskCard({
+    required this.taskState,
+    required this.timerState,
+    required this.task,
+    required this.onOpenTimer,
+  });
+
+  final TaskState taskState;
+  final TimerState timerState;
+  final Task task;
+  final VoidCallback? onOpenTimer;
+
+  @override
+  State<_WaitingTaskCard> createState() => _WaitingTaskCardState();
+}
+
+class _WaitingTaskCardState extends State<_WaitingTaskCard> {
+  _NudgeStyle _style = _NudgeStyle.gentle;
+  bool _saving = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final task = widget.task;
+    final tinyStep = widget.taskState.tinyStepSuggestionFor(task);
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.history_toggle_off_rounded, color: cs.secondary),
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(
+                  child: Text(
+                    'This has been waiting',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              task.title,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodyLarge
+                  ?.copyWith(fontWeight: FontWeight.w700),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            SegmentedButton<_NudgeStyle>(
+              key: const Key('waiting-nudge-style'),
+              showSelectedIcon: false,
+              segments: const [
+                ButtonSegment(
+                  value: _NudgeStyle.gentle,
+                  label: Text('Gentle'),
+                  icon: Icon(Icons.spa_outlined),
+                ),
+                ButtonSegment(
+                  value: _NudgeStyle.direct,
+                  label: Text('Direct'),
+                  icon: Icon(Icons.arrow_forward_rounded),
+                ),
+                ButtonSegment(
+                  value: _NudgeStyle.tinyStep,
+                  label: Text('Tiny step'),
+                  icon: Icon(Icons.call_split_rounded),
+                ),
+              ],
+              selected: {_style},
+              onSelectionChanged: (selection) {
+                setState(() => _style = selection.single);
+              },
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              _nudgeCopy(tinyStep),
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Wrap(
+              spacing: AppSpacing.xs,
+              runSpacing: AppSpacing.xs,
+              children: [
+                FilledButton.icon(
+                  key: const Key('waiting-shrink-task'),
+                  onPressed: _saving ? null : _shrinkTask,
+                  icon: const Icon(Icons.call_split_rounded),
+                  label: const Text('Shrink it'),
+                ),
+                OutlinedButton.icon(
+                  key: const Key('waiting-move-later'),
+                  onPressed: _saving ? null : _moveToLater,
+                  icon: const Icon(Icons.inventory_2_outlined),
+                  label: const Text('Move to Later'),
+                ),
+                OutlinedButton.icon(
+                  key: const Key('waiting-start-tiny'),
+                  onPressed: _saving ? null : _startTiny,
+                  icon: const Icon(Icons.bolt_rounded),
+                  label: const Text('Start tiny'),
+                ),
+              ],
+            ),
+            if (_saving) ...[
+              const SizedBox(height: AppSpacing.sm),
+              const LinearProgressIndicator(minHeight: 2),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _nudgeCopy(String tinyStep) {
+    switch (_style) {
+      case _NudgeStyle.gentle:
+        return 'Still worth doing. Want to start tiny?';
+      case _NudgeStyle.direct:
+        return "Open the task. That's enough to begin.";
+      case _NudgeStyle.tinyStep:
+        return 'Only do this next tiny step: $tinyStep';
+    }
+  }
+
+  Future<void> _shrinkTask() async {
+    setState(() => _saving = true);
+    try {
+      final added = await widget.taskState.addTinyStep(widget.task.id);
+      if (!mounted) return;
+      _message(added ? 'Tiny step added' : 'Tiny step is already there');
+    } catch (_) {
+      if (mounted) _message('Could not shrink that task.');
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _moveToLater() async {
+    setState(() => _saving = true);
+    try {
+      await widget.taskState.moveTaskToLater(widget.task.id);
+      if (!mounted) return;
+      _message('Moved to Later');
+    } catch (_) {
+      if (mounted) _message('Could not move that task.');
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  void _startTiny() {
+    widget.timerState.startQuickFocus(2);
+    widget.onOpenTimer?.call();
+    _message('2 minute tiny focus started');
+  }
+
+  void _message(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
+}
+
+enum _DailyCapacity { low, medium, high }
+
+class _DailyResetCard extends StatefulWidget {
+  const _DailyResetCard({
+    required this.moodState,
+    required this.timerState,
+    required this.onOpenMood,
+    required this.onOpenTimer,
+  });
+
+  final MoodState moodState;
+  final TimerState timerState;
+  final VoidCallback? onOpenMood;
+  final VoidCallback? onOpenTimer;
+
+  @override
+  State<_DailyResetCard> createState() => _DailyResetCardState();
+}
+
+class _DailyResetCardState extends State<_DailyResetCard> {
+  _DailyCapacity _capacity = _DailyCapacity.medium;
+  bool _manualRecoveryMode = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final recoverySuggested = _capacity == _DailyCapacity.low ||
+        widget.moodState.recommendsRecoveryMode;
+    final recoveryActive = recoverySuggested || _manualRecoveryMode;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.battery_5_bar_rounded, color: cs.primary),
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(
+                  child: Text(
+                    'Capacity',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              'How much capacity do you have?',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            SegmentedButton<_DailyCapacity>(
+              key: const Key('daily-capacity-selector'),
+              showSelectedIcon: false,
+              segments: const [
+                ButtonSegment(
+                  value: _DailyCapacity.low,
+                  label: Text('Low'),
+                  icon: Icon(Icons.battery_1_bar_rounded),
+                ),
+                ButtonSegment(
+                  value: _DailyCapacity.medium,
+                  label: Text('Medium'),
+                  icon: Icon(Icons.battery_4_bar_rounded),
+                ),
+                ButtonSegment(
+                  value: _DailyCapacity.high,
+                  label: Text('High'),
+                  icon: Icon(Icons.battery_full_rounded),
+                ),
+              ],
+              selected: {_capacity},
+              onSelectionChanged: (selection) {
+                setState(() => _capacity = selection.single);
+              },
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              _capacityPlan(_capacity),
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            if (widget.moodState.selectedMood.isNotEmpty) ...[
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                widget.moodState.moodPlanSuggestion,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+            const SizedBox(height: AppSpacing.sm),
+            SwitchListTile(
+              key: const Key('recovery-mode-toggle'),
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Recovery mode'),
+              subtitle: Text(
+                recoverySuggested
+                    ? 'Suggested for this capacity or mood.'
+                    : 'Use a reduced plan for a hard day.',
+              ),
+              value: _manualRecoveryMode,
+              onChanged: (value) {
+                setState(() => _manualRecoveryMode = value);
+              },
+            ),
+            if (recoveryActive) ...[
+              const SizedBox(height: AppSpacing.xs),
+              _RecoveryPlan(
+                onOpenMood: widget.onOpenMood,
+                onStartTiny: _startTinyRecovery,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _capacityPlan(_DailyCapacity capacity) {
+    switch (capacity) {
+      case _DailyCapacity.low:
+        return 'One tiny task is enough today. Setup counts.';
+      case _DailyCapacity.medium:
+        return 'One task plus one focus session is the plan.';
+      case _DailyCapacity.high:
+        return 'Pick two or three planned tasks, then protect one focus block.';
+    }
+  }
+
+  void _startTinyRecovery() {
+    widget.timerState.startQuickFocus(2);
+    widget.onOpenTimer?.call();
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(content: Text('2 minute recovery focus started')),
+      );
+  }
+}
+
+class _RecoveryPlan extends StatelessWidget {
+  const _RecoveryPlan({
+    required this.onOpenMood,
+    required this.onStartTiny,
+  });
+
+  final VoidCallback? onOpenMood;
+  final VoidCallback onStartTiny;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: cs.secondary.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(AppRadii.control),
+        border: Border.all(color: cs.secondary.withOpacity(0.18)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.sm),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Recovery mode: 1 tiny task, 1 mood check-in, optional 2-minute focus.',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Wrap(
+              spacing: AppSpacing.xs,
+              runSpacing: AppSpacing.xs,
+              children: [
+                OutlinedButton.icon(
+                  key: const Key('recovery-mood-checkin'),
+                  onPressed: onOpenMood ??
+                      () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const MoodTrackerScreen(),
+                            ),
+                          ),
+                  icon: const Icon(Icons.mood_outlined),
+                  label: const Text('Check mood'),
+                ),
+                FilledButton.icon(
+                  key: const Key('recovery-start-tiny'),
+                  onPressed: onStartTiny,
+                  icon: const Icon(Icons.bolt_rounded),
+                  label: const Text('Start 2 min'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DailyReviewCard extends StatelessWidget {
+  const _DailyReviewCard({
+    required this.taskState,
+    required this.timerState,
+  });
+
+  final TaskState taskState;
+  final TimerState timerState;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tomorrowStart = _tomorrowStart();
+    final starterOptions = taskState.tomorrowStarterOptions;
+    final selectedStarter = taskState.selectedTomorrowStarterTask;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.nights_stay_outlined, color: cs.secondary),
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(
+                  child: Text(
+                    'What counted today?',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              _countedLine(),
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            const _ReviewPrompt(
+              icon: Icons.favorite_border_rounded,
+              label: 'What helped?',
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            _ReviewPrompt(
+              icon: Icons.flag_outlined,
+              label: 'Tomorrow start with $tomorrowStart.',
+            ),
+            if (starterOptions.isNotEmpty) ...[
+              const SizedBox(height: AppSpacing.sm),
+              DropdownButtonFormField<int>(
+                key: const Key('tomorrow-starter-menu'),
+                value: selectedStarter?.id,
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  labelText: 'Tomorrow starter',
+                  isDense: true,
+                ),
+                hint: const Text('Choose first task'),
+                items: [
+                  for (final task in starterOptions)
+                    DropdownMenuItem(
+                      value: task.id,
+                      child: Text(
+                        task.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                ],
+                onChanged: (taskId) {
+                  if (taskId == null) return;
+                  taskState.setTomorrowStarter(taskId);
+                },
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _countedLine() {
+    if (timerState.focusMinutesToday > 0) {
+      return '${timerState.focusMinutesToday}m of focus counted.';
+    }
+    if (taskState.completedTasksToday > 0) {
+      return '${taskState.completedTasksToday} task finished today counted.';
+    }
+    if (taskState.completedSubtasks > 0) {
+      return '${taskState.completedSubtasks} tiny steps counted.';
+    }
+    return 'You showed up. That counted.';
+  }
+
+  String _tomorrowStart() {
+    return taskState.tomorrowStarterTask?.title ?? 'a mood check-in';
+  }
+}
+
+class _ReviewPrompt extends StatelessWidget {
+  const _ReviewPrompt({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: cs.onSurfaceVariant),
+        const SizedBox(width: AppSpacing.xs),
+        Expanded(
+          child: Text(
+            label,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -493,7 +1071,7 @@ class _MoodCard extends StatelessWidget {
                     ),
                     if (hasMood)
                       Text(
-                        moodState.moodMessage,
+                        moodState.moodPlanSuggestion,
                         style: Theme.of(context).textTheme.bodySmall,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
