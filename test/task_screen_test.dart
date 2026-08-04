@@ -188,8 +188,35 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text("I'm stuck"), findsOneWidget);
+    expect(find.text('Start tiny'), findsOneWidget);
     expect(find.text('Edit'), findsOneWidget);
     expect(find.text('Delete'), findsOneWidget);
+  });
+
+  testWidgets('task actions can start a tiny focus session', (tester) async {
+    final state = TaskState(
+      repository: FakeTaskRepository(
+        tasks: [taskRow(id: 1, title: 'Tiny start task', dueDate: today)],
+      ),
+      autoLoad: false,
+    );
+    final timerState = TimerState(
+      notificationService: FakeTimerNotificationService(),
+      sessionRepository: FakeTimerSessionRepository(),
+    );
+    addTearDown(timerState.dispose);
+    await state.loadTasks();
+    await _pumpTaskScreen(tester, state, timerState: timerState);
+
+    await tester.tap(find.byTooltip('Task actions for Tiny start task'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Start tiny'));
+    await tester.pump();
+
+    expect(timerState.isTimerRunning, isTrue);
+    expect(timerState.timerDisplay, '02:00');
+    expect(find.text('2 minute tiny focus started'), findsOneWidget);
+    timerState.stopTimer();
   });
 
   testWidgets('editing a task saves without controller disposal errors',
@@ -219,7 +246,8 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('stuck flow saves friction, adds a tiny step, and starts timer',
+  testWidgets(
+      'stuck flow saves anxiety support, adds a tiny step, and starts timer',
       (tester) async {
     final repository = FakeTaskRepository(
       tasks: [taskRow(id: 1, title: 'Hard task', dueDate: today)],
@@ -238,10 +266,17 @@ void main() {
     await tester.tap(find.text("I'm stuck"));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const ValueKey('friction-unclear')));
+    expect(find.byKey(const ValueKey('friction-boring')), findsNothing);
+    expect(find.byKey(const ValueKey('friction-distracted')), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('friction-anxious')));
     await tester.pump();
-    expect(repository.taskRows.single['friction'], 'unclear');
-    expect(find.text('Clarity first. Action second.'), findsOneWidget);
+    expect(repository.taskRows.single['friction'], 'anxious');
+    expect(find.text('What would make this 10% easier?'), findsOneWidget);
+    expect(
+      find.text('Do the version that counts, not the perfect version.'),
+      findsOneWidget,
+    );
 
     await tester.ensureVisible(find.byKey(const Key('add-tiny-step')));
     await tester.pump();
@@ -249,9 +284,9 @@ void main() {
     await tester.pump();
     expect(repository.subtaskRows[1], hasLength(1));
 
-    await tester.ensureVisible(find.byKey(const ValueKey('quick-focus-2')));
+    await tester.ensureVisible(find.byKey(const Key('start-tiny-focus')));
     await tester.pump();
-    await tester.tap(find.byKey(const ValueKey('quick-focus-2')));
+    await tester.tap(find.byKey(const Key('start-tiny-focus')));
     await tester.pump();
     expect(timerState.isTimerRunning, isTrue);
     expect(timerState.timerDisplay, '02:00');

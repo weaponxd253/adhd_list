@@ -1,11 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../models/subtask.dart';
 import '../../models/task.dart';
 import '../../models/task_support.dart';
 import '../../providers/task_state.dart';
+import '../../providers/timer_state.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/task_support_sheet.dart';
 
@@ -233,6 +235,7 @@ class _TaskListSectionState extends State<TaskListSection> {
                       icon: const Icon(Icons.more_horiz_rounded),
                       enabled: !busy,
                       onSelected: (value) {
+                        if (value == 'startTiny') _startTinyFocus(task);
                         if (value == 'stuck') {
                           showTaskSupportSheet(context: context, task: task);
                         }
@@ -240,6 +243,13 @@ class _TaskListSectionState extends State<TaskListSection> {
                         if (value == 'delete') _deleteWithUndo(task);
                       },
                       itemBuilder: (_) => [
+                        const PopupMenuItem(
+                          value: 'startTiny',
+                          child: ListTile(
+                            leading: Icon(Icons.bolt_rounded),
+                            title: Text('Start tiny'),
+                          ),
+                        ),
                         const PopupMenuItem(
                           value: 'stuck',
                           child: ListTile(
@@ -267,6 +277,14 @@ class _TaskListSectionState extends State<TaskListSection> {
                       ],
                     )
                   else ...[
+                    IconButton(
+                      key: ValueKey('start-tiny-${task.id}'),
+                      tooltip: 'Start tiny focus for ${task.title}',
+                      onPressed: busy ? null : () => _startTinyFocus(task),
+                      icon: const Icon(Icons.bolt_rounded),
+                      iconSize: 22,
+                      visualDensity: VisualDensity.compact,
+                    ),
                     IconButton(
                       tooltip: "I'm stuck on ${task.title}",
                       onPressed: busy
@@ -407,6 +425,11 @@ class _TaskListSectionState extends State<TaskListSection> {
       () => widget.taskState.addSubtask(task.id, title),
     );
     if (succeeded) controller.clear();
+  }
+
+  void _startTinyFocus(Task task) {
+    context.read<TimerState>().startQuickFocus(2);
+    _message('2 minute tiny focus started');
   }
 
   Future<void> _deleteWithUndo(Task task) async {

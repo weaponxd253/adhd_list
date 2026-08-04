@@ -207,6 +207,8 @@ class TaskState extends ChangeNotifier {
     return true;
   }
 
+  String tinyStepSuggestionFor(Task task) => _tinyStepTitle(task);
+
   Future<void> editSubtask(
     int taskId,
     int subtaskId,
@@ -297,8 +299,18 @@ class TaskState extends ChangeNotifier {
   }
 
   String _tinyStepTitle(Task task) {
+    final existingStep = _firstIncompleteSubtask(task);
+    if (existingStep != null) return existingStep.title;
+
     return task.tinyNextStep ??
         'Open "${task.title}" and do one visible next step.';
+  }
+
+  Subtask? _firstIncompleteSubtask(Task task) {
+    for (final subtask in task.subtasks) {
+      if (!subtask.isCompleted) return subtask;
+    }
+    return null;
   }
 
   bool _hasSubtaskTitle(Task task, String title) {

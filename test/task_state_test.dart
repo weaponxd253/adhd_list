@@ -262,5 +262,30 @@ void main() {
         'Open "Start essay" and do one visible next step.',
       );
     });
+
+    test('uses the first incomplete subtask as the tiny-step suggestion',
+        () async {
+      final repository = FakeTaskRepository(
+        tasks: [taskRow(id: 15, title: 'Research paper', dueDate: today)],
+        subtasks: {
+          15: [
+            subtaskRow(
+              id: 31,
+              taskId: 15,
+              title: 'Pick a topic',
+              completed: true,
+            ),
+            subtaskRow(id: 32, taskId: 15, title: 'Find one source'),
+          ],
+        },
+      );
+      final state = TaskState(repository: repository, autoLoad: false);
+      await state.loadTasks();
+
+      final task = state.tasks.single;
+      expect(state.tinyStepSuggestionFor(task), 'Find one source');
+      expect(await state.addTinyStep(15), isFalse);
+      expect(repository.subtaskRows[15], hasLength(2));
+    });
   });
 }

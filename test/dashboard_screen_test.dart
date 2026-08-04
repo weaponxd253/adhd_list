@@ -123,6 +123,7 @@ void main() {
     );
 
     expect(find.text('Do homework'), findsOneWidget);
+    expect(find.text('Open notes'), findsOneWidget);
     expect(find.text('Pack backpack'), findsOneWidget);
     expect(find.text('0/2 steps'), findsOneWidget);
     expect(find.text('Next'), findsOneWidget);
@@ -143,6 +144,25 @@ void main() {
     expect(harness.timerState.isTimerRunning, isTrue);
     expect(harness.timerState.timerDisplay, '05:00');
     expect(openedTimer, isTrue);
+    harness.timerState.stopTimer();
+  });
+
+  testWidgets('dashboard tiny start begins a two minute focus session',
+      (tester) async {
+    var openedTimer = false;
+    final harness = await _pumpDashboard(
+      tester,
+      tasks: [taskRow(id: 1, title: 'Do homework', dueDate: today)],
+      onOpenTimer: () => openedTimer = true,
+    );
+
+    await tester.tap(find.byKey(const Key('dashboard-start-tiny')));
+    await tester.pump();
+
+    expect(harness.timerState.isTimerRunning, isTrue);
+    expect(harness.timerState.timerDisplay, '02:00');
+    expect(openedTimer, isTrue);
+    expect(find.text('2 minute tiny focus started'), findsOneWidget);
     harness.timerState.stopTimer();
   });
 
@@ -187,7 +207,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('I am stuck'), findsOneWidget);
-    expect(find.text("What's making this hard?"), findsOneWidget);
+    expect(find.text("What's the blocker?"), findsOneWidget);
+    expect(find.byKey(const ValueKey('friction-distracted')), findsOneWidget);
   });
 
   testWidgets('mood card is tappable', (tester) async {

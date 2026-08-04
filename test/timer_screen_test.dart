@@ -48,10 +48,22 @@ void main() {
     now = startedAt.add(const Duration(minutes: 1));
     state.syncWithClock();
     await tester.pump();
-    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.text('Short Break ready'), findsOneWidget);
+    expect(find.text('That counted.'), findsOneWidget);
+    expect(find.text('Want to keep going or stop here?'), findsOneWidget);
     expect(find.text('Focus complete. Short Break ready.'), findsOneWidget);
+
+    final keepGoing = tester.widget<FilledButton>(
+      find.byKey(const Key('completion-keep-going')),
+    );
+    keepGoing.onPressed?.call();
+    await tester.pump();
+
+    expect(state.isTimerRunning, isTrue);
+    expect(state.timerDisplay, '05:00');
+    state.stopTimer();
   });
 
   testWidgets('reconciles completed sessions when the app resumes',
@@ -70,9 +82,10 @@ void main() {
     now = startedAt.add(const Duration(seconds: 75));
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     await tester.pump();
-    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.text('Short Break ready'), findsOneWidget);
+    expect(find.text('That counted.'), findsOneWidget);
     expect(find.text('Focus complete. Short Break ready.'), findsOneWidget);
   });
 }

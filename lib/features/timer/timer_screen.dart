@@ -60,10 +60,11 @@ class _TimerScreenState extends State<TimerScreen>
     if (completionMessage != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
-          ..showSnackBar(SnackBar(content: Text(completionMessage)));
-        context.read<TimerState>().clearCompletionMessage();
+        final timerState = context.read<TimerState>();
+        final message = timerState.completionMessage;
+        if (message == null) return;
+        timerState.clearCompletionMessage();
+        _showCompletionPrompt(message);
       });
     }
 
@@ -126,6 +127,22 @@ class _TimerScreenState extends State<TimerScreen>
       ),
     );
   }
+
+  void _showCompletionPrompt(String detail) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => _CompletionPromptSheet(
+        detail: detail,
+        onKeepGoing: () {
+          Navigator.pop(sheetContext);
+          if (!mounted) return;
+          context.read<TimerState>().startQuickFocus(5);
+        },
+        onDone: () => Navigator.pop(sheetContext),
+      ),
+    );
+  }
 }
 
 class _TimerStatusChip extends StatelessWidget {
@@ -162,6 +179,72 @@ class _TimerStatusChip extends StatelessWidget {
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CompletionPromptSheet extends StatelessWidget {
+  const _CompletionPromptSheet({
+    required this.detail,
+    required this.onKeepGoing,
+    required this.onDone,
+  });
+
+  final String detail;
+  final VoidCallback onKeepGoing;
+  final VoidCallback onDone;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.md,
+          AppSpacing.xs,
+          AppSpacing.md,
+          AppSpacing.md,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.check_circle_outline_rounded, color: cs.primary),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              'That counted.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: AppSpacing.xxs),
+            Text(
+              'Want to keep going or stop here?',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: AppSpacing.xxs),
+            Text(
+              detail,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            FilledButton.icon(
+              key: const Key('completion-keep-going'),
+              onPressed: onKeepGoing,
+              icon: const Icon(Icons.play_arrow_rounded),
+              label: const Text('Keep going'),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            OutlinedButton(
+              key: const Key('completion-done-for-now'),
+              onPressed: onDone,
+              child: const Text('Done for now'),
+            ),
+          ],
         ),
       ),
     );

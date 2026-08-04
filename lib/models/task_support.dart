@@ -6,6 +6,7 @@ enum TaskFriction {
   lowEnergy,
   tooManySteps,
   avoiding,
+  distracted,
 }
 
 enum TaskEnergyLevel { low, medium, high }
@@ -13,6 +14,14 @@ enum TaskEnergyLevel { low, medium, high }
 enum TaskTimeEstimate { twoMinutes, fiveMinutes, tenMinutes, twentyFivePlus }
 
 enum TaskAnxietyLevel { calm, tense, high }
+
+const taskRescueFrictionOptions = <TaskFriction>[
+  TaskFriction.tooBig,
+  TaskFriction.unclear,
+  TaskFriction.anxious,
+  TaskFriction.lowEnergy,
+  TaskFriction.distracted,
+];
 
 extension TaskFrictionDetails on TaskFriction {
   String get id => name;
@@ -22,17 +31,19 @@ extension TaskFrictionDetails on TaskFriction {
       case TaskFriction.tooBig:
         return 'Too big';
       case TaskFriction.unclear:
-        return "I don't know where to start";
+        return 'Not sure where to start';
       case TaskFriction.boring:
         return 'Boring';
       case TaskFriction.anxious:
-        return 'I feel anxious';
+        return 'Anxious about it';
       case TaskFriction.lowEnergy:
-        return 'Low energy';
+        return 'No energy';
       case TaskFriction.tooManySteps:
         return 'Too many steps';
       case TaskFriction.avoiding:
         return "I'm avoiding it";
+      case TaskFriction.distracted:
+        return 'Distracted';
     }
   }
 
@@ -45,13 +56,15 @@ extension TaskFrictionDetails on TaskFriction {
       case TaskFriction.boring:
         return 'Do the first two minutes while making it mildly pleasant.';
       case TaskFriction.anxious:
-        return 'Take one slow breath, then do the lowest-risk first step.';
+        return 'Open "$taskTitle" and do the lowest-risk version that counts.';
       case TaskFriction.lowEnergy:
         return 'Set up only the next object, tab, or place you need.';
       case TaskFriction.tooManySteps:
         return 'Pick one step and ignore the rest for five minutes.';
       case TaskFriction.avoiding:
         return 'Touch the task once: open it, move it, or name the blocker.';
+      case TaskFriction.distracted:
+        return 'Put away one distraction, then work on "$taskTitle" for two minutes.';
     }
   }
 
@@ -64,13 +77,39 @@ extension TaskFrictionDetails on TaskFriction {
       case TaskFriction.boring:
         return 'Lower the demand and add a little novelty.';
       case TaskFriction.anxious:
-        return 'Safety before speed.';
+        return 'What would make this 10% easier?';
       case TaskFriction.lowEnergy:
         return 'Use setup as progress.';
       case TaskFriction.tooManySteps:
         return 'One lane. One step.';
       case TaskFriction.avoiding:
         return 'No shame. Just a tiny re-entry.';
+      case TaskFriction.distracted:
+        return 'One tab, one place, one next action.';
+    }
+  }
+
+  List<String> get reframes {
+    switch (this) {
+      case TaskFriction.anxious:
+        return const [
+          'Do the version that counts, not the perfect version.',
+          'For two minutes, only open the task.',
+        ];
+      case TaskFriction.tooBig:
+        return const ['Make it smaller than feels necessary.'];
+      case TaskFriction.unclear:
+        return const ['Define done enough before doing more.'];
+      case TaskFriction.lowEnergy:
+        return const ['Setup counts when energy is low.'];
+      case TaskFriction.distracted:
+        return const ['Move one distraction out of reach first.'];
+      case TaskFriction.boring:
+        return const ['Add novelty, sound, or a tiny race.'];
+      case TaskFriction.tooManySteps:
+        return const ['Hide the list after choosing one lane.'];
+      case TaskFriction.avoiding:
+        return const ['Re-entry is progress.'];
     }
   }
 
@@ -78,6 +117,7 @@ extension TaskFrictionDetails on TaskFriction {
     switch (this) {
       case TaskFriction.lowEnergy:
       case TaskFriction.anxious:
+      case TaskFriction.distracted:
         return 2;
       case TaskFriction.tooBig:
       case TaskFriction.unclear:

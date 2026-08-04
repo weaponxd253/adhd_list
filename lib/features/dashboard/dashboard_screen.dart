@@ -34,7 +34,11 @@ class DashboardScreen extends StatelessWidget {
               right: AppSpacing.md,
             ),
             children: [
-              _NowCard(task: nowTask, onOpenTimer: onOpenTimer),
+              _NowCard(
+                taskState: taskState,
+                task: nowTask,
+                onOpenTimer: onOpenTimer,
+              ),
               const SizedBox(height: AppSpacing.md),
               _TodayStrip(taskState: taskState, timerState: timerState),
               const SizedBox(height: AppSpacing.md),
@@ -91,8 +95,13 @@ class DashboardScreen extends StatelessWidget {
 }
 
 class _NowCard extends StatelessWidget {
-  const _NowCard({required this.task, required this.onOpenTimer});
+  const _NowCard({
+    required this.taskState,
+    required this.task,
+    required this.onOpenTimer,
+  });
 
+  final TaskState taskState;
   final Task? task;
   final VoidCallback? onOpenTimer;
 
@@ -112,7 +121,9 @@ class _NowCard extends StatelessWidget {
       ),
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.md),
-        child: task == null ? _emptyState(context) : _taskState(context, task),
+        child: task == null
+            ? _emptyState(context)
+            : _taskState(context, task, taskState),
       ),
     );
   }
@@ -146,10 +157,11 @@ class _NowCard extends StatelessWidget {
     );
   }
 
-  Widget _taskState(BuildContext context, Task task) {
+  Widget _taskState(BuildContext context, Task task, TaskState taskState) {
     final dueStr = DateFormat.MMMd().format(task.dueDate);
     final completedSteps = task.subtasks.where((s) => s.isCompleted).length;
     final totalSteps = task.subtasks.length;
+    final tinyStep = taskState.tinyStepSuggestionFor(task);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -197,26 +209,15 @@ class _NowCard extends StatelessWidget {
               ),
           ],
         ),
-        if (task.tinyNextStep != null) ...[
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            task.tinyNextStep!,
-            style: const TextStyle(color: Colors.white70, fontSize: 13),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-        const SizedBox(height: AppSpacing.md),
-        FilledButton.icon(
-          key: const Key('dashboard-start-5'),
-          onPressed: () => _startFocus(context, 5),
-          icon: const Icon(Icons.play_arrow_rounded),
-          label: const Text('Start 5 min'),
-          style: FilledButton.styleFrom(
-            backgroundColor: Colors.white,
-            foregroundColor: Theme.of(context).colorScheme.primary,
-          ),
+        const SizedBox(height: AppSpacing.sm),
+        Text(
+          tinyStep,
+          style: const TextStyle(color: Colors.white70, fontSize: 13),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
         ),
+        const SizedBox(height: AppSpacing.md),
+        _startButtons(context),
         const SizedBox(height: AppSpacing.xs),
         Row(
           children: [
@@ -240,6 +241,54 @@ class _NowCard extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+
+  Widget _startButtons(BuildContext context) {
+    final style = FilledButton.styleFrom(
+      backgroundColor: Colors.white,
+      foregroundColor: Theme.of(context).colorScheme.primary,
+    );
+    final buttons = [
+      FilledButton.icon(
+        key: const Key('dashboard-start-tiny'),
+        onPressed: () => _startFocus(context, 2),
+        icon: const Icon(Icons.bolt_rounded),
+        label: const Text('Start tiny'),
+        style: style,
+      ),
+      FilledButton.icon(
+        key: const Key('dashboard-start-5'),
+        onPressed: () => _startFocus(context, 5),
+        icon: const Icon(Icons.play_arrow_rounded),
+        label: const Text('Start 5 min'),
+        style: style,
+      ),
+    ];
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final stacked = constraints.maxWidth < 340 ||
+            MediaQuery.textScalerOf(context).scale(1) > 1.3;
+        if (stacked) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              buttons[0],
+              const SizedBox(height: AppSpacing.xs),
+              buttons[1],
+            ],
+          );
+        }
+
+        return Row(
+          children: [
+            Expanded(child: buttons[0]),
+            const SizedBox(width: AppSpacing.xs),
+            Expanded(child: buttons[1]),
+          ],
+        );
+      },
     );
   }
 
@@ -270,7 +319,13 @@ class _NowCard extends StatelessWidget {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
-        SnackBar(content: Text('$minutes minute focus started')),
+        SnackBar(
+          content: Text(
+            minutes == 2
+                ? '2 minute tiny focus started'
+                : '$minutes minute focus started',
+          ),
+        ),
       );
   }
 }

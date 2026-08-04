@@ -111,17 +111,24 @@ class _TaskSupportSheetState extends State<_TaskSupportSheet> {
     context.read<TimerState>().startQuickFocus(minutes);
     Navigator.pop(context);
     messenger.showSnackBar(
-      SnackBar(content: Text('$minutes minute focus started')),
+      SnackBar(
+        content: Text(
+          minutes == 2
+              ? '2 minute tiny focus started'
+              : '$minutes minute focus started',
+        ),
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final taskState = context.watch<TaskState>();
     final selectedFriction = _friction;
     final suggestedMinutes = selectedFriction?.suggestedMinutes ?? 5;
-    final tinyStep = selectedFriction?.tinyStepFor(_task.title) ??
-        'Open "${_task.title}" and do one visible next step.';
+    final tinyStep = taskState.tinyStepSuggestionFor(_task);
+    final reframes = selectedFriction?.reframes ?? const <String>[];
 
     return SafeArea(
       child: Padding(
@@ -145,7 +152,7 @@ class _TaskSupportSheetState extends State<_TaskSupportSheet> {
               ),
               const SizedBox(height: AppSpacing.md),
               Text(
-                "What's making this hard?",
+                "What's the blocker?",
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: AppSpacing.xs),
@@ -153,7 +160,7 @@ class _TaskSupportSheetState extends State<_TaskSupportSheet> {
                 spacing: AppSpacing.xs,
                 runSpacing: AppSpacing.xs,
                 children: [
-                  for (final friction in TaskFriction.values)
+                  for (final friction in taskRescueFrictionOptions)
                     ChoiceChip(
                       key: ValueKey('friction-${friction.id}'),
                       label: Text(friction.label),
@@ -182,7 +189,22 @@ class _TaskSupportSheetState extends State<_TaskSupportSheet> {
                             'Pick a blocker and I will make the next move smaller.',
                         style: Theme.of(context).textTheme.labelLarge,
                       ),
+                      for (final reframe in reframes) ...[
+                        const SizedBox(height: AppSpacing.xxs),
+                        Text(
+                          reframe,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
                       const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        'Next tiny step',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: cs.onSurfaceVariant,
+                              fontWeight: FontWeight.w700,
+                            ),
+                      ),
+                      const SizedBox(height: AppSpacing.xxs),
                       Text(
                         tinyStep,
                         style: Theme.of(context).textTheme.bodyMedium,
@@ -227,20 +249,27 @@ class _TaskSupportSheetState extends State<_TaskSupportSheet> {
                 runSpacing: AppSpacing.xs,
                 children: [
                   FilledButton.icon(
-                    key: const Key('start-suggested-focus'),
-                    onPressed: _saving
-                        ? null
-                        : () => _startQuickFocus(suggestedMinutes),
-                    icon: const Icon(Icons.play_arrow_rounded),
-                    label: Text('Start ${suggestedMinutes}m'),
+                    key: const Key('start-tiny-focus'),
+                    onPressed: _saving ? null : () => _startQuickFocus(2),
+                    icon: const Icon(Icons.bolt_rounded),
+                    label: const Text('Start tiny'),
                   ),
+                  if (suggestedMinutes != 2)
+                    OutlinedButton.icon(
+                      key: const Key('start-suggested-focus'),
+                      onPressed: _saving
+                          ? null
+                          : () => _startQuickFocus(suggestedMinutes),
+                      icon: const Icon(Icons.play_arrow_rounded),
+                      label: Text('Start ${suggestedMinutes}m'),
+                    ),
                   OutlinedButton.icon(
                     key: const Key('add-tiny-step'),
                     onPressed: _saving ? null : _addTinyStep,
                     icon: const Icon(Icons.call_split_rounded),
                     label: const Text('Make smaller'),
                   ),
-                  for (final minutes in const [2, 5, 10])
+                  for (final minutes in const [5, 10])
                     OutlinedButton(
                       key: ValueKey('quick-focus-$minutes'),
                       onPressed:
@@ -264,6 +293,7 @@ class _TaskSupportSheetState extends State<_TaskSupportSheet> {
     switch (friction) {
       case TaskFriction.lowEnergy:
       case TaskFriction.anxious:
+      case TaskFriction.distracted:
         return TaskEnergyLevel.low;
       case TaskFriction.tooBig:
       case TaskFriction.tooManySteps:
@@ -287,6 +317,7 @@ class _TaskSupportSheetState extends State<_TaskSupportSheet> {
       case TaskFriction.anxious:
       case TaskFriction.avoiding:
         return TaskAnxietyLevel.high;
+      case TaskFriction.distracted:
       case TaskFriction.tooBig:
       case TaskFriction.unclear:
       case TaskFriction.tooManySteps:
