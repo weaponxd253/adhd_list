@@ -232,8 +232,8 @@ abstract final class AppTheme {
       textTheme: textTheme,
       visualDensity: VisualDensity.standard,
       materialTapTargetSize: MaterialTapTargetSize.padded,
-      focusColor: primary.withValues(alpha: 0.18),
-      hoverColor: primary.withValues(alpha: 0.08),
+      focusColor: primary.withOpacity(0.18),
+      hoverColor: primary.withOpacity(0.08),
       splashFactory: InkSparkle.splashFactory,
       extensions: [
         AppSemanticColors(
@@ -251,7 +251,7 @@ abstract final class AppTheme {
         systemOverlayStyle: systemOverlayStyle(brightness),
         titleTextStyle: textTheme.headlineMedium,
       ),
-      cardTheme: CardThemeData(
+      cardTheme: CardTheme(
         color: surface,
         elevation: 0,
         margin: EdgeInsets.zero,
@@ -342,7 +342,7 @@ abstract final class AppTheme {
           minimumSize: const Size(
               AppSizes.minimumTouchTarget, AppSizes.minimumTouchTarget),
           foregroundColor: secondaryText,
-          focusColor: primary.withValues(alpha: 0.18),
+          focusColor: primary.withOpacity(0.18),
         ),
       ),
       checkboxTheme: CheckboxThemeData(

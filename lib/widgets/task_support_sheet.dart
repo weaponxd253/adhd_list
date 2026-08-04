@@ -164,10 +164,10 @@ class _TaskSupportSheetState extends State<_TaskSupportSheet> {
               const SizedBox(height: AppSpacing.md),
               DecoratedBox(
                 decoration: BoxDecoration(
-                  color: cs.primary.withValues(alpha: 0.08),
+                  color: cs.primary.withOpacity(0.08),
                   borderRadius: BorderRadius.circular(AppRadii.control),
                   border: Border.all(
-                    color: cs.primary.withValues(alpha: 0.18),
+                    color: cs.primary.withOpacity(0.18),
                   ),
                 ),
                 child: Padding(

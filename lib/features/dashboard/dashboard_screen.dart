@@ -70,7 +70,7 @@ class DashboardScreen extends StatelessWidget {
                   color: Theme.of(context)
                       .colorScheme
                       .onSurface
-                      .withValues(alpha: 0.5),
+                      .withOpacity(0.5),
                   fontSize: 12,
                 ),
           ),
@@ -322,7 +322,7 @@ class _NowSecondaryButton extends StatelessWidget {
       style: OutlinedButton.styleFrom(
         foregroundColor: Colors.white,
         side: const BorderSide(color: Colors.white54),
-        backgroundColor: Colors.white.withValues(alpha: 0.10),
+        backgroundColor: Colors.white.withOpacity(0.10),
       ),
     );
   }
@@ -451,7 +451,7 @@ class _MoodCard extends StatelessWidget {
                 color: Theme.of(context)
                     .colorScheme
                     .onSurface
-                    .withValues(alpha: 0.3),
+                    .withOpacity(0.3),
               ),
             ],
           ),
@@ -504,7 +504,7 @@ class _TimerSummaryCard extends StatelessWidget {
                   width: 42,
                   height: 42,
                   decoration: BoxDecoration(
-                    color: cs.primary.withValues(alpha: 0.1),
+                    color: cs.primary.withOpacity(0.1),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(Icons.timer_rounded, color: cs.primary, size: 22),
@@ -596,7 +596,7 @@ class _TimerButton extends StatelessWidget {
               vertical: AppSpacing.xs,
             ),
             decoration: BoxDecoration(
-              color: primary ? cs.primary : cs.primary.withValues(alpha: 0.08),
+              color: primary ? cs.primary : cs.primary.withOpacity(0.08),
               borderRadius: BorderRadius.circular(AppRadii.control),
             ),
             child: Text(
@@ -704,7 +704,7 @@ class _CountPill extends StatelessWidget {
         vertical: 2,
       ),
       decoration: BoxDecoration(
-        color: cs.primary.withValues(alpha: 0.12),
+        color: cs.primary.withOpacity(0.12),
         borderRadius: BorderRadius.circular(AppRadii.pill),
       ),
       child: Text(
@@ -731,7 +731,7 @@ class _UpcomingTile extends StatelessWidget {
       decoration: BoxDecoration(
         color: Theme.of(context).cardTheme.color,
         borderRadius: BorderRadius.circular(AppRadii.control),
-        border: Border.all(color: color.withValues(alpha: 0.22)),
+        border: Border.all(color: color.withOpacity(0.22)),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(
