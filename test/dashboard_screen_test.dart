@@ -12,6 +12,8 @@ import 'package:provider/provider.dart';
 
 import 'helpers/fakes.dart';
 
+final _dashboardTestToday = DateTime(2026, 8, 3);
+
 class _DashboardHarness {
   _DashboardHarness({
     List<Map<String, dynamic>>? tasks,
@@ -94,11 +96,12 @@ Future<_DashboardHarness> _pumpDashboard(
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
 
+  final effectiveNow = now ?? () => _dashboardTestToday;
   final harness = _DashboardHarness(
     tasks: tasks,
     subtasks: subtasks,
     moods: moods,
-    now: now,
+    now: effectiveNow,
     onOpenMood: onOpenMood,
     onOpenTimer: onOpenTimer,
   );
@@ -142,7 +145,7 @@ Future<_DashboardHarness> _pumpDashboard(
 }
 
 void main() {
-  final today = DateTime(2026, 8, 3);
+  final today = _dashboardTestToday;
 
   testWidgets('now card prioritizes the first task and next excludes it',
       (tester) async {
@@ -387,6 +390,12 @@ void main() {
       tester,
       tasks: [taskRow(id: 1, title: 'Do homework', dueDate: today)],
     );
+
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('daily-capacity-selector')),
+      320,
+    );
+    await tester.pump();
 
     expect(find.text('How much capacity do you have?'), findsOneWidget);
     expect(find.text('One task plus one focus session is the plan.'),
