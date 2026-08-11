@@ -307,6 +307,37 @@ void main() {
       expect(state.tasks.single.subtasks.single.title, 'Renamed');
     });
 
+    test('stores task and subtask estimates', () async {
+      final repository = FakeTaskRepository();
+      final state = TaskState(repository: repository, autoLoad: false);
+
+      await state.addTask('Estimated task', today, estimatedMinutes: 25);
+      await state.addSubtask(100, 'Estimated step', estimatedMinutes: 10);
+      await state.updateTaskEstimate(100, 5);
+      await state.editSubtask(
+        100,
+        200,
+        'Short step',
+        estimatedMinutes: 2,
+      );
+
+      expect(state.tasks.single.estimatedMinutes, 5);
+      expect(state.tasks.single.subtasks.single.title, 'Short step');
+      expect(state.tasks.single.subtasks.single.estimatedMinutes, 2);
+      expect(repository.taskRows.single['estimated_minutes'], 5);
+      expect(repository.subtaskRows[100]!.single['estimated_minutes'], 2);
+
+      await state.editSubtask(
+        100,
+        200,
+        'No estimate step',
+        clearEstimatedMinutes: true,
+      );
+
+      expect(state.tasks.single.subtasks.single.estimatedMinutes, isNull);
+      expect(repository.subtaskRows[100]!.single['estimated_minutes'], isNull);
+    });
+
     test('failed writes preserve in-memory state', () async {
       final repository = FakeTaskRepository(
         tasks: [taskRow(id: 1, title: 'Task', dueDate: today)],
@@ -355,6 +386,7 @@ void main() {
             dueDate: today,
             completed: true,
             completedAt: today,
+            estimatedMinutes: 25,
           ),
         ],
         subtasks: {
@@ -364,6 +396,7 @@ void main() {
               taskId: 8,
               title: 'Recovered step',
               completed: true,
+              estimatedMinutes: 10,
             ),
           ],
         },
@@ -378,8 +411,10 @@ void main() {
       expect(state.tasks, hasLength(1));
       expect(state.tasks.single.title, 'Recover me');
       expect(state.tasks.single.isCompleted, isTrue);
+      expect(state.tasks.single.estimatedMinutes, 25);
       expect(state.tasks.single.subtasks.single.title, 'Recovered step');
       expect(state.tasks.single.subtasks.single.isCompleted, isTrue);
+      expect(state.tasks.single.subtasks.single.estimatedMinutes, 10);
     });
 
     test('saves support metadata and exposes a tiny next step', () async {

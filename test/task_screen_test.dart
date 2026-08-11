@@ -239,6 +239,52 @@ void main() {
     timerState.stopTimer();
   });
 
+  testWidgets('subtasks can store an estimate and start a linked timer',
+      (tester) async {
+    final repository = FakeTaskRepository(
+      tasks: [taskRow(id: 1, title: 'Project task', dueDate: today)],
+    );
+    final state = TaskState(
+      repository: repository,
+      autoLoad: false,
+    );
+    final timerState = TimerState(
+      notificationService: FakeTimerNotificationService(),
+      sessionRepository: FakeTimerSessionRepository(),
+    );
+    addTearDown(timerState.dispose);
+    await state.loadTasks();
+    await _pumpTaskScreen(tester, state, timerState: timerState);
+
+    await tester.tap(find.byTooltip('Expand task'));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('subtask-estimate-1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('10 min'));
+    await tester.pump();
+    await tester.enterText(
+      find.byKey(const ValueKey('add-subtask-field-1')),
+      'Write outline',
+    );
+    await tester.tap(find.byKey(const ValueKey('add-subtask-button-1')));
+    await tester.pump();
+
+    expect(repository.subtaskRows[1]!.single['estimated_minutes'], 10);
+    expect(find.text('10m'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Start timer for Write outline'));
+    await tester.pump();
+
+    expect(timerState.isTimerRunning, isTrue);
+    expect(timerState.timerDisplay, '10:00');
+    expect(timerState.activeTaskId, 1);
+    expect(timerState.activeSubtaskId, 200);
+    expect(timerState.activeTargetType, TimerState.targetTypeSubtask);
+    expect(timerState.activeTargetTitle, 'Write outline');
+    expect(find.text('10 minute focus started'), findsOneWidget);
+    timerState.stopTimer();
+  });
+
   testWidgets('task actions can schedule a reminder', (tester) async {
     final state = TaskState(
       repository: FakeTaskRepository(

@@ -13,6 +13,8 @@ import '../../providers/timer_state.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/task_support_sheet.dart';
 
+const _estimateMinuteOptions = [2, 5, 10, 25];
+
 class TaskListSection extends StatefulWidget {
   const TaskListSection({super.key, required this.taskState});
 
@@ -24,6 +26,7 @@ class TaskListSection extends StatefulWidget {
 
 class _TaskListSectionState extends State<TaskListSection> {
   final Map<int, TextEditingController> _subtaskControllers = {};
+  final Map<int, int?> _subtaskEstimateMinutes = {};
   final Set<int> _expandedTaskIds = {};
   bool _showLater = false;
   bool _showCompleted = false;
@@ -449,6 +452,7 @@ class _TaskListSectionState extends State<TaskListSection> {
                     .toggleSubtaskCompletion(task.id, subtask.id),
               ),
               onEdit: () => _showEditSubtask(task, subtask),
+              onStartFocus: () => _startSubtaskFocus(task, subtask),
               onDelete: () => _run(
                 () => widget.taskState.deleteSubtask(task.id, subtask.id),
               ),
@@ -469,6 +473,15 @@ class _TaskListSectionState extends State<TaskListSection> {
                     isDense: true,
                   ),
                 ),
+              ),
+              const SizedBox(width: AppSpacing.xs),
+              _EstimateMenu(
+                key: ValueKey('subtask-estimate-${task.id}'),
+                value: _subtaskEstimateMinutes[task.id],
+                enabled: !busy,
+                onSelected: (value) {
+                  setState(() => _subtaskEstimateMinutes[task.id] = value);
+                },
               ),
               const SizedBox(width: AppSpacing.xs),
               IconButton.filled(
@@ -501,10 +514,20 @@ class _TaskListSectionState extends State<TaskListSection> {
       _message('Enter a step name');
       return;
     }
+    final estimatedMinutes = _subtaskEstimateMinutes[task.id];
     final succeeded = await _run(
-      () => widget.taskState.addSubtask(task.id, title),
+      () => widget.taskState.addSubtask(
+        task.id,
+        title,
+        estimatedMinutes: estimatedMinutes,
+      ),
     );
-    if (succeeded) controller.clear();
+    if (succeeded) {
+      controller.clear();
+      if (mounted) {
+        setState(() => _subtaskEstimateMinutes.remove(task.id));
+      }
+    }
   }
 
   void _startTinyFocus(Task task) {
@@ -515,6 +538,19 @@ class _TaskListSectionState extends State<TaskListSection> {
           title: task.title,
         );
     _message(started ? '2 minute focus started' : 'Timer already running');
+  }
+
+  void _startSubtaskFocus(Task task, Subtask subtask) {
+    final minutes = subtask.estimatedMinutes ?? 2;
+    final started = context.read<TimerState>().startTargetFocus(
+          minutes: minutes,
+          targetType: TimerState.targetTypeSubtask,
+          taskId: task.id,
+          subtaskId: subtask.id,
+          title: subtask.title,
+        );
+    _message(
+        started ? '$minutes minute focus started' : 'Timer already running');
   }
 
   Future<void> _remindTask(
@@ -625,9 +661,15 @@ class _TaskListSectionState extends State<TaskListSection> {
       context: context,
       builder: (_) => _EditSubtaskDialog(
         subtask: subtask,
-        onSave: (title) {
+        onSave: (title, estimatedMinutes) {
           return _run(
-            () => widget.taskState.editSubtask(task.id, subtask.id, title),
+            () => widget.taskState.editSubtask(
+              task.id,
+              subtask.id,
+              title,
+              estimatedMinutes: estimatedMinutes,
+              clearEstimatedMinutes: estimatedMinutes == null,
+            ),
           );
         },
       ),
@@ -778,7 +820,7 @@ class _EditSubtaskDialog extends StatefulWidget {
   });
 
   final Subtask subtask;
-  final Future<bool> Function(String title) onSave;
+  final Future<bool> Function(String title, int? estimatedMinutes) onSave;
 
   @override
   State<_EditSubtaskDialog> createState() => _EditSubtaskDialogState();
@@ -786,6 +828,7 @@ class _EditSubtaskDialog extends StatefulWidget {
 
 class _EditSubtaskDialogState extends State<_EditSubtaskDialog> {
   late final TextEditingController _controller;
+  late int? _estimatedMinutes;
   String? _errorText;
   bool _saving = false;
 
@@ -793,6 +836,7 @@ class _EditSubtaskDialogState extends State<_EditSubtaskDialog> {
   void initState() {
     super.initState();
     _controller = TextEditingController(text: widget.subtask.title);
+    _estimatedMinutes = widget.subtask.estimatedMinutes;
   }
 
   @override
@@ -812,7 +856,7 @@ class _EditSubtaskDialogState extends State<_EditSubtaskDialog> {
       _errorText = null;
       _saving = true;
     });
-    final success = await widget.onSave(title);
+    final success = await widget.onSave(title, _estimatedMinutes);
     if (!mounted) return;
     setState(() => _saving = false);
     if (success) Navigator.pop(context);
@@ -822,18 +866,48 @@ class _EditSubtaskDialogState extends State<_EditSubtaskDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: const Text('Edit step'),
-      content: TextField(
-        controller: _controller,
-        autofocus: true,
-        enabled: !_saving,
-        textCapitalization: TextCapitalization.sentences,
-        decoration: InputDecoration(
-          labelText: 'Step name',
-          errorText: _errorText,
-        ),
-        onChanged: (_) {
-          if (_errorText != null) setState(() => _errorText = null);
-        },
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            controller: _controller,
+            autofocus: true,
+            enabled: !_saving,
+            textCapitalization: TextCapitalization.sentences,
+            decoration: InputDecoration(
+              labelText: 'Step name',
+              errorText: _errorText,
+            ),
+            onChanged: (_) {
+              if (_errorText != null) setState(() => _errorText = null);
+            },
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text('Estimate', style: Theme.of(context).textTheme.bodySmall),
+          const SizedBox(height: AppSpacing.xxs),
+          Wrap(
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
+            children: [
+              ChoiceChip(
+                label: const Text('None'),
+                selected: _estimatedMinutes == null,
+                onSelected: _saving
+                    ? null
+                    : (_) => setState(() => _estimatedMinutes = null),
+              ),
+              for (final minutes in _estimateMinuteOptions)
+                ChoiceChip(
+                  label: Text('${minutes}m'),
+                  selected: _estimatedMinutes == minutes,
+                  onSelected: _saving
+                      ? null
+                      : (_) => setState(() => _estimatedMinutes = minutes),
+                ),
+            ],
+          ),
+        ],
       ),
       actions: [
         TextButton(
@@ -849,6 +923,66 @@ class _EditSubtaskDialogState extends State<_EditSubtaskDialog> {
   }
 }
 
+class _EstimateMenu extends StatelessWidget {
+  const _EstimateMenu({
+    super.key,
+    required this.value,
+    required this.enabled,
+    required this.onSelected,
+  });
+
+  final int? value;
+  final bool enabled;
+  final ValueChanged<int?> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final label = value == null ? 'Time' : '${value}m';
+
+    return PopupMenuButton<int>(
+      enabled: enabled,
+      tooltip: 'Step estimate',
+      onSelected: (minutes) => onSelected(minutes == 0 ? null : minutes),
+      itemBuilder: (_) => [
+        const PopupMenuItem<int>(
+          value: 0,
+          child: Text('No estimate'),
+        ),
+        for (final minutes in _estimateMinuteOptions)
+          PopupMenuItem<int>(
+            value: minutes,
+            child: Text('$minutes min'),
+          ),
+      ],
+      child: Container(
+        height: 44,
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+        decoration: BoxDecoration(
+          color: cs.surface,
+          border: Border.all(color: cs.outlineVariant),
+          borderRadius: BorderRadius.circular(AppRadii.control),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.timer_outlined, size: 18, color: cs.primary),
+            const SizedBox(width: AppSpacing.xxs),
+            Text(
+              label,
+              style: TextStyle(
+                color: cs.primary,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _SubtaskRow extends StatelessWidget {
   const _SubtaskRow({
     super.key,
@@ -856,6 +990,7 @@ class _SubtaskRow extends StatelessWidget {
     required this.enabled,
     required this.onToggle,
     required this.onEdit,
+    required this.onStartFocus,
     required this.onDelete,
   });
 
@@ -863,6 +998,7 @@ class _SubtaskRow extends StatelessWidget {
   final bool enabled;
   final VoidCallback onToggle;
   final VoidCallback onEdit;
+  final VoidCallback onStartFocus;
   final VoidCallback onDelete;
 
   @override
@@ -893,6 +1029,14 @@ class _SubtaskRow extends StatelessWidget {
                 ),
               ),
             ),
+            if (subtask.estimatedMinutes != null)
+              _EstimateBadge(minutes: subtask.estimatedMinutes!),
+            IconButton(
+              tooltip: 'Start timer for ${subtask.title}',
+              onPressed: enabled ? onStartFocus : null,
+              icon: const Icon(Icons.play_arrow_rounded, size: 20),
+              visualDensity: VisualDensity.compact,
+            ),
             IconButton(
               tooltip: 'Edit ${subtask.title}',
               onPressed: enabled ? onEdit : null,
@@ -906,6 +1050,37 @@ class _SubtaskRow extends StatelessWidget {
               visualDensity: VisualDensity.compact,
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EstimateBadge extends StatelessWidget {
+  const _EstimateBadge({required this.minutes});
+
+  final int minutes;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Container(
+      margin: const EdgeInsets.only(left: AppSpacing.xxs),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.xxs,
+        vertical: AppSpacing.xxs,
+      ),
+      decoration: BoxDecoration(
+        color: cs.primary.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(AppRadii.pill),
+      ),
+      child: Text(
+        '${minutes}m',
+        style: TextStyle(
+          color: cs.primary,
+          fontSize: 12,
+          fontWeight: FontWeight.w800,
         ),
       ),
     );

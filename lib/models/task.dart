@@ -11,6 +11,7 @@ class Task {
   TaskEnergyLevel? energyLevel;
   TaskTimeEstimate? timeEstimate;
   TaskAnxietyLevel? anxietyLevel;
+  int? estimatedMinutes;
 
   // Set when status transitions to 'completed'. Null for tasks that were
   // completed before v4 of the DB schema (which added the completed_at column).
@@ -26,6 +27,7 @@ class Task {
     this.energyLevel,
     this.timeEstimate,
     this.anxietyLevel,
+    this.estimatedMinutes,
     List<Subtask>? subtasks,
   }) : subtasks = subtasks ?? [];
 

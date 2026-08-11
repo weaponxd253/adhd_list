@@ -14,7 +14,11 @@ class TaskDatabase implements TaskRepository {
   }
 
   @override
-  Future<int> insertTask(String title, String dueDate) async {
+  Future<int> insertTask(
+    String title,
+    String dueDate, {
+    int? estimatedMinutes,
+  }) async {
     final db = await dbHelper.database;
     return await db.insert(
       'tasks',
@@ -28,6 +32,7 @@ class TaskDatabase implements TaskRepository {
         'energy_level': null,
         'time_estimate': null,
         'anxiety_level': null,
+        'estimated_minutes': estimatedMinutes,
       },
     );
   }
@@ -48,6 +53,18 @@ class TaskDatabase implements TaskRepository {
       whereArgs: [id],
     );
     _requireAffectedRow(count, 'Editing task $id');
+  }
+
+  @override
+  Future<void> updateTaskEstimate(int taskId, int? estimatedMinutes) async {
+    final db = await dbHelper.database;
+    final count = await db.update(
+      'tasks',
+      {'estimated_minutes': estimatedMinutes},
+      where: 'id = ?',
+      whereArgs: [taskId],
+    );
+    _requireAffectedRow(count, 'Updating task estimate for $taskId');
   }
 
   // Keeps is_completed, status, and completed_at in sync.
@@ -107,11 +124,20 @@ class TaskDatabase implements TaskRepository {
   }
 
   @override
-  Future<int> insertSubtask(int taskId, String title) async {
+  Future<int> insertSubtask(
+    int taskId,
+    String title, {
+    int? estimatedMinutes,
+  }) async {
     final db = await dbHelper.database;
     return await db.insert(
       'subtasks',
-      {'task_id': taskId, 'title': title, 'is_completed': 0},
+      {
+        'task_id': taskId,
+        'title': title,
+        'is_completed': 0,
+        'estimated_minutes': estimatedMinutes,
+      },
     );
   }
 
@@ -120,18 +146,25 @@ class TaskDatabase implements TaskRepository {
     final db = await dbHelper.database;
     return await db.query(
       'subtasks',
-      columns: ['id', 'task_id', 'title', 'is_completed'],
+      columns: ['id', 'task_id', 'title', 'is_completed', 'estimated_minutes'],
       where: 'task_id = ?',
       whereArgs: [taskId],
     );
   }
 
   @override
-  Future<void> updateSubtask(int subtaskId, String newTitle) async {
+  Future<void> updateSubtask(
+    int subtaskId,
+    String newTitle, {
+    int? estimatedMinutes,
+  }) async {
     final db = await dbHelper.database;
     final count = await db.update(
       'subtasks',
-      {'title': newTitle},
+      {
+        'title': newTitle,
+        'estimated_minutes': estimatedMinutes,
+      },
       where: 'id = ?',
       whereArgs: [subtaskId],
     );

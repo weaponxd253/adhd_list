@@ -50,6 +50,13 @@ class FakeTaskRepository implements TaskRepository {
   }
 
   @override
+  Future<void> updateTaskEstimate(int taskId, int? estimatedMinutes) async {
+    if (failWrites) _failure();
+    final row = taskRows.firstWhere((row) => row['id'] == taskId);
+    row['estimated_minutes'] = estimatedMinutes;
+  }
+
+  @override
   Future<List<Map<String, dynamic>>> fetchSubtasks(int taskId) async {
     if (failReads) _readFailure();
     return subtaskRows[taskId]?.map(Map<String, dynamic>.from).toList() ?? [];
@@ -62,7 +69,11 @@ class FakeTaskRepository implements TaskRepository {
   }
 
   @override
-  Future<int> insertSubtask(int taskId, String title) async {
+  Future<int> insertSubtask(
+    int taskId,
+    String title, {
+    int? estimatedMinutes,
+  }) async {
     if (failWrites) _failure();
     final id = nextSubtaskId++;
     subtaskRows.putIfAbsent(taskId, () => []).add({
@@ -70,12 +81,17 @@ class FakeTaskRepository implements TaskRepository {
       'task_id': taskId,
       'title': title,
       'is_completed': 0,
+      'estimated_minutes': estimatedMinutes,
     });
     return id;
   }
 
   @override
-  Future<int> insertTask(String title, String dueDate) async {
+  Future<int> insertTask(
+    String title,
+    String dueDate, {
+    int? estimatedMinutes,
+  }) async {
     if (failWrites) _failure();
     final id = nextTaskId++;
     taskRows.add({
@@ -85,16 +101,24 @@ class FakeTaskRepository implements TaskRepository {
       'is_completed': 0,
       'status': 'pending',
       'completed_at': null,
+      'estimated_minutes': estimatedMinutes,
     });
     return id;
   }
 
   @override
-  Future<void> updateSubtask(int subtaskId, String title) async {
+  Future<void> updateSubtask(
+    int subtaskId,
+    String title, {
+    int? estimatedMinutes,
+  }) async {
     if (failWrites) _failure();
     for (final rows in subtaskRows.values) {
       for (final row in rows) {
-        if (row['id'] == subtaskId) row['title'] = title;
+        if (row['id'] == subtaskId) {
+          row['title'] = title;
+          row['estimated_minutes'] = estimatedMinutes;
+        }
       }
     }
   }
@@ -362,6 +386,7 @@ Map<String, dynamic> taskRow({
   required DateTime dueDate,
   bool completed = false,
   DateTime? completedAt,
+  int? estimatedMinutes,
 }) {
   return {
     'id': id,
@@ -374,6 +399,7 @@ Map<String, dynamic> taskRow({
     'energy_level': null,
     'time_estimate': null,
     'anxiety_level': null,
+    'estimated_minutes': estimatedMinutes,
   };
 }
 
@@ -382,11 +408,13 @@ Map<String, dynamic> subtaskRow({
   required int taskId,
   required String title,
   bool completed = false,
+  int? estimatedMinutes,
 }) {
   return {
     'id': id,
     'task_id': taskId,
     'title': title,
     'is_completed': completed ? 1 : 0,
+    'estimated_minutes': estimatedMinutes,
   };
 }

@@ -23,7 +23,7 @@ void main() {
 
     tearDown(() => helper.close());
 
-    test('creates all tables and indexes at version 10', () async {
+    test('creates all tables and indexes at version 11', () async {
       final db = await helper.database;
       final objects = await db.query(
         'sqlite_master',
@@ -54,7 +54,14 @@ void main() {
           'idx_task_reminders_scheduled_at',
         ]),
       );
-      expect(await db.getVersion(), 10);
+      expect(await db.getVersion(), 11);
+
+      final taskColumns = await db.rawQuery('PRAGMA table_info(tasks)');
+      final taskColumnNames = taskColumns.map((row) => row['name']);
+      final subtaskColumns = await db.rawQuery('PRAGMA table_info(subtasks)');
+      final subtaskColumnNames = subtaskColumns.map((row) => row['name']);
+      expect(taskColumnNames, contains('estimated_minutes'));
+      expect(subtaskColumnNames, contains('estimated_minutes'));
 
       final timerColumns = await db.rawQuery(
         'PRAGMA table_info(timer_sessions)',
@@ -147,6 +154,34 @@ void main() {
       expect(row['anxiety_level'], 'high');
     });
 
+    test('persists task and subtask estimates', () async {
+      final tasks = TaskDatabase(dbHelper: helper);
+      final taskId = await tasks.insertTask(
+        'Task',
+        DateTime(2026, 6, 24).toIso8601String(),
+        estimatedMinutes: 25,
+      );
+      final subtaskId = await tasks.insertSubtask(
+        taskId,
+        'Step',
+        estimatedMinutes: 10,
+      );
+
+      var taskRow = (await tasks.fetchTasks()).single;
+      var subtaskRow = (await tasks.fetchSubtasks(taskId)).single;
+      expect(taskRow['estimated_minutes'], 25);
+      expect(subtaskRow['estimated_minutes'], 10);
+
+      await tasks.updateTaskEstimate(taskId, 5);
+      await tasks.updateSubtask(subtaskId, 'Renamed step', estimatedMinutes: 2);
+
+      taskRow = (await tasks.fetchTasks()).single;
+      subtaskRow = (await tasks.fetchSubtasks(taskId)).single;
+      expect(taskRow['estimated_minutes'], 5);
+      expect(subtaskRow['title'], 'Renamed step');
+      expect(subtaskRow['estimated_minutes'], 2);
+    });
+
     test('settings use replace semantics', () async {
       final settings = SettingsDatabase(dbHelper: helper);
 
@@ -225,7 +260,7 @@ void main() {
     });
   });
 
-  test('version 10 repairs a version 4 database with missing objects',
+  test('version 11 repairs a version 4 database with missing objects',
       () async {
     final directory = await Directory.systemTemp.createTemp('focusflow_test_');
     final path = '${directory.path}${Platform.pathSeparator}repair.db';
@@ -269,6 +304,8 @@ void main() {
       'PRAGMA table_info(timer_sessions)',
     );
     final timerColumnNames = timerColumns.map((row) => row['name']);
+    final subtaskColumns = await db.rawQuery('PRAGMA table_info(subtasks)');
+    final subtaskColumnNames = subtaskColumns.map((row) => row['name']);
     final tables = await db.query(
       'sqlite_master',
       columns: ['name'],
@@ -286,8 +323,10 @@ void main() {
         'energy_level',
         'time_estimate',
         'anxiety_level',
+        'estimated_minutes',
       ]),
     );
+    expect(subtaskColumnNames, contains('estimated_minutes'));
     expect(
         tableNames,
         containsAll([
@@ -308,6 +347,6 @@ void main() {
       ]),
     );
     expect((await db.query('tasks')).single['due_date'], isNotNull);
-    expect(await db.getVersion(), 10);
+    expect(await db.getVersion(), 11);
   });
 }

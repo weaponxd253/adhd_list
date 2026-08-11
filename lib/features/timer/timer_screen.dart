@@ -170,7 +170,7 @@ class _TimerTargetLabel extends StatelessWidget {
           Text(
             label,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: color.withOpacity(0.78),
+                  color: color.withValues(alpha: 0.78),
                   fontWeight: FontWeight.w700,
                 ),
           ),

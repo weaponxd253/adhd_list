@@ -79,6 +79,7 @@ class TaskState extends ChangeNotifier {
                 taskTimeEstimateFromId(row['time_estimate'] as String?),
             anxietyLevel:
                 taskAnxietyLevelFromId(row['anxiety_level'] as String?),
+            estimatedMinutes: row['estimated_minutes'] as int?,
             subtasks: subtaskRows.map(Subtask.fromMap).toList(),
           ),
         );
@@ -92,11 +93,19 @@ class TaskState extends ChangeNotifier {
     }
   }
 
-  Future<void> addTask(String title, DateTime dueDate) async {
+  Future<void> addTask(
+    String title,
+    DateTime dueDate, {
+    int? estimatedMinutes,
+  }) async {
     _isCreating = true;
     notifyListeners();
     try {
-      await _repository.insertTask(title, dueDate.toIso8601String());
+      await _repository.insertTask(
+        title,
+        dueDate.toIso8601String(),
+        estimatedMinutes: estimatedMinutes,
+      );
       await loadTasks();
     } finally {
       _isCreating = false;
@@ -141,6 +150,7 @@ class TaskState extends ChangeNotifier {
       final taskId = await _repository.insertTask(
         task.title,
         task.dueDate.toIso8601String(),
+        estimatedMinutes: task.estimatedMinutes,
       );
       if (task.isCompleted) {
         await _repository.updateTaskStatus(taskId, 'completed');
@@ -153,8 +163,11 @@ class TaskState extends ChangeNotifier {
         anxietyLevel: task.anxietyLevel?.id,
       );
       for (final subtask in task.subtasks) {
-        final subtaskId =
-            await _repository.insertSubtask(taskId, subtask.title);
+        final subtaskId = await _repository.insertSubtask(
+          taskId,
+          subtask.title,
+          estimatedMinutes: subtask.estimatedMinutes,
+        );
         if (subtask.isCompleted) {
           await _repository.updateSubtaskStatus(subtaskId, true);
         }
@@ -232,11 +245,29 @@ class TaskState extends ChangeNotifier {
     });
   }
 
-  Future<void> addSubtask(int taskId, String title) async {
+  Future<void> updateTaskEstimate(int taskId, int? estimatedMinutes) async {
     final task = _requireTask(taskId);
     await _runTaskMutation(taskId, () async {
-      final id = await _repository.insertSubtask(taskId, title);
-      task.subtasks.add(Subtask(id: id, title: title));
+      await _repository.updateTaskEstimate(taskId, estimatedMinutes);
+      task.estimatedMinutes = estimatedMinutes;
+    });
+  }
+
+  Future<void> addSubtask(
+    int taskId,
+    String title, {
+    int? estimatedMinutes,
+  }) async {
+    final task = _requireTask(taskId);
+    await _runTaskMutation(taskId, () async {
+      final id = await _repository.insertSubtask(
+        taskId,
+        title,
+        estimatedMinutes: estimatedMinutes,
+      );
+      task.subtasks.add(
+        Subtask(id: id, title: title, estimatedMinutes: estimatedMinutes),
+      );
     });
   }
 
@@ -257,13 +288,23 @@ class TaskState extends ChangeNotifier {
   Future<void> editSubtask(
     int taskId,
     int subtaskId,
-    String title,
-  ) async {
+    String title, {
+    int? estimatedMinutes,
+    bool clearEstimatedMinutes = false,
+  }) async {
     final task = _requireTask(taskId);
     final subtask = _requireSubtask(task, subtaskId);
+    final nextEstimatedMinutes = clearEstimatedMinutes
+        ? null
+        : estimatedMinutes ?? subtask.estimatedMinutes;
     await _runTaskMutation(taskId, () async {
-      await _repository.updateSubtask(subtaskId, title);
+      await _repository.updateSubtask(
+        subtaskId,
+        title,
+        estimatedMinutes: nextEstimatedMinutes,
+      );
       subtask.title = title;
+      subtask.estimatedMinutes = nextEstimatedMinutes;
     });
   }
 
@@ -337,12 +378,14 @@ class TaskState extends ChangeNotifier {
       energyLevel: task.energyLevel,
       timeEstimate: task.timeEstimate,
       anxietyLevel: task.anxietyLevel,
+      estimatedMinutes: task.estimatedMinutes,
       subtasks: task.subtasks
           .map(
             (subtask) => Subtask(
               id: subtask.id,
               title: subtask.title,
               isCompleted: subtask.isCompleted,
+              estimatedMinutes: subtask.estimatedMinutes,
             ),
           )
           .toList(),

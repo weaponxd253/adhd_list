@@ -1,12 +1,14 @@
 class Subtask {
-  int id;  // 
+  int id;
   String title;
   bool isCompleted;
+  int? estimatedMinutes;
 
   Subtask({
-    required this.id,  // 
+    required this.id,
     required this.title,
     this.isCompleted = false,
+    this.estimatedMinutes,
   });
 
   // Convert to Map for database storage
@@ -15,15 +17,17 @@ class Subtask {
       'id': id,
       'title': title,
       'is_completed': isCompleted ? 1 : 0,
+      'estimated_minutes': estimatedMinutes,
     };
   }
 
   // Create Subtask from a Map (used when fetching from DB)
   factory Subtask.fromMap(Map<String, dynamic> map) {
     return Subtask(
-      id: map['id'],  // ✅ Load ID from DB
+      id: map['id'],
       title: map['title'],
       isCompleted: map['is_completed'] == 1,
+      estimatedMinutes: map['estimated_minutes'] as int?,
     );
   }
 }

@@ -2,7 +2,7 @@ import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
 class DatabaseHelper {
-  static const _schemaVersion = 10;
+  static const _schemaVersion = 11;
   static final DatabaseHelper instance = DatabaseHelper._();
 
   DatabaseHelper._({
@@ -57,6 +57,7 @@ class DatabaseHelper {
         task_id INTEGER NOT NULL,
         title TEXT NOT NULL,
         is_completed INTEGER DEFAULT 0,
+        estimated_minutes INTEGER,
         FOREIGN KEY (task_id) REFERENCES tasks (id) ON DELETE CASCADE
       )
     ''');
@@ -160,6 +161,12 @@ class DatabaseHelper {
     await _ensureColumn(db, 'tasks', 'energy_level', 'energy_level TEXT');
     await _ensureColumn(db, 'tasks', 'time_estimate', 'time_estimate TEXT');
     await _ensureColumn(db, 'tasks', 'anxiety_level', 'anxiety_level TEXT');
+    await _ensureColumn(
+      db,
+      'tasks',
+      'estimated_minutes',
+      'estimated_minutes INTEGER',
+    );
     await _createTimerSessionsTable(db);
     await _ensureColumn(db, 'timer_sessions', 'task_id', 'task_id INTEGER');
     await _ensureColumn(
@@ -190,6 +197,12 @@ class DatabaseHelper {
       where: 'due_date IS NULL',
     );
     await _createSubtasksTable(db);
+    await _ensureColumn(
+      db,
+      'subtasks',
+      'estimated_minutes',
+      'estimated_minutes INTEGER',
+    );
     await _createMoodsTable(db);
     await _createSettingsTable(db);
     await _createTaskRemindersTable(db);
@@ -208,7 +221,8 @@ class DatabaseHelper {
         friction TEXT,
         energy_level TEXT,
         time_estimate TEXT,
-        anxiety_level TEXT
+        anxiety_level TEXT,
+        estimated_minutes INTEGER
       )
     ''');
 
