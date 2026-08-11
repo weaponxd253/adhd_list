@@ -108,7 +108,12 @@ class _TaskSupportSheetState extends State<_TaskSupportSheet> {
 
   void _startQuickFocus(int minutes) {
     final messenger = ScaffoldMessenger.of(context);
-    final started = context.read<TimerState>().startQuickFocus(minutes);
+    final started = context.read<TimerState>().startTargetFocus(
+          minutes: minutes,
+          targetType: TimerState.targetTypeTask,
+          taskId: _task.id,
+          title: _task.title,
+        );
     Navigator.pop(context);
     messenger.showSnackBar(
       SnackBar(

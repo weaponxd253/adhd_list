@@ -232,6 +232,9 @@ void main() {
 
     expect(timerState.isTimerRunning, isTrue);
     expect(timerState.timerDisplay, '02:00');
+    expect(timerState.activeTaskId, 1);
+    expect(timerState.activeTargetType, TimerState.targetTypeTask);
+    expect(timerState.activeTargetTitle, 'Tiny start task');
     expect(find.text('2 minute focus started'), findsOneWidget);
     timerState.stopTimer();
   });
@@ -347,6 +350,9 @@ void main() {
     await tester.pump();
     expect(timerState.isTimerRunning, isTrue);
     expect(timerState.timerDisplay, '02:00');
+    expect(timerState.activeTaskId, 1);
+    expect(timerState.activeTargetType, TimerState.targetTypeTask);
+    expect(timerState.activeTargetTitle, 'Hard task');
     timerState.stopTimer();
   });
 

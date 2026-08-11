@@ -40,6 +40,7 @@ void main() {
     await _pumpTimerScreen(tester, state);
 
     expect(find.text('Ready to start'), findsOneWidget);
+    expect(find.text('Focus session'), findsOneWidget);
 
     state.startTimer();
     await tester.pump();
@@ -63,6 +64,28 @@ void main() {
 
     expect(state.isTimerRunning, isTrue);
     expect(state.timerDisplay, '05:00');
+    expect(state.hasActiveTarget, isFalse);
+    state.stopTimer();
+  });
+
+  testWidgets('shows active task context for linked focus sessions',
+      (tester) async {
+    final state = TimerState(
+      sessionRepository: FakeTimerSessionRepository(),
+    );
+    await _pumpTimerScreen(tester, state);
+
+    state.startTargetFocus(
+      minutes: 10,
+      targetType: TimerState.targetTypeTask,
+      taskId: 7,
+      title: 'Write report',
+    );
+    await tester.pump();
+
+    expect(find.text('Working on'), findsOneWidget);
+    expect(find.text('Write report'), findsOneWidget);
+    expect(find.text('Focus session'), findsNothing);
     state.stopTimer();
   });
 

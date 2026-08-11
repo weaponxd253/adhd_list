@@ -508,7 +508,12 @@ class _TaskListSectionState extends State<TaskListSection> {
   }
 
   void _startTinyFocus(Task task) {
-    final started = context.read<TimerState>().startQuickFocus(2);
+    final started = context.read<TimerState>().startTargetFocus(
+          minutes: 2,
+          targetType: TimerState.targetTypeTask,
+          taskId: task.id,
+          title: task.title,
+        );
     _message(started ? '2 minute focus started' : 'Timer already running');
   }
 

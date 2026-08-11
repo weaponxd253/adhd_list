@@ -115,7 +115,9 @@ class _TimerScreenState extends State<TimerScreen>
                 pulse: _pulseController,
                 emoji: _modeEmojis[modeIndex],
               ),
-              SizedBox(height: compact ? AppSpacing.xl : 48),
+              const SizedBox(height: AppSpacing.md),
+              _TimerTargetLabel(timerState: timerState, color: color),
+              SizedBox(height: compact ? AppSpacing.lg : AppSpacing.xl),
               _TimerControls(timerState: timerState, color: color),
               const SizedBox(height: AppSpacing.sm),
               _TimerStatusChip(label: timerState.statusLabel, color: color),
@@ -140,6 +142,51 @@ class _TimerScreenState extends State<TimerScreen>
           context.read<TimerState>().startQuickFocus(5);
         },
         onDone: () => Navigator.pop(sheetContext),
+      ),
+    );
+  }
+}
+
+class _TimerTargetLabel extends StatelessWidget {
+  const _TimerTargetLabel({
+    required this.timerState,
+    required this.color,
+  });
+
+  final TimerState timerState;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final title = timerState.activeTargetTitle;
+    final hasTitle = timerState.hasActiveTarget && title != null;
+    final label = hasTitle ? 'Working on' : 'Focus session';
+    final detail = hasTitle ? title : null;
+
+    return Semantics(
+      label: detail == null ? label : '$label $detail',
+      child: Column(
+        children: [
+          Text(
+            label,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: color.withOpacity(0.78),
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+          if (detail != null) ...[
+            const SizedBox(height: AppSpacing.xxs),
+            Text(
+              detail,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+            ),
+          ],
+        ],
       ),
     );
   }

@@ -279,7 +279,7 @@ class _NowCard extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
         ),
         const SizedBox(height: AppSpacing.md),
-        _startButtons(context),
+        _startButtons(context, task),
         const SizedBox(height: AppSpacing.xs),
         Row(
           children: [
@@ -306,7 +306,7 @@ class _NowCard extends StatelessWidget {
     );
   }
 
-  Widget _startButtons(BuildContext context) {
+  Widget _startButtons(BuildContext context, Task task) {
     final style = FilledButton.styleFrom(
       backgroundColor: Colors.white,
       foregroundColor: Theme.of(context).colorScheme.primary,
@@ -314,14 +314,14 @@ class _NowCard extends StatelessWidget {
     final buttons = [
       FilledButton.icon(
         key: const Key('dashboard-start-tiny'),
-        onPressed: () => _startFocus(context, 2),
+        onPressed: () => _startFocus(context, task, 2),
         icon: const Icon(Icons.bolt_rounded),
         label: const Text('Start 2 min'),
         style: style,
       ),
       FilledButton.icon(
         key: const Key('dashboard-start-5'),
-        onPressed: () => _startFocus(context, 5),
+        onPressed: () => _startFocus(context, task, 5),
         icon: const Icon(Icons.play_arrow_rounded),
         label: const Text('Start 5 min'),
         style: style,
@@ -375,8 +375,13 @@ class _NowCard extends StatelessWidget {
     }
   }
 
-  void _startFocus(BuildContext context, int minutes) {
-    final started = context.read<TimerState>().startQuickFocus(minutes);
+  void _startFocus(BuildContext context, Task task, int minutes) {
+    final started = context.read<TimerState>().startTargetFocus(
+          minutes: minutes,
+          targetType: TimerState.targetTypeTask,
+          taskId: task.id,
+          title: task.title,
+        );
     onOpenTimer?.call();
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()

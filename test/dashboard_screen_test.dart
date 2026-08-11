@@ -188,6 +188,9 @@ void main() {
 
     expect(harness.timerState.isTimerRunning, isTrue);
     expect(harness.timerState.timerDisplay, '05:00');
+    expect(harness.timerState.activeTaskId, 1);
+    expect(harness.timerState.activeTargetType, TimerState.targetTypeTask);
+    expect(harness.timerState.activeTargetTitle, 'Do homework');
     expect(openedTimer, isTrue);
     harness.timerState.stopTimer();
   });
@@ -206,8 +209,36 @@ void main() {
 
     expect(harness.timerState.isTimerRunning, isTrue);
     expect(harness.timerState.timerDisplay, '02:00');
+    expect(harness.timerState.activeTaskId, 1);
+    expect(harness.timerState.activeTargetType, TimerState.targetTypeTask);
+    expect(harness.timerState.activeTargetTitle, 'Do homework');
     expect(openedTimer, isTrue);
     expect(find.text('2 minute focus started'), findsOneWidget);
+    harness.timerState.stopTimer();
+  });
+
+  testWidgets('dashboard task start does not replace a running task timer',
+      (tester) async {
+    final harness = await _pumpDashboard(
+      tester,
+      tasks: [
+        taskRow(id: 1, title: 'First task', dueDate: today),
+        taskRow(id: 2, title: 'Second task', dueDate: today),
+      ],
+    );
+
+    await tester.tap(find.byKey(const Key('dashboard-start-tiny')));
+    await tester.pump();
+    final firstTaskId = harness.timerState.activeTaskId;
+    final firstTaskTitle = harness.timerState.activeTargetTitle;
+
+    await tester.tap(find.byKey(const Key('dashboard-start-5')));
+    await tester.pump();
+
+    expect(harness.timerState.timerDisplay, '02:00');
+    expect(harness.timerState.activeTaskId, firstTaskId);
+    expect(harness.timerState.activeTargetTitle, firstTaskTitle);
+    expect(find.text('Timer already running'), findsOneWidget);
     harness.timerState.stopTimer();
   });
 
