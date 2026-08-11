@@ -9,6 +9,11 @@ import '../repositories/repositories.dart';
 import '../services/timer_notification_service.dart';
 
 class TimerState extends ChangeNotifier {
+  static const targetTypeNone = 'none';
+  static const targetTypeTask = 'task';
+  static const targetTypeSubtask = 'subtask';
+  static const outcomeTimeDoneOnly = 'time_done_only';
+
   TimerState({
     DateTime Function()? now,
     TimerSessionRepository? sessionRepository,
@@ -40,6 +45,10 @@ class TimerState extends ChangeNotifier {
   DateTime? _sessionStartedAt;
   DateTime? _sessionEndsAt;
   int? _sessionPlannedDurationSeconds;
+  int? _activeTaskId;
+  int? _activeSubtaskId;
+  String _activeTargetType = targetTypeNone;
+  String? _activeTargetTitle;
   Timer? _timer;
   bool _isSessionHistoryLoading = false;
   bool _notificationsEnabled = false;
@@ -55,6 +64,11 @@ class TimerState extends ChangeNotifier {
   bool get notificationPermissionGranted => _notificationPermissionGranted;
   bool get notificationPermissionNeeded =>
       _notificationsEnabled && !_notificationPermissionGranted;
+  int? get activeTaskId => _activeTaskId;
+  int? get activeSubtaskId => _activeSubtaskId;
+  String get activeTargetType => _activeTargetType;
+  String? get activeTargetTitle => _activeTargetTitle;
+  bool get hasActiveTarget => _activeTargetType != targetTypeNone;
 
   String get statusLabel {
     if (isTimerRunning) return 'Session in progress';
@@ -115,9 +129,27 @@ class TimerState extends ChangeNotifier {
   }
 
   bool startQuickFocus(int minutes) {
+    return startTargetFocus(
+      minutes: minutes,
+      targetType: targetTypeNone,
+    );
+  }
+
+  bool startTargetFocus({
+    required int minutes,
+    required String targetType,
+    int? taskId,
+    int? subtaskId,
+    String? title,
+  }) {
     if (minutes <= 0) {
       throw ArgumentError.value(minutes, 'minutes', 'Must be greater than 0');
     }
+    _validateTarget(
+      targetType: targetType,
+      taskId: taskId,
+      subtaskId: subtaskId,
+    );
     syncWithClock(notify: false);
     if (isTimerRunning) return false;
 
@@ -125,6 +157,12 @@ class TimerState extends ChangeNotifier {
     _timer = null;
     _clearCompletionState();
     _clearSessionTracking();
+    _setActiveTarget(
+      targetType: targetType,
+      taskId: taskId,
+      subtaskId: subtaskId,
+      title: title,
+    );
     currentMode = 'Focus';
     _currentDuration = minutes * 60;
     remainingTime = _currentDuration;
@@ -319,6 +357,10 @@ class TimerState extends ChangeNotifier {
     final startedAt = _sessionStartedAt ??
         endedAt.subtract(Duration(seconds: _currentDuration));
     final durationSeconds = _sessionPlannedDurationSeconds ?? _currentDuration;
+    final taskId = _activeTaskId;
+    final subtaskId = _activeSubtaskId;
+    final targetType = _activeTargetType;
+    final targetTitleSnapshot = _activeTargetTitle;
     _timer?.cancel();
     _timer = null;
     _sessionEndsAt = null;
@@ -335,6 +377,11 @@ class TimerState extends ChangeNotifier {
         startedAt: startedAt,
         endedAt: endedAt,
         durationSeconds: durationSeconds,
+        taskId: taskId,
+        subtaskId: subtaskId,
+        targetType: targetType,
+        targetTitleSnapshot: targetTitleSnapshot,
+        outcome: outcomeTimeDoneOnly,
       ),
     );
     notifyListeners();
@@ -359,6 +406,66 @@ class TimerState extends ChangeNotifier {
   void _clearSessionTracking() {
     _sessionStartedAt = null;
     _sessionPlannedDurationSeconds = null;
+    _activeTaskId = null;
+    _activeSubtaskId = null;
+    _activeTargetType = targetTypeNone;
+    _activeTargetTitle = null;
+  }
+
+  void _validateTarget({
+    required String targetType,
+    required int? taskId,
+    required int? subtaskId,
+  }) {
+    switch (targetType) {
+      case targetTypeNone:
+        return;
+      case targetTypeTask:
+        if (taskId == null) {
+          throw ArgumentError.value(taskId, 'taskId', 'Required for task');
+        }
+        return;
+      case targetTypeSubtask:
+        if (taskId == null) {
+          throw ArgumentError.value(taskId, 'taskId', 'Required for subtask');
+        }
+        if (subtaskId == null) {
+          throw ArgumentError.value(
+            subtaskId,
+            'subtaskId',
+            'Required for subtask',
+          );
+        }
+        return;
+      default:
+        throw ArgumentError.value(
+          targetType,
+          'targetType',
+          'Must be none, task, or subtask',
+        );
+    }
+  }
+
+  void _setActiveTarget({
+    required String targetType,
+    int? taskId,
+    int? subtaskId,
+    String? title,
+  }) {
+    if (targetType == targetTypeNone) {
+      _activeTaskId = null;
+      _activeSubtaskId = null;
+      _activeTargetType = targetTypeNone;
+      _activeTargetTitle = null;
+      return;
+    }
+
+    _activeTaskId = taskId;
+    _activeSubtaskId = subtaskId;
+    _activeTargetType = targetType;
+    final trimmedTitle = title?.trim();
+    _activeTargetTitle =
+        trimmedTitle == null || trimmedTitle.isEmpty ? null : trimmedTitle;
   }
 
   void _startTicker() {
@@ -374,12 +481,22 @@ class TimerState extends ChangeNotifier {
     required DateTime startedAt,
     required DateTime endedAt,
     required int durationSeconds,
+    int? taskId,
+    int? subtaskId,
+    String targetType = targetTypeNone,
+    String? targetTitleSnapshot,
+    String? outcome,
   }) async {
     final session = FocusSession(
       mode: mode,
       startedAt: startedAt,
       endedAt: endedAt,
       durationSeconds: durationSeconds,
+      taskId: taskId,
+      subtaskId: subtaskId,
+      targetType: targetType,
+      targetTitleSnapshot: targetTitleSnapshot,
+      outcome: outcome,
     );
 
     try {
@@ -394,6 +511,11 @@ class TimerState extends ChangeNotifier {
           endedAt: session.endedAt,
           durationSeconds: session.durationSeconds,
           completed: session.completed,
+          taskId: session.taskId,
+          subtaskId: session.subtaskId,
+          targetType: session.targetType,
+          targetTitleSnapshot: session.targetTitleSnapshot,
+          outcome: session.outcome,
         ),
       );
       notifyListeners();

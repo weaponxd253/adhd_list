@@ -2,7 +2,7 @@ import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
 class DatabaseHelper {
-  static const _schemaVersion = 9;
+  static const _schemaVersion = 10;
   static final DatabaseHelper instance = DatabaseHelper._();
 
   DatabaseHelper._({
@@ -123,7 +123,12 @@ class DatabaseHelper {
         started_at TEXT NOT NULL,
         ended_at TEXT NOT NULL,
         duration_seconds INTEGER NOT NULL,
-        completed INTEGER DEFAULT 1
+        completed INTEGER DEFAULT 1,
+        task_id INTEGER,
+        subtask_id INTEGER,
+        target_type TEXT NOT NULL DEFAULT 'none',
+        target_title_snapshot TEXT,
+        outcome TEXT
       )
     ''');
   }
@@ -155,6 +160,27 @@ class DatabaseHelper {
     await _ensureColumn(db, 'tasks', 'energy_level', 'energy_level TEXT');
     await _ensureColumn(db, 'tasks', 'time_estimate', 'time_estimate TEXT');
     await _ensureColumn(db, 'tasks', 'anxiety_level', 'anxiety_level TEXT');
+    await _createTimerSessionsTable(db);
+    await _ensureColumn(db, 'timer_sessions', 'task_id', 'task_id INTEGER');
+    await _ensureColumn(
+      db,
+      'timer_sessions',
+      'subtask_id',
+      'subtask_id INTEGER',
+    );
+    await _ensureColumn(
+      db,
+      'timer_sessions',
+      'target_type',
+      "target_type TEXT NOT NULL DEFAULT 'none'",
+    );
+    await _ensureColumn(
+      db,
+      'timer_sessions',
+      'target_title_snapshot',
+      'target_title_snapshot TEXT',
+    );
+    await _ensureColumn(db, 'timer_sessions', 'outcome', 'outcome TEXT');
     await db.update(
       'tasks',
       {
@@ -166,7 +192,6 @@ class DatabaseHelper {
     await _createSubtasksTable(db);
     await _createMoodsTable(db);
     await _createSettingsTable(db);
-    await _createTimerSessionsTable(db);
     await _createTaskRemindersTable(db);
     await _createIndexes(db);
   }

@@ -91,6 +91,30 @@ void main() {
       expect(state.timerDisplay, '05:00');
       expect(state.isTimerRunning, isTrue);
       expect(state.focusDuration, 25);
+      expect(state.hasActiveTarget, isFalse);
+      expect(state.activeTargetType, TimerState.targetTypeNone);
+    });
+
+    test('target focus starts with active task context', () {
+      final state = TimerState();
+      addTearDown(state.dispose);
+
+      final started = state.startTargetFocus(
+        minutes: 10,
+        targetType: TimerState.targetTypeTask,
+        taskId: 42,
+        title: 'Write report',
+      );
+
+      expect(started, isTrue);
+      expect(state.currentMode, 'Focus');
+      expect(state.timerDisplay, '10:00');
+      expect(state.isTimerRunning, isTrue);
+      expect(state.hasActiveTarget, isTrue);
+      expect(state.activeTargetType, TimerState.targetTypeTask);
+      expect(state.activeTaskId, 42);
+      expect(state.activeSubtaskId, isNull);
+      expect(state.activeTargetTitle, 'Write report');
     });
 
     test('quick focus does not replace a running timer', () {
@@ -110,6 +134,38 @@ void main() {
         expect(state.isTimerRunning, isTrue);
         state.dispose();
       });
+    });
+
+    test('reset and stop clear active target state', () {
+      final state = TimerState();
+      addTearDown(state.dispose);
+
+      state.startTargetFocus(
+        minutes: 10,
+        targetType: TimerState.targetTypeSubtask,
+        taskId: 42,
+        subtaskId: 77,
+        title: 'Find one source',
+      );
+      state.resetTimer();
+
+      expect(state.hasActiveTarget, isFalse);
+      expect(state.activeTaskId, isNull);
+      expect(state.activeSubtaskId, isNull);
+      expect(state.activeTargetTitle, isNull);
+
+      state.startTargetFocus(
+        minutes: 5,
+        targetType: TimerState.targetTypeTask,
+        taskId: 42,
+        title: 'Write report',
+      );
+      state.stopTimer();
+
+      expect(state.hasActiveTarget, isFalse);
+      expect(state.activeTaskId, isNull);
+      expect(state.activeSubtaskId, isNull);
+      expect(state.activeTargetTitle, isNull);
     });
 
     test('completes a session by switching to the next ready mode', () {
@@ -136,6 +192,50 @@ void main() {
         expect(repository.sessionRows, hasLength(1));
         expect(repository.sessionRows.single['mode'], 'Focus');
         expect(repository.sessionRows.single['duration_seconds'], 60);
+        expect(repository.sessionRows.single['target_type'], 'none');
+        expect(repository.sessionRows.single['outcome'], 'time_done_only');
+        state.dispose();
+      });
+    });
+
+    test('completed target focus saves task context', () {
+      fakeAsync((async) {
+        final startedAt = DateTime(2026, 6, 23, 9);
+        var now = startedAt;
+        final repository = FakeTimerSessionRepository();
+        final state = TimerState(
+          now: () => now,
+          sessionRepository: repository,
+        );
+
+        state.startTargetFocus(
+          minutes: 10,
+          targetType: TimerState.targetTypeSubtask,
+          taskId: 42,
+          subtaskId: 77,
+          title: 'Find one source',
+        );
+        now = now.add(const Duration(minutes: 10));
+        state.syncWithClock();
+        async.flushMicrotasks();
+
+        expect(repository.sessionRows, hasLength(1));
+        expect(repository.sessionRows.single['task_id'], 42);
+        expect(repository.sessionRows.single['subtask_id'], 77);
+        expect(repository.sessionRows.single['target_type'], 'subtask');
+        expect(
+          repository.sessionRows.single['target_title_snapshot'],
+          'Find one source',
+        );
+        expect(repository.sessionRows.single['outcome'], 'time_done_only');
+        expect(state.sessionHistory.single.taskId, 42);
+        expect(state.sessionHistory.single.subtaskId, 77);
+        expect(state.sessionHistory.single.targetType, 'subtask');
+        expect(
+          state.sessionHistory.single.targetTitleSnapshot,
+          'Find one source',
+        );
+        expect(state.hasActiveTarget, isFalse);
         state.dispose();
       });
     });
@@ -210,6 +310,8 @@ void main() {
       await state.loadSessionHistory();
 
       expect(state.sessionHistory, hasLength(3));
+      expect(state.sessionHistory.last.targetType, TimerState.targetTypeNone);
+      expect(state.sessionHistory.last.taskId, isNull);
       expect(state.completedSessionsToday, 2);
       expect(state.focusMinutesToday, 25);
     });

@@ -23,7 +23,7 @@ void main() {
 
     tearDown(() => helper.close());
 
-    test('creates all tables and indexes at version 9', () async {
+    test('creates all tables and indexes at version 10', () async {
       final db = await helper.database;
       final objects = await db.query(
         'sqlite_master',
@@ -54,7 +54,22 @@ void main() {
           'idx_task_reminders_scheduled_at',
         ]),
       );
-      expect(await db.getVersion(), 9);
+      expect(await db.getVersion(), 10);
+
+      final timerColumns = await db.rawQuery(
+        'PRAGMA table_info(timer_sessions)',
+      );
+      final timerColumnNames = timerColumns.map((row) => row['name']);
+      expect(
+        timerColumnNames,
+        containsAll([
+          'task_id',
+          'subtask_id',
+          'target_type',
+          'target_title_snapshot',
+          'outcome',
+        ]),
+      );
     });
 
     test('enforces due dates and foreign keys', () async {
@@ -178,12 +193,22 @@ void main() {
         'ended_at': DateTime(2026, 6, 24, 9, 25).toIso8601String(),
         'duration_seconds': 1500,
         'completed': 1,
+        'task_id': 7,
+        'subtask_id': 11,
+        'target_type': 'subtask',
+        'target_title_snapshot': 'Find one source',
+        'outcome': 'time_done_only',
       });
 
       final rows = await sessions.fetchSessions();
       expect(id, isPositive);
       expect(rows.single['mode'], 'Focus');
       expect(rows.single['duration_seconds'], 1500);
+      expect(rows.single['task_id'], 7);
+      expect(rows.single['subtask_id'], 11);
+      expect(rows.single['target_type'], 'subtask');
+      expect(rows.single['target_title_snapshot'], 'Find one source');
+      expect(rows.single['outcome'], 'time_done_only');
 
       await sessions.clearSessions();
       expect(await sessions.fetchSessions(), isEmpty);
@@ -200,7 +225,8 @@ void main() {
     });
   });
 
-  test('version 9 repairs a version 4 database with missing objects', () async {
+  test('version 10 repairs a version 4 database with missing objects',
+      () async {
     final directory = await Directory.systemTemp.createTemp('focusflow_test_');
     final path = '${directory.path}${Platform.pathSeparator}repair.db';
     final oldDb = await databaseFactoryFfi.openDatabase(
@@ -239,6 +265,10 @@ void main() {
     final db = await helper.database;
     final taskColumns = await db.rawQuery('PRAGMA table_info(tasks)');
     final columnNames = taskColumns.map((row) => row['name']);
+    final timerColumns = await db.rawQuery(
+      'PRAGMA table_info(timer_sessions)',
+    );
+    final timerColumnNames = timerColumns.map((row) => row['name']);
     final tables = await db.query(
       'sqlite_master',
       columns: ['name'],
@@ -267,7 +297,17 @@ void main() {
           'timer_sessions',
           'task_reminders',
         ]));
+    expect(
+      timerColumnNames,
+      containsAll([
+        'task_id',
+        'subtask_id',
+        'target_type',
+        'target_title_snapshot',
+        'outcome',
+      ]),
+    );
     expect((await db.query('tasks')).single['due_date'], isNotNull);
-    expect(await db.getVersion(), 9);
+    expect(await db.getVersion(), 10);
   });
 }
