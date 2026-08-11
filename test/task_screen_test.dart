@@ -203,7 +203,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text("I'm stuck"), findsOneWidget);
-    expect(find.text('Start tiny'), findsOneWidget);
+    expect(find.text('Start 2 min'), findsOneWidget);
     expect(find.text('Remind later'), findsOneWidget);
     expect(find.text('Remind tomorrow'), findsOneWidget);
     expect(find.text('Edit'), findsOneWidget);
@@ -227,12 +227,12 @@ void main() {
 
     await tester.tap(find.byTooltip('Task actions for Tiny start task'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Start tiny'));
+    await tester.tap(find.text('Start 2 min'));
     await tester.pump();
 
     expect(timerState.isTimerRunning, isTrue);
     expect(timerState.timerDisplay, '02:00');
-    expect(find.text('2 minute tiny focus started'), findsOneWidget);
+    expect(find.text('2 minute focus started'), findsOneWidget);
     timerState.stopTimer();
   });
 

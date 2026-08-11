@@ -277,7 +277,7 @@ class _TaskListSectionState extends State<TaskListSection> {
                           value: 'startTiny',
                           child: ListTile(
                             leading: Icon(Icons.bolt_rounded),
-                            title: Text('Start tiny'),
+                            title: Text('Start 2 min'),
                           ),
                         ),
                         const PopupMenuItem(
@@ -333,7 +333,7 @@ class _TaskListSectionState extends State<TaskListSection> {
                   else ...[
                     IconButton(
                       key: ValueKey('start-tiny-${task.id}'),
-                      tooltip: 'Start tiny focus for ${task.title}',
+                      tooltip: 'Start 2-minute focus for ${task.title}',
                       onPressed: busy ? null : () => _startTinyFocus(task),
                       icon: const Icon(Icons.bolt_rounded),
                       iconSize: 22,
@@ -508,8 +508,8 @@ class _TaskListSectionState extends State<TaskListSection> {
   }
 
   void _startTinyFocus(Task task) {
-    context.read<TimerState>().startQuickFocus(2);
-    _message('2 minute tiny focus started');
+    final started = context.read<TimerState>().startQuickFocus(2);
+    _message(started ? '2 minute focus started' : 'Timer already running');
   }
 
   Future<void> _remindTask(

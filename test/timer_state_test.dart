@@ -84,12 +84,32 @@ void main() {
       final state = TimerState();
       addTearDown(state.dispose);
 
-      state.startQuickFocus(5);
+      final started = state.startQuickFocus(5);
 
+      expect(started, isTrue);
       expect(state.currentMode, 'Focus');
       expect(state.timerDisplay, '05:00');
       expect(state.isTimerRunning, isTrue);
       expect(state.focusDuration, 25);
+    });
+
+    test('quick focus does not replace a running timer', () {
+      fakeAsync((_) {
+        final startedAt = DateTime(2026, 6, 23, 9);
+        var now = startedAt;
+        final state = TimerState(now: () => now);
+        state.startTimer();
+        now = now.add(const Duration(minutes: 3));
+        state.syncWithClock();
+
+        final started = state.startQuickFocus(2);
+
+        expect(started, isFalse);
+        expect(state.currentMode, 'Focus');
+        expect(state.timerDisplay, '22:00');
+        expect(state.isTimerRunning, isTrue);
+        state.dispose();
+      });
     });
 
     test('completes a session by switching to the next ready mode', () {

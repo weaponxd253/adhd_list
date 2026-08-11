@@ -108,14 +108,12 @@ class _TaskSupportSheetState extends State<_TaskSupportSheet> {
 
   void _startQuickFocus(int minutes) {
     final messenger = ScaffoldMessenger.of(context);
-    context.read<TimerState>().startQuickFocus(minutes);
+    final started = context.read<TimerState>().startQuickFocus(minutes);
     Navigator.pop(context);
     messenger.showSnackBar(
       SnackBar(
         content: Text(
-          minutes == 2
-              ? '2 minute tiny focus started'
-              : '$minutes minute focus started',
+          started ? '$minutes minute focus started' : 'Timer already running',
         ),
       ),
     );
@@ -252,7 +250,7 @@ class _TaskSupportSheetState extends State<_TaskSupportSheet> {
                     key: const Key('start-tiny-focus'),
                     onPressed: _saving ? null : () => _startQuickFocus(2),
                     icon: const Icon(Icons.bolt_rounded),
-                    label: const Text('Start tiny'),
+                    label: const Text('Start 2 min'),
                   ),
                   if (suggestedMinutes != 2)
                     OutlinedButton.icon(

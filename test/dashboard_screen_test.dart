@@ -207,7 +207,7 @@ void main() {
     expect(harness.timerState.isTimerRunning, isTrue);
     expect(harness.timerState.timerDisplay, '02:00');
     expect(openedTimer, isTrue);
-    expect(find.text('2 minute tiny focus started'), findsOneWidget);
+    expect(find.text('2 minute focus started'), findsOneWidget);
     harness.timerState.stopTimer();
   });
 
@@ -282,7 +282,7 @@ void main() {
 
     expect(find.text('Old paperwork'), findsOneWidget);
     expect(
-      find.text('Still worth doing. Want to start tiny?'),
+      find.text('Still worth doing. Want a 2-minute start?'),
       findsOneWidget,
     );
 

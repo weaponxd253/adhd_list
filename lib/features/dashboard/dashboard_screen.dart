@@ -316,7 +316,7 @@ class _NowCard extends StatelessWidget {
         key: const Key('dashboard-start-tiny'),
         onPressed: () => _startFocus(context, 2),
         icon: const Icon(Icons.bolt_rounded),
-        label: const Text('Start tiny'),
+        label: const Text('Start 2 min'),
         style: style,
       ),
       FilledButton.icon(
@@ -376,16 +376,14 @@ class _NowCard extends StatelessWidget {
   }
 
   void _startFocus(BuildContext context, int minutes) {
-    context.read<TimerState>().startQuickFocus(minutes);
+    final started = context.read<TimerState>().startQuickFocus(minutes);
     onOpenTimer?.call();
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
           content: Text(
-            minutes == 2
-                ? '2 minute tiny focus started'
-                : '$minutes minute focus started',
+            started ? '$minutes minute focus started' : 'Timer already running',
           ),
         ),
       );
@@ -671,7 +669,7 @@ class _WaitingTaskCardState extends State<_WaitingTaskCard> {
                   key: const Key('waiting-start-tiny'),
                   onPressed: _saving ? null : _startTiny,
                   icon: const Icon(Icons.bolt_rounded),
-                  label: const Text('Start tiny'),
+                  label: const Text('Start 2 min'),
                 ),
                 OutlinedButton.icon(
                   key: const Key('waiting-remind-later'),
@@ -718,7 +716,7 @@ class _WaitingTaskCardState extends State<_WaitingTaskCard> {
   String _nudgeCopy(String tinyStep) {
     switch (_style) {
       case _NudgeStyle.gentle:
-        return 'Still worth doing. Want to start tiny?';
+        return 'Still worth doing. Want a 2-minute start?';
       case _NudgeStyle.direct:
         return "Open the task. That's enough to begin.";
       case _NudgeStyle.tinyStep:
@@ -753,9 +751,9 @@ class _WaitingTaskCardState extends State<_WaitingTaskCard> {
   }
 
   void _startTiny() {
-    widget.timerState.startQuickFocus(2);
+    final started = widget.timerState.startQuickFocus(2);
     widget.onOpenTimer?.call();
-    _message('2 minute tiny focus started');
+    _message(started ? '2 minute focus started' : 'Timer already running');
   }
 
   Future<void> _scheduleReminder(bool tomorrow) async {
@@ -987,12 +985,18 @@ class _DailyResetCardState extends State<_DailyResetCard> {
   }
 
   void _startTinyRecovery() {
-    widget.timerState.startQuickFocus(2);
+    final started = widget.timerState.startQuickFocus(2);
     widget.onOpenTimer?.call();
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
-        const SnackBar(content: Text('2 minute recovery focus started')),
+        SnackBar(
+          content: Text(
+            started
+                ? '2 minute recovery focus started'
+                : 'Timer already running',
+          ),
+        ),
       );
   }
 }

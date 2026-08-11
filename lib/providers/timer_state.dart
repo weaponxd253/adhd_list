@@ -114,10 +114,13 @@ class TimerState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void startQuickFocus(int minutes) {
+  bool startQuickFocus(int minutes) {
     if (minutes <= 0) {
       throw ArgumentError.value(minutes, 'minutes', 'Must be greater than 0');
     }
+    syncWithClock(notify: false);
+    if (isTimerRunning) return false;
+
     _timer?.cancel();
     _timer = null;
     _clearCompletionState();
@@ -126,6 +129,7 @@ class TimerState extends ChangeNotifier {
     _currentDuration = minutes * 60;
     remainingTime = _currentDuration;
     startTimer();
+    return true;
   }
 
   void stopTimer() {
