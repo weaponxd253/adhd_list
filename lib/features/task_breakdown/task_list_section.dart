@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -135,6 +136,7 @@ class _TaskListSectionState extends State<TaskListSection> {
     final activeForTask = timerState.isActiveForTask(task.id);
     final anotherFocusActive =
         timerState.isActiveFocusSession && !activeForTask;
+    final focusSummary = timerState.focusSummaryForTask(task.id);
     final settingsState = context.watch<SettingsState>();
     final reminderState = context.watch<TaskReminderState>();
     final reminder = reminderState.reminderFor(task.id);
@@ -470,14 +472,19 @@ class _TaskListSectionState extends State<TaskListSection> {
                 ],
               ),
             ),
-            if (expanded) _buildSubtasks(task, busy, timerState),
+            if (expanded) _buildSubtasks(task, busy, timerState, focusSummary),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildSubtasks(Task task, bool busy, TimerState timerState) {
+  Widget _buildSubtasks(
+    Task task,
+    bool busy,
+    TimerState timerState,
+    TaskFocusSummary focusSummary,
+  ) {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Container(
@@ -496,12 +503,14 @@ class _TaskListSectionState extends State<TaskListSection> {
       ),
       child: Column(
         children: [
+          _TaskFocusProgress(task: task, summary: focusSummary),
           for (final subtask in task.subtasks)
             _SubtaskRow(
               key: ValueKey('subtask-${subtask.id}'),
               subtask: subtask,
               enabled: !busy,
               active: timerState.isActiveForSubtask(subtask.id),
+              focusedMinutes: focusSummary.subtaskFocusMinutes(subtask.id),
               timerDisplay: timerState.timerDisplay,
               anotherFocusActive: timerState.isActiveFocusSession &&
                   !timerState.isActiveForSubtask(subtask.id),
@@ -778,6 +787,94 @@ class _TaskListSectionState extends State<TaskListSection> {
     if (difference == 1) return 'due tomorrow';
     return 'due ${task.dueDate.month}/${task.dueDate.day}';
   }
+}
+
+class _TaskFocusProgress extends StatelessWidget {
+  const _TaskFocusProgress({
+    required this.task,
+    required this.summary,
+  });
+
+  final Task task;
+  final TaskFocusSummary summary;
+
+  @override
+  Widget build(BuildContext context) {
+    final estimate = task.estimatedMinutes;
+    if (!summary.hasFocus && estimate == null) {
+      return const SizedBox.shrink();
+    }
+
+    final cs = Theme.of(context).colorScheme;
+    final semantic = Theme.of(context).extension<AppSemanticColors>()!;
+    final comparison = estimate == null || !summary.hasFocus
+        ? null
+        : _estimateComparison(
+            focusedMinutes: summary.focusMinutes,
+            estimatedMinutes: estimate,
+          );
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Wrap(
+          spacing: AppSpacing.xs,
+          runSpacing: AppSpacing.xxs,
+          children: [
+            if (summary.hasFocus)
+              _StatusBadge(
+                label: 'Focused ${summary.focusMinutes}m',
+                color: cs.primary,
+                icon: Icons.timer_outlined,
+              ),
+            if (estimate != null)
+              _StatusBadge(
+                label: 'Estimate ${estimate}m',
+                color: cs.secondary,
+                icon: Icons.schedule_rounded,
+              ),
+            if (comparison != null)
+              _StatusBadge(
+                label: comparison.label,
+                color: comparison.isOver ? semantic.warning : semantic.success,
+                icon: comparison.isOver
+                    ? Icons.trending_up_rounded
+                    : Icons.done_rounded,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  _EstimateComparison _estimateComparison({
+    required int focusedMinutes,
+    required int estimatedMinutes,
+  }) {
+    final difference = focusedMinutes - estimatedMinutes;
+    final tolerance = math.max(2, (estimatedMinutes * 0.2).round());
+    if (difference.abs() <= tolerance) {
+      return const _EstimateComparison(label: 'Close estimate');
+    }
+    if (difference < 0) {
+      return const _EstimateComparison(label: 'Under estimate');
+    }
+    return const _EstimateComparison(
+      label: 'Needed more time',
+      isOver: true,
+    );
+  }
+}
+
+class _EstimateComparison {
+  const _EstimateComparison({
+    required this.label,
+    this.isOver = false,
+  });
+
+  final String label;
+  final bool isOver;
 }
 
 class _EditTaskDialog extends StatefulWidget {
@@ -1061,6 +1158,7 @@ class _SubtaskRow extends StatelessWidget {
     required this.subtask,
     required this.enabled,
     required this.active,
+    required this.focusedMinutes,
     required this.timerDisplay,
     required this.anotherFocusActive,
     required this.onToggle,
@@ -1073,6 +1171,7 @@ class _SubtaskRow extends StatelessWidget {
   final Subtask subtask;
   final bool enabled;
   final bool active;
+  final int focusedMinutes;
   final String timerDisplay;
   final bool anotherFocusActive;
   final VoidCallback onToggle;
@@ -1087,7 +1186,7 @@ class _SubtaskRow extends StatelessWidget {
 
     return Semantics(
       label:
-          '${subtask.title}, ${subtask.isCompleted ? "completed" : "not completed"}${active ? ", timer active" : ""}',
+          '${subtask.title}, ${subtask.isCompleted ? "completed" : "not completed"}${focusedMinutes > 0 ? ", focused $focusedMinutes minutes" : ""}${active ? ", timer active" : ""}',
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxs),
         child: DecoratedBox(
@@ -1111,15 +1210,32 @@ class _SubtaskRow extends StatelessWidget {
                     : 'Mark ${subtask.title} complete',
               ),
               Expanded(
-                child: Text(
-                  subtask.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontWeight: active ? FontWeight.w700 : null,
-                    decoration:
-                        subtask.isCompleted ? TextDecoration.lineThrough : null,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      subtask.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontWeight: active ? FontWeight.w700 : null,
+                        decoration: subtask.isCompleted
+                            ? TextDecoration.lineThrough
+                            : null,
+                      ),
+                    ),
+                    if (focusedMinutes > 0 && !active)
+                      Text(
+                        'Focused ${focusedMinutes}m',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: cs.primary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                  ],
                 ),
               ),
               if (subtask.estimatedMinutes != null && !active)

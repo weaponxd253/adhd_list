@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../features/mood_tracker/mood_tracker_screen.dart';
 import '../../features/settings/settings_screen.dart';
+import '../../models/focus_session.dart';
 import '../../models/task.dart';
 import '../../models/task_reminder.dart';
 import '../../models/task_support.dart';
@@ -62,7 +63,11 @@ class DashboardScreen extends StatelessWidget {
                 moodState: moodState,
               ),
               const SizedBox(height: AppSpacing.md),
-              _NextPreview(taskState: taskState),
+              _NextPreview(
+                taskState: taskState,
+                timerState: timerState,
+                onOpenTimer: onOpenTimer,
+              ),
               if (waitingTask != null) ...[
                 const SizedBox(height: AppSpacing.md),
                 _WaitingTaskCard(
@@ -1649,9 +1654,15 @@ class _TimerButton extends StatelessWidget {
 }
 
 class _NextPreview extends StatefulWidget {
-  const _NextPreview({required this.taskState});
+  const _NextPreview({
+    required this.taskState,
+    required this.timerState,
+    required this.onOpenTimer,
+  });
 
   final TaskState taskState;
+  final TimerState timerState;
+  final VoidCallback? onOpenTimer;
 
   @override
   State<_NextPreview> createState() => _NextPreviewState();
@@ -1664,6 +1675,7 @@ class _NextPreviewState extends State<_NextPreview> {
   Widget build(BuildContext context) {
     final tasks = widget.taskState.nextTasks;
     final laterCount = widget.taskState.laterTaskCount;
+    final resumeCandidate = _resumeCandidate();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1701,7 +1713,14 @@ class _NextPreviewState extends State<_NextPreview> {
           ),
         ),
         if (_expanded) ...[
-          if (tasks.isEmpty)
+          if (resumeCandidate != null) ...[
+            _ResumeFocusTile(
+              candidate: resumeCandidate,
+              onStart: () => _startResumeFocus(resumeCandidate),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+          ],
+          if (tasks.isEmpty && resumeCandidate == null)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
               child: Text(
@@ -1722,6 +1741,177 @@ class _NextPreviewState extends State<_NextPreview> {
           _LaterSummary(count: laterCount),
         ],
       ],
+    );
+  }
+
+  _ResumeCandidate? _resumeCandidate() {
+    if (widget.timerState.isActiveFocusSession) return null;
+
+    final pendingTasks = widget.taskState.pendingTaskList;
+    final tasksById = {for (final task in pendingTasks) task.id: task};
+    final session = widget.timerState.latestOpenFocusSessionForTaskIds(
+      tasksById.keys,
+    );
+    if (session == null) return null;
+    if (session.targetType != TimerState.targetTypeTask &&
+        session.targetType != TimerState.targetTypeSubtask) {
+      return null;
+    }
+
+    final task = tasksById[session.taskId];
+    if (task == null) return null;
+
+    if (session.targetType == TimerState.targetTypeSubtask) {
+      final subtaskId = session.subtaskId;
+      final subtaskStillOpen = task.subtasks.any(
+        (subtask) => subtask.id == subtaskId && !subtask.isCompleted,
+      );
+      if (!subtaskStillOpen) return null;
+    }
+
+    return _ResumeCandidate(session: session, task: task);
+  }
+
+  void _startResumeFocus(_ResumeCandidate candidate) {
+    final session = candidate.session;
+    final started = widget.timerState.startTargetFocus(
+      minutes: 5,
+      targetType: session.targetType,
+      taskId: candidate.task.id,
+      subtaskId: session.targetType == TimerState.targetTypeSubtask
+          ? session.subtaskId
+          : null,
+      title: candidate.targetTitle,
+    );
+    if (started) {
+      widget.onOpenTimer?.call();
+      return;
+    }
+
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(content: Text('A focus session is already running.')),
+      );
+  }
+}
+
+class _ResumeCandidate {
+  const _ResumeCandidate({
+    required this.session,
+    required this.task,
+  });
+
+  final FocusSession session;
+  final Task task;
+
+  String get targetTitle {
+    final snapshot = session.targetTitleSnapshot?.trim();
+    if (snapshot != null && snapshot.isNotEmpty) return snapshot;
+    if (session.targetType == TimerState.targetTypeSubtask) {
+      for (final subtask in task.subtasks) {
+        if (subtask.id == session.subtaskId) return subtask.title;
+      }
+    }
+    return task.title;
+  }
+
+  bool get isSubtask => session.targetType == TimerState.targetTypeSubtask;
+}
+
+class _ResumeFocusTile extends StatelessWidget {
+  const _ResumeFocusTile({
+    required this.candidate,
+    required this.onStart,
+  });
+
+  final _ResumeCandidate candidate;
+  final VoidCallback onStart;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final compact = MediaQuery.textScalerOf(context).scale(1) > 1.3 ||
+        MediaQuery.sizeOf(context).width < 390;
+    final detail = candidate.isSubtask
+        ? '${candidate.targetTitle} · ${candidate.task.title}'
+        : candidate.task.title;
+    final button = OutlinedButton.icon(
+      key: const Key('dashboard-resume-focus'),
+      onPressed: onStart,
+      icon: const Icon(Icons.play_arrow_rounded),
+      label: const Text('Start 5 min'),
+      style: OutlinedButton.styleFrom(
+        visualDensity: VisualDensity.compact,
+      ),
+    );
+
+    final titleRow = Row(
+      children: [
+        Icon(Icons.history_rounded, color: cs.primary, size: 20),
+        const SizedBox(width: AppSpacing.xs),
+        Expanded(
+          child: Text(
+            'Still open',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context)
+                .textTheme
+                .bodyLarge
+                ?.copyWith(fontWeight: FontWeight.w800),
+          ),
+        ),
+      ],
+    );
+
+    final textBlock = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        titleRow,
+        const SizedBox(height: AppSpacing.xxs),
+        Text(
+          detail,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+        Text(
+          'Left open ${DateFormat.jm().format(candidate.session.endedAt)}',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+      ],
+    );
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: cs.surface,
+        borderRadius: BorderRadius.circular(AppRadii.control),
+        border: Border.all(color: cs.primary.withValues(alpha: 0.22)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: AppSpacing.xs,
+        ),
+        child: compact
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  textBlock,
+                  const SizedBox(height: AppSpacing.xs),
+                  Align(alignment: Alignment.centerLeft, child: button),
+                ],
+              )
+            : Row(
+                children: [
+                  Expanded(child: textBlock),
+                  const SizedBox(width: AppSpacing.xs),
+                  button,
+                ],
+              ),
+      ),
     );
   }
 }

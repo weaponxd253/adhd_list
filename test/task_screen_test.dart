@@ -285,6 +285,68 @@ void main() {
     timerState.stopTimer();
   });
 
+  testWidgets('expanded task shows focus memory from linked sessions',
+      (tester) async {
+    final timerRepository = FakeTimerSessionRepository(
+      sessions: [
+        {
+          'id': 1,
+          'mode': 'Focus',
+          'started_at': DateTime(2026, 6, 23, 9).toIso8601String(),
+          'ended_at': DateTime(2026, 6, 23, 9, 5).toIso8601String(),
+          'duration_seconds': 300,
+          'completed': 1,
+          'task_id': 1,
+          'subtask_id': 200,
+          'target_type': TimerState.targetTypeSubtask,
+          'target_title_snapshot': 'Write outline',
+          'outcome': TimerState.outcomeLeftOpen,
+        },
+      ],
+    );
+    final repository = FakeTaskRepository(
+      tasks: [
+        taskRow(
+          id: 1,
+          title: 'Project task',
+          dueDate: today,
+          estimatedMinutes: 10,
+        ),
+      ],
+      subtasks: {
+        1: [
+          subtaskRow(
+            id: 200,
+            taskId: 1,
+            title: 'Write outline',
+            estimatedMinutes: 5,
+          ),
+        ],
+      },
+    );
+    final state = TaskState(
+      repository: repository,
+      autoLoad: false,
+    );
+    final timerState = TimerState(
+      notificationService: FakeTimerNotificationService(),
+      sessionRepository: timerRepository,
+    );
+    addTearDown(timerState.dispose);
+    await state.loadTasks();
+    await timerState.loadSessionHistory();
+    await _pumpTaskScreen(tester, state, timerState: timerState);
+
+    expect(find.text('Focused 5m'), findsNothing);
+
+    await tester.tap(find.byTooltip('Expand task'));
+    await tester.pump();
+
+    expect(find.text('Focused 5m'), findsWidgets);
+    expect(find.text('Estimate 10m'), findsOneWidget);
+    expect(find.text('Under estimate'), findsOneWidget);
+  });
+
   testWidgets('active subtask row can end focus early', (tester) async {
     final startedAt = DateTime(2026, 6, 23, 9);
     var now = startedAt;

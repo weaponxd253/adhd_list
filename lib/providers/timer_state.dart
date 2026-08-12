@@ -40,6 +40,26 @@ class TimerCompletionTarget {
   }
 }
 
+@immutable
+class TaskFocusSummary {
+  const TaskFocusSummary({
+    required this.focusSeconds,
+    required this.sessionCount,
+    required this.subtaskFocusSeconds,
+  });
+
+  final int focusSeconds;
+  final int sessionCount;
+  final Map<int, int> subtaskFocusSeconds;
+
+  int get focusMinutes => TimerState.minutesFromSeconds(focusSeconds);
+  bool get hasFocus => focusSeconds > 0;
+
+  int subtaskFocusMinutes(int subtaskId) {
+    return TimerState.minutesFromSeconds(subtaskFocusSeconds[subtaskId] ?? 0);
+  }
+}
+
 class TimerState extends ChangeNotifier {
   static const targetTypeNone = 'none';
   static const targetTypeTask = 'task';
@@ -114,6 +134,29 @@ class TimerState extends ChangeNotifier {
   TimerCompletionTarget? get pendingCompletionTarget =>
       _pendingCompletionTarget;
 
+  static int minutesFromSeconds(int seconds) {
+    if (seconds <= 0) return 0;
+    return (seconds / 60).round();
+  }
+
+  static String readableOutcomeLabel(String? outcome) {
+    switch (outcome) {
+      case outcomeTaskCompleted:
+        return 'Task complete';
+      case outcomeSubtaskCompleted:
+        return 'Step complete';
+      case outcomeContinued:
+        return 'Added more time';
+      case outcomeLeftOpen:
+        return 'Left open';
+      case outcomeBreakReady:
+        return 'Break ready';
+      case outcomeTimeDoneOnly:
+      default:
+        return 'Time ended';
+    }
+  }
+
   bool isActiveForTask(int taskId) {
     return isActiveFocusSession && _activeTaskId == taskId;
   }
@@ -146,10 +189,68 @@ class TimerState extends ChangeNotifier {
     return seconds ~/ 60;
   }
 
+  TaskFocusSummary focusSummaryForTask(int taskId) {
+    var focusSeconds = 0;
+    var sessionCount = 0;
+    final subtaskFocusSeconds = <int, int>{};
+
+    for (final session in _sessions) {
+      if (!_countsTowardFocusSummary(session) || session.taskId != taskId) {
+        continue;
+      }
+
+      focusSeconds += session.durationSeconds;
+      sessionCount++;
+      final subtaskId = session.subtaskId;
+      if (subtaskId != null) {
+        subtaskFocusSeconds[subtaskId] =
+            (subtaskFocusSeconds[subtaskId] ?? 0) + session.durationSeconds;
+      }
+    }
+
+    return TaskFocusSummary(
+      focusSeconds: focusSeconds,
+      sessionCount: sessionCount,
+      subtaskFocusSeconds: Map.unmodifiable(subtaskFocusSeconds),
+    );
+  }
+
+  FocusSession? latestOpenFocusSessionForTaskIds(Iterable<int> taskIds) {
+    final taskIdSet = taskIds.toSet();
+    if (taskIdSet.isEmpty) return null;
+
+    final latestByTarget = <String, FocusSession>{};
+    for (final session in _sessions) {
+      if (!_countsTowardFocusSummary(session)) continue;
+      final taskId = session.taskId;
+      if (taskId == null || !taskIdSet.contains(taskId)) continue;
+
+      final targetKey =
+          '$taskId:${session.targetType}:${session.subtaskId ?? 0}';
+      final current = latestByTarget[targetKey];
+      if (current == null || session.endedAt.isAfter(current.endedAt)) {
+        latestByTarget[targetKey] = session;
+      }
+    }
+
+    final openSessions = latestByTarget.values
+        .where((session) => session.outcome == outcomeLeftOpen)
+        .toList()
+      ..sort((a, b) => b.endedAt.compareTo(a.endedAt));
+    return openSessions.isEmpty ? null : openSessions.first;
+  }
+
   bool _isSameDay(DateTime first, DateTime second) {
     return first.year == second.year &&
         first.month == second.month &&
         first.day == second.day;
+  }
+
+  bool _countsTowardFocusSummary(FocusSession session) {
+    return session.completed &&
+        session.mode == 'Focus' &&
+        session.durationSeconds > 0 &&
+        session.taskId != null;
   }
 
   int _durationForMode(String mode) {

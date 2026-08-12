@@ -48,6 +48,11 @@ void main() {
             'ended_at': DateTime(2026, 6, 23, 9, 25).toIso8601String(),
             'duration_seconds': 1500,
             'completed': 1,
+            'task_id': 42,
+            'subtask_id': 77,
+            'target_type': TimerState.targetTypeSubtask,
+            'target_title_snapshot': 'Find one source',
+            'outcome': TimerState.outcomeLeftOpen,
           },
           {
             'id': 2,
@@ -65,6 +70,8 @@ void main() {
 
     expect(find.text('Focus'), findsOneWidget);
     expect(find.text('Long Break'), findsOneWidget);
+    expect(find.text('Step: Find one source'), findsOneWidget);
+    expect(find.textContaining('Left open'), findsOneWidget);
     expect(find.textContaining('25 min'), findsOneWidget);
     expect(find.textContaining('15 min'), findsOneWidget);
   });
