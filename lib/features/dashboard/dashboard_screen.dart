@@ -14,6 +14,7 @@ import '../../providers/task_reminder_state.dart';
 import '../../providers/timer_state.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/task_support_sheet.dart';
+import '../../widgets/timer_completion_prompt.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key, this.onOpenMood, this.onOpenTimer});
@@ -50,6 +51,7 @@ class DashboardScreen extends StatelessWidget {
               _NowCard(
                 taskState: taskState,
                 moodState: moodState,
+                timerState: timerState,
                 task: nowTask,
                 onOpenTimer: onOpenTimer,
               ),
@@ -142,12 +144,14 @@ class _NowCard extends StatelessWidget {
   const _NowCard({
     required this.taskState,
     required this.moodState,
+    required this.timerState,
     required this.task,
     required this.onOpenTimer,
   });
 
   final TaskState taskState;
   final MoodState moodState;
+  final TimerState timerState;
   final Task? task;
   final VoidCallback? onOpenTimer;
 
@@ -169,7 +173,7 @@ class _NowCard extends StatelessWidget {
         padding: const EdgeInsets.all(AppSpacing.md),
         child: task == null
             ? _emptyState(context)
-            : _taskState(context, task, taskState, moodState),
+            : _taskState(context, task, taskState, moodState, timerState),
       ),
     );
   }
@@ -208,6 +212,7 @@ class _NowCard extends StatelessWidget {
     Task task,
     TaskState taskState,
     MoodState moodState,
+    TimerState timerState,
   ) {
     final dueStr = DateFormat.MMMd().format(task.dueDate);
     final completedSteps = task.subtasks.where((s) => s.isCompleted).length;
@@ -279,7 +284,7 @@ class _NowCard extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
         ),
         const SizedBox(height: AppSpacing.md),
-        _startButtons(context, task),
+        _primaryFocusControls(context, task, timerState),
         const SizedBox(height: AppSpacing.xs),
         Row(
           children: [
@@ -306,7 +311,26 @@ class _NowCard extends StatelessWidget {
     );
   }
 
-  Widget _startButtons(BuildContext context, Task task) {
+  Widget _primaryFocusControls(
+    BuildContext context,
+    Task task,
+    TimerState timerState,
+  ) {
+    if (timerState.isActiveForTask(task.id)) {
+      return _NowActiveFocusControls(
+        timerState: timerState,
+        task: task,
+        onEnd: () => _endFocusNow(context),
+      );
+    }
+
+    if (timerState.isActiveFocusSession) {
+      return _NowOtherFocusControls(
+        timerState: timerState,
+        onOpenTimer: onOpenTimer,
+      );
+    }
+
     final style = FilledButton.styleFrom(
       backgroundColor: Colors.white,
       foregroundColor: Theme.of(context).colorScheme.primary,
@@ -382,16 +406,166 @@ class _NowCard extends StatelessWidget {
           taskId: task.id,
           title: task.title,
         );
-    onOpenTimer?.call();
+    if (started) return;
+
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
-        SnackBar(
-          content: Text(
-            started ? '$minutes minute focus started' : 'Timer already running',
-          ),
-        ),
+        const SnackBar(content: Text('A focus session is already running.')),
       );
+  }
+
+  void _endFocusNow(BuildContext context) {
+    final ended = context.read<TimerState>().endCurrentSessionEarly();
+    if (!ended) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('No active focus session to end.')),
+        );
+      return;
+    }
+
+    showPendingTimerCompletionPrompt(context);
+  }
+}
+
+class _NowActiveFocusControls extends StatelessWidget {
+  const _NowActiveFocusControls({
+    required this.timerState,
+    required this.task,
+    required this.onEnd,
+  });
+
+  final TimerState timerState;
+  final Task task;
+  final VoidCallback onEnd;
+
+  @override
+  Widget build(BuildContext context) {
+    final targetTitle = timerState.activeTargetTitle;
+    final detail =
+        targetTitle == null || targetTitle == task.title ? null : targetTitle;
+    final status = timerState.isTimerRunning ? 'In progress' : 'Paused';
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(AppRadii.control),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: AppSpacing.xs,
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.timer_outlined, color: Colors.white, size: 20),
+            const SizedBox(width: AppSpacing.xs),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '$status · ${timerState.timerDisplay} left',
+                    key: const Key('dashboard-active-focus'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  if (detail != null)
+                    Text(
+                      detail,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(width: AppSpacing.xs),
+            OutlinedButton.icon(
+              key: const Key('dashboard-end-active-focus'),
+              onPressed: onEnd,
+              icon: const Icon(Icons.stop_circle_outlined, size: 18),
+              label: const Text('End now'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.white,
+                side: const BorderSide(color: Colors.white70),
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NowOtherFocusControls extends StatelessWidget {
+  const _NowOtherFocusControls({
+    required this.timerState,
+    required this.onOpenTimer,
+  });
+
+  final TimerState timerState;
+  final VoidCallback? onOpenTimer;
+
+  @override
+  Widget build(BuildContext context) {
+    final title = timerState.activeTargetTitle ?? 'Focus session';
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(AppRadii.control),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.20)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: AppSpacing.xs,
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.timer_outlined, color: Colors.white70, size: 20),
+            const SizedBox(width: AppSpacing.xs),
+            Expanded(
+              child: Text(
+                'Timer running · $title',
+                key: const Key('dashboard-other-focus'),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.xs),
+            TextButton(
+              key: const Key('dashboard-open-active-timer'),
+              onPressed: onOpenTimer,
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.white,
+                visualDensity: VisualDensity.compact,
+              ),
+              child: const Text('Timer'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -758,7 +932,9 @@ class _WaitingTaskCardState extends State<_WaitingTaskCard> {
   void _startTiny() {
     final started = widget.timerState.startQuickFocus(2);
     widget.onOpenTimer?.call();
-    _message(started ? '2 minute focus started' : 'Timer already running');
+    _message(
+      started ? '2 minute focus started' : 'A focus session is already active',
+    );
   }
 
   Future<void> _scheduleReminder(bool tomorrow) async {
@@ -999,7 +1175,7 @@ class _DailyResetCardState extends State<_DailyResetCard> {
           content: Text(
             started
                 ? '2 minute recovery focus started'
-                : 'Timer already running',
+                : 'A focus session is already active',
           ),
         ),
       );

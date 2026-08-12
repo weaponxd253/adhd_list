@@ -285,6 +285,63 @@ void main() {
     timerState.stopTimer();
   });
 
+  testWidgets('active subtask row can end focus early', (tester) async {
+    final startedAt = DateTime(2026, 6, 23, 9);
+    var now = startedAt;
+    final timerRepository = FakeTimerSessionRepository();
+    final repository = FakeTaskRepository(
+      tasks: [taskRow(id: 1, title: 'Project task', dueDate: today)],
+      subtasks: {
+        1: [
+          subtaskRow(
+            id: 200,
+            taskId: 1,
+            title: 'Write outline',
+            estimatedMinutes: 5,
+          ),
+        ],
+      },
+    );
+    final state = TaskState(
+      repository: repository,
+      autoLoad: false,
+    );
+    final timerState = TimerState(
+      now: () => now,
+      notificationService: FakeTimerNotificationService(),
+      sessionRepository: timerRepository,
+    );
+    addTearDown(timerState.dispose);
+    await state.loadTasks();
+    await _pumpTaskScreen(tester, state, timerState: timerState);
+
+    await tester.tap(find.byTooltip('Expand task'));
+    await tester.pump();
+    await tester.tap(find.byTooltip('Start timer for Write outline'));
+    await tester.pump();
+    now = startedAt.add(const Duration(seconds: 65));
+    timerState.syncWithClock();
+    await tester.pump();
+
+    expect(find.byKey(const Key('active-subtask-end-focus')), findsOneWidget);
+    expect(find.text('03:55 · End'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('active-subtask-end-focus')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 700));
+
+    expect(timerRepository.sessionRows.single['duration_seconds'], 65);
+    expect(find.text('Did that get finished?'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('linked-completion-leave-open')));
+    await tester.pump();
+
+    expect(
+      timerRepository.sessionRows.single['outcome'],
+      TimerState.outcomeLeftOpen,
+    );
+  });
+
   testWidgets('task actions can schedule a reminder', (tester) async {
     final state = TaskState(
       repository: FakeTaskRepository(
@@ -460,6 +517,12 @@ void main() {
                 repository: FakeTaskReminderRepository(),
                 notificationService: FakeTaskReminderNotificationService(),
                 autoLoad: false,
+              ),
+            ),
+            ChangeNotifierProvider(
+              create: (_) => TimerState(
+                notificationService: FakeTimerNotificationService(),
+                sessionRepository: FakeTimerSessionRepository(),
               ),
             ),
           ],

@@ -49,6 +49,7 @@ class _DashboardHarness {
       autoLoad: false,
     );
     timerState = TimerState(
+      now: now,
       notificationService: notificationService,
       sessionRepository: timerSessionRepository,
     );
@@ -174,7 +175,7 @@ void main() {
     expect(find.text('Next'), findsOneWidget);
   });
 
-  testWidgets('dashboard quick start begins a five minute focus session',
+  testWidgets('dashboard quick start shows an active focus state',
       (tester) async {
     var openedTimer = false;
     final harness = await _pumpDashboard(
@@ -191,11 +192,14 @@ void main() {
     expect(harness.timerState.activeTaskId, 1);
     expect(harness.timerState.activeTargetType, TimerState.targetTypeTask);
     expect(harness.timerState.activeTargetTitle, 'Do homework');
-    expect(openedTimer, isTrue);
+    expect(openedTimer, isFalse);
+    expect(find.byKey(const Key('dashboard-active-focus')), findsOneWidget);
+    expect(find.text('In progress · 05:00 left'), findsOneWidget);
+    expect(find.byKey(const Key('dashboard-start-5')), findsNothing);
     harness.timerState.stopTimer();
   });
 
-  testWidgets('dashboard tiny start begins a two minute focus session',
+  testWidgets('dashboard tiny start shows an active focus state',
       (tester) async {
     var openedTimer = false;
     final harness = await _pumpDashboard(
@@ -212,13 +216,12 @@ void main() {
     expect(harness.timerState.activeTaskId, 1);
     expect(harness.timerState.activeTargetType, TimerState.targetTypeTask);
     expect(harness.timerState.activeTargetTitle, 'Do homework');
-    expect(openedTimer, isTrue);
-    expect(find.text('2 minute focus started'), findsOneWidget);
+    expect(openedTimer, isFalse);
+    expect(find.text('In progress · 02:00 left'), findsOneWidget);
     harness.timerState.stopTimer();
   });
 
-  testWidgets('dashboard task start does not replace a running task timer',
-      (tester) async {
+  testWidgets('dashboard active focus replaces start actions', (tester) async {
     final harness = await _pumpDashboard(
       tester,
       tasks: [
@@ -232,14 +235,49 @@ void main() {
     final firstTaskId = harness.timerState.activeTaskId;
     final firstTaskTitle = harness.timerState.activeTargetTitle;
 
-    await tester.tap(find.byKey(const Key('dashboard-start-5')));
-    await tester.pump();
-
     expect(harness.timerState.timerDisplay, '02:00');
     expect(harness.timerState.activeTaskId, firstTaskId);
     expect(harness.timerState.activeTargetTitle, firstTaskTitle);
-    expect(find.text('Timer already running'), findsOneWidget);
+    expect(find.byKey(const Key('dashboard-start-5')), findsNothing);
+    expect(find.byKey(const Key('dashboard-end-active-focus')), findsOneWidget);
     harness.timerState.stopTimer();
+  });
+
+  testWidgets('dashboard can end active task focus early', (tester) async {
+    final startedAt = DateTime(2026, 8, 3, 9);
+    var now = startedAt;
+    final harness = await _pumpDashboard(
+      tester,
+      now: () => now,
+      tasks: [taskRow(id: 1, title: 'Do homework', dueDate: today)],
+    );
+
+    await tester.tap(find.byKey(const Key('dashboard-start-5')));
+    await tester.pump();
+    now = startedAt.add(const Duration(seconds: 90));
+    harness.timerState.syncWithClock();
+    await tester.pump();
+
+    expect(find.text('In progress · 03:30 left'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('dashboard-end-active-focus')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 700));
+
+    expect(harness.timerState.isTimerRunning, isFalse);
+    expect(harness.timerState.currentMode, 'Short Break');
+    expect(
+        harness.timerSessionRepository.sessionRows.single['duration_seconds'],
+        90);
+    expect(find.text('Did that get finished?'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('linked-completion-leave-open')));
+    await tester.pump();
+
+    expect(
+      harness.timerSessionRepository.sessionRows.single['outcome'],
+      TimerState.outcomeLeftOpen,
+    );
   });
 
   testWidgets('dashboard tiny step adds a subtask', (tester) async {

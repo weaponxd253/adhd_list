@@ -307,6 +307,80 @@ void main() {
       });
     });
 
+    test('ending linked focus early records elapsed time', () {
+      fakeAsync((async) {
+        final startedAt = DateTime(2026, 6, 23, 9);
+        var now = startedAt;
+        final repository = FakeTimerSessionRepository();
+        final state = TimerState(
+          now: () => now,
+          sessionRepository: repository,
+        );
+
+        state.startTargetFocus(
+          minutes: 10,
+          targetType: TimerState.targetTypeTask,
+          taskId: 42,
+          title: 'Write report',
+        );
+        now = now.add(const Duration(seconds: 150));
+        state.syncWithClock();
+
+        final ended = state.endCurrentSessionEarly();
+        async.flushMicrotasks();
+
+        expect(ended, isTrue);
+        expect(state.isTimerRunning, isFalse);
+        expect(state.hasActiveSession, isFalse);
+        expect(state.currentMode, 'Short Break');
+        expect(state.completionMessage, 'Focus ended. Short Break ready.');
+        expect(state.pendingCompletionTarget?.taskId, 42);
+        expect(repository.sessionRows.single['duration_seconds'], 150);
+        expect(repository.sessionRows.single['task_id'], 42);
+        expect(repository.sessionRows.single['outcome'], 'time_done_only');
+        state.dispose();
+      });
+    });
+
+    test('paused linked focus cannot be replaced and can end early', () {
+      fakeAsync((async) {
+        final startedAt = DateTime(2026, 6, 23, 9);
+        var now = startedAt;
+        final repository = FakeTimerSessionRepository();
+        final state = TimerState(
+          now: () => now,
+          sessionRepository: repository,
+        );
+
+        state.startTargetFocus(
+          minutes: 5,
+          targetType: TimerState.targetTypeSubtask,
+          taskId: 42,
+          subtaskId: 77,
+          title: 'Find one source',
+        );
+        now = now.add(const Duration(seconds: 60));
+        state.syncWithClock();
+        state.pauseTimer();
+
+        final replaced = state.startTargetFocus(
+          minutes: 2,
+          targetType: TimerState.targetTypeTask,
+          taskId: 99,
+          title: 'Other task',
+        );
+        final ended = state.endCurrentSessionEarly();
+        async.flushMicrotasks();
+
+        expect(replaced, isFalse);
+        expect(ended, isTrue);
+        expect(repository.sessionRows.single['duration_seconds'], 60);
+        expect(repository.sessionRows.single['task_id'], 42);
+        expect(repository.sessionRows.single['subtask_id'], 77);
+        state.dispose();
+      });
+    });
+
     test('syncs stale running sessions against the clock', () {
       fakeAsync((async) {
         final startedAt = DateTime(2026, 6, 23, 9);

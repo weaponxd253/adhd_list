@@ -109,8 +109,18 @@ class TimerState extends ChangeNotifier {
   String get activeTargetType => _activeTargetType;
   String? get activeTargetTitle => _activeTargetTitle;
   bool get hasActiveTarget => _activeTargetType != targetTypeNone;
+  bool get hasActiveSession => _sessionStartedAt != null;
+  bool get isActiveFocusSession => hasActiveSession && currentMode == 'Focus';
   TimerCompletionTarget? get pendingCompletionTarget =>
       _pendingCompletionTarget;
+
+  bool isActiveForTask(int taskId) {
+    return isActiveFocusSession && _activeTaskId == taskId;
+  }
+
+  bool isActiveForSubtask(int subtaskId) {
+    return isActiveFocusSession && _activeSubtaskId == subtaskId;
+  }
 
   String get statusLabel {
     if (isTimerRunning) return 'Session in progress';
@@ -193,7 +203,7 @@ class TimerState extends ChangeNotifier {
       subtaskId: subtaskId,
     );
     syncWithClock(notify: false);
-    if (isTimerRunning) return false;
+    if (hasActiveSession) return false;
 
     _timer?.cancel();
     _timer = null;
@@ -246,6 +256,33 @@ class TimerState extends ChangeNotifier {
     _resetDuration();
     unawaited(_notificationService.cancelTimerCompletion());
     notifyListeners();
+  }
+
+  bool endCurrentSessionEarly() {
+    syncWithClock(notify: false);
+    if (!hasActiveSession) return false;
+
+    final completedMode = currentMode;
+    final plannedDuration = _sessionPlannedDurationSeconds ?? _currentDuration;
+    final rawElapsed = plannedDuration - remainingTime;
+    final durationSeconds = rawElapsed < 0
+        ? 0
+        : rawElapsed > plannedDuration
+            ? plannedDuration
+            : rawElapsed;
+    final endedAt = _now();
+    final startedAt = _sessionStartedAt ??
+        endedAt.subtract(Duration(seconds: durationSeconds));
+    final nextMode = _nextModeFor(completedMode);
+
+    _finishSession(
+      completedMode: completedMode,
+      startedAt: startedAt,
+      endedAt: endedAt,
+      durationSeconds: durationSeconds,
+      completionText: '$completedMode ended. $nextMode ready.',
+    );
+    return true;
   }
 
   void updateDurations({
@@ -431,6 +468,24 @@ class TimerState extends ChangeNotifier {
     final startedAt = _sessionStartedAt ??
         endedAt.subtract(Duration(seconds: _currentDuration));
     final durationSeconds = _sessionPlannedDurationSeconds ?? _currentDuration;
+    final nextMode = _nextModeFor(completedMode);
+
+    _finishSession(
+      completedMode: completedMode,
+      startedAt: startedAt,
+      endedAt: endedAt,
+      durationSeconds: durationSeconds,
+      completionText: '$completedMode complete. $nextMode ready.',
+    );
+  }
+
+  void _finishSession({
+    required String completedMode,
+    required DateTime startedAt,
+    required DateTime endedAt,
+    required int durationSeconds,
+    required String completionText,
+  }) {
     final taskId = _activeTaskId;
     final subtaskId = _activeSubtaskId;
     final targetType = _activeTargetType;
@@ -449,9 +504,9 @@ class TimerState extends ChangeNotifier {
     _sessionEndsAt = null;
     _clearSessionTracking();
     isTimerRunning = false;
-    currentMode = _nextModeFor(currentMode);
+    currentMode = _nextModeFor(completedMode);
     _lastCompletedMode = completedMode;
-    _completionMessage = '$completedMode complete. $currentMode ready.';
+    _completionMessage = completionText;
     _pendingCompletionTarget = pendingTarget;
     _resetDuration();
     unawaited(_notificationService.cancelTimerCompletion());
