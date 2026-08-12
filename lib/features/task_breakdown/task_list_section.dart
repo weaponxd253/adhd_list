@@ -6,11 +6,13 @@ import 'package:provider/provider.dart';
 
 import '../../models/subtask.dart';
 import '../../models/task.dart';
+import '../../models/daily_plan.dart';
 import '../../models/task_support.dart';
 import '../../providers/settings_state.dart';
 import '../../providers/task_reminder_state.dart';
 import '../../providers/task_state.dart';
 import '../../providers/timer_state.dart';
+import '../../services/daily_plan_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/task_support_sheet.dart';
 import '../../widgets/timer_completion_prompt.dart';
@@ -54,6 +56,13 @@ class _TaskListSectionState extends State<TaskListSection> {
     final nextTasks = widget.taskState.nextTasks;
     final laterTasks = widget.taskState.laterTasks;
     final completed = widget.taskState.completedTaskList;
+    final timerState = context.watch<TimerState>();
+    final dailyPlan = DailyPlanService().build(
+      tasks: widget.taskState.tasks,
+      timerState: timerState,
+      capacity: DailyCapacity.medium,
+      mood: '',
+    );
 
     if (widget.taskState.tasks.isEmpty) {
       return const _EmptyTasks();
@@ -79,7 +88,7 @@ class _TaskListSectionState extends State<TaskListSection> {
             message: "Nothing urgent. Pick one small thing when you're ready.",
           )
         else
-          _buildTaskCard(nowTask),
+          _buildTaskCard(nowTask, timerState, dailyPlan),
         const SizedBox(height: AppSpacing.md),
         _SectionHeader(
           title: 'Next',
@@ -90,7 +99,9 @@ class _TaskListSectionState extends State<TaskListSection> {
         if (nextTasks.isEmpty)
           const _SectionEmpty(message: 'Nothing else waiting right now.')
         else
-          ...nextTasks.map(_buildTaskCard),
+          ...nextTasks.map(
+            (task) => _buildTaskCard(task, timerState, dailyPlan),
+          ),
         if (laterTasks.isNotEmpty) ...[
           const SizedBox(height: AppSpacing.md),
           _SectionHeader(
@@ -102,7 +113,9 @@ class _TaskListSectionState extends State<TaskListSection> {
           ),
           if (_showLater) ...[
             const SizedBox(height: AppSpacing.xs),
-            ...laterTasks.map(_buildTaskCard),
+            ...laterTasks.map(
+              (task) => _buildTaskCard(task, timerState, dailyPlan),
+            ),
           ] else
             _SectionEmpty(
               message: '${laterTasks.length} tasks tucked away.',
@@ -123,20 +136,26 @@ class _TaskListSectionState extends State<TaskListSection> {
               message: 'Completed tasks will show here.',
             )
           else
-            ...completed.map(_buildTaskCard),
+            ...completed.map(
+              (task) => _buildTaskCard(task, timerState, dailyPlan),
+            ),
         ],
       ],
     );
   }
 
-  Widget _buildTaskCard(Task task) {
+  Widget _buildTaskCard(
+    Task task,
+    TimerState timerState,
+    DailyPlan dailyPlan,
+  ) {
     final expanded = _expandedTaskIds.contains(task.id);
     final busy = widget.taskState.isTaskBusy(task.id);
-    final timerState = context.watch<TimerState>();
     final activeForTask = timerState.isActiveForTask(task.id);
     final anotherFocusActive =
         timerState.isActiveFocusSession && !activeForTask;
     final focusSummary = timerState.focusSummaryForTask(task.id);
+    final planInsight = dailyPlan.insightFor(task.id);
     final settingsState = context.watch<SettingsState>();
     final reminderState = context.watch<TaskReminderState>();
     final reminder = reminderState.reminderFor(task.id);
@@ -472,7 +491,14 @@ class _TaskListSectionState extends State<TaskListSection> {
                 ],
               ),
             ),
-            if (expanded) _buildSubtasks(task, busy, timerState, focusSummary),
+            if (expanded)
+              _buildSubtasks(
+                task,
+                busy,
+                timerState,
+                focusSummary,
+                planInsight,
+              ),
           ],
         ),
       ),
@@ -484,6 +510,7 @@ class _TaskListSectionState extends State<TaskListSection> {
     bool busy,
     TimerState timerState,
     TaskFocusSummary focusSummary,
+    DailyPlanTaskInsight? planInsight,
   ) {
     final colorScheme = Theme.of(context).colorScheme;
 
@@ -504,6 +531,7 @@ class _TaskListSectionState extends State<TaskListSection> {
       child: Column(
         children: [
           _TaskFocusProgress(task: task, summary: focusSummary),
+          _TaskPlanInsightBadge(insight: planInsight),
           for (final subtask in task.subtasks)
             _SubtaskRow(
               key: ValueKey('subtask-${subtask.id}'),
@@ -786,6 +814,49 @@ class _TaskListSectionState extends State<TaskListSection> {
     if (difference == 0) return 'due today';
     if (difference == 1) return 'due tomorrow';
     return 'due ${task.dueDate.month}/${task.dueDate.day}';
+  }
+}
+
+class _TaskPlanInsightBadge extends StatelessWidget {
+  const _TaskPlanInsightBadge({required this.insight});
+
+  final DailyPlanTaskInsight? insight;
+
+  @override
+  Widget build(BuildContext context) {
+    final insight = this.insight;
+    if (insight == null || insight.reason == 'Good next step') {
+      return const SizedBox.shrink();
+    }
+
+    final cs = Theme.of(context).colorScheme;
+    final semantic = Theme.of(context).extension<AppSemanticColors>()!;
+    final color = switch (insight.action) {
+      DailyPlanAction.resume => cs.primary,
+      DailyPlanAction.shrinkFirst => semantic.warning,
+      DailyPlanAction.startTiny => semantic.success,
+      DailyPlanAction.startFocus => cs.secondary,
+      DailyPlanAction.moveLater => cs.onSurfaceVariant,
+    };
+    final icon = switch (insight.action) {
+      DailyPlanAction.resume => Icons.history_rounded,
+      DailyPlanAction.shrinkFirst => Icons.call_split_rounded,
+      DailyPlanAction.startTiny => Icons.bolt_rounded,
+      DailyPlanAction.startFocus => Icons.flag_outlined,
+      DailyPlanAction.moveLater => Icons.inventory_2_outlined,
+    };
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: _StatusBadge(
+          label: insight.badgeLabel,
+          color: color,
+          icon: icon,
+        ),
+      ),
+    );
   }
 }
 

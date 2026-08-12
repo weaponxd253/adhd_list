@@ -42,6 +42,8 @@ Primary navigation:
 ### Dashboard and Daily Support
 
 - Current task card adapts copy to mood and capacity.
+- Daily plan scoring recommends a calm Now task and up to two Next tasks from due dates, capacity, task size, progress memory, and left-open timer sessions.
+- Plan reasons such as `Due today`, `Small enough`, `Shrink first`, and `Left open` explain recommendations without exposing scores.
 - Daily stats show focus minutes, sessions, completed tasks, and completed steps.
 - Capacity selector supports low, medium, and high energy days.
 - Waiting-task card offers shrink, move later, start tiny focus, and reminder actions.
@@ -128,9 +130,9 @@ test/             Unit, widget, smoke, database, and design-system tests
 
 ## Current Verification
 
-As of the Phase 6 implementation:
+As of the Phase 7 implementation:
 
-- `flutter test` passes with 123 tests.
+- `flutter test` passes with 127 tests.
 - `flutter analyze` completes with the existing info-only deprecation baseline.
 
 ## Phase Status
@@ -141,6 +143,7 @@ As of the Phase 6 implementation:
 - **Phase 4** - Active focus visibility and early end controls.
 - **Phase 5** - High-UX active state polish across Home, Tasks, Timer, and dark mode.
 - **Phase 6** - Quiet progress memory, history labels, estimate feedback, and resume suggestion.
+- **Phase 7** - Deterministic daily plan scoring, explainable plan reasons, capacity-aware task recommendations, and quiet recommendation badges.
 
 ## Next Planning Questions
 

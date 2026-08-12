@@ -345,6 +345,7 @@ void main() {
     expect(find.text('Focused 5m'), findsWidgets);
     expect(find.text('Estimate 10m'), findsOneWidget);
     expect(find.text('Under estimate'), findsOneWidget);
+    expect(find.text('Resume candidate'), findsOneWidget);
   });
 
   testWidgets('active subtask row can end focus early', (tester) async {

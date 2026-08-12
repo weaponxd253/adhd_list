@@ -180,6 +180,9 @@ void main() {
     expect(find.text('Open notes'), findsOneWidget);
     expect(find.text('Pack backpack'), findsOneWidget);
     expect(find.text('0/2 steps'), findsOneWidget);
+    expect(find.text('Overdue'), findsOneWidget);
+    expect(
+        find.text('One focus block can get it moving again.'), findsOneWidget);
     expect(find.text('Next'), findsOneWidget);
   });
 

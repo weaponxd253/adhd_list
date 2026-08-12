@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../features/mood_tracker/mood_tracker_screen.dart';
 import '../../features/settings/settings_screen.dart';
-import '../../models/focus_session.dart';
+import '../../models/daily_plan.dart';
 import '../../models/task.dart';
 import '../../models/task_reminder.dart';
 import '../../models/task_support.dart';
@@ -13,15 +13,24 @@ import '../../providers/task_state.dart';
 import '../../providers/settings_state.dart';
 import '../../providers/task_reminder_state.dart';
 import '../../providers/timer_state.dart';
+import '../../services/daily_plan_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/task_support_sheet.dart';
 import '../../widgets/timer_completion_prompt.dart';
 
-class DashboardScreen extends StatelessWidget {
+class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key, this.onOpenMood, this.onOpenTimer});
 
   final VoidCallback? onOpenMood;
   final VoidCallback? onOpenTimer;
+
+  @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  final DailyPlanService _dailyPlanService = DailyPlanService();
+  DailyCapacity _capacity = DailyCapacity.medium;
 
   @override
   Widget build(BuildContext context) {
@@ -38,7 +47,13 @@ class DashboardScreen extends StatelessWidget {
           reminderState,
           _,
         ) {
-          final nowTask = taskState.nowTask;
+          final dailyPlan = _dailyPlanService.build(
+            tasks: taskState.tasks,
+            timerState: timerState,
+            capacity: _capacity,
+            mood: moodState.selectedMood,
+          );
+          final nowTask = dailyPlan.nowTask ?? taskState.nowTask;
           final waitingTask = taskState.waitingTask;
 
           return ListView(
@@ -54,7 +69,9 @@ class DashboardScreen extends StatelessWidget {
                 moodState: moodState,
                 timerState: timerState,
                 task: nowTask,
-                onOpenTimer: onOpenTimer,
+                insight:
+                    nowTask == null ? null : dailyPlan.insightFor(nowTask.id),
+                onOpenTimer: widget.onOpenTimer,
               ),
               const SizedBox(height: AppSpacing.md),
               _TodayStrip(
@@ -64,9 +81,9 @@ class DashboardScreen extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.md),
               _NextPreview(
-                taskState: taskState,
                 timerState: timerState,
-                onOpenTimer: onOpenTimer,
+                dailyPlan: dailyPlan,
+                onOpenTimer: widget.onOpenTimer,
               ),
               if (waitingTask != null) ...[
                 const SizedBox(height: AppSpacing.md),
@@ -77,18 +94,22 @@ class DashboardScreen extends StatelessWidget {
                   remindersEnabled: settingsState.taskRemindersEnabled,
                   reminderStyle: settingsState.taskReminderStyle,
                   task: waitingTask,
-                  onOpenTimer: onOpenTimer,
+                  onOpenTimer: widget.onOpenTimer,
                 ),
               ],
               const SizedBox(height: AppSpacing.md),
               _DailyResetCard(
                 moodState: moodState,
                 timerState: timerState,
-                onOpenMood: onOpenMood,
-                onOpenTimer: onOpenTimer,
+                capacity: _capacity,
+                onCapacityChanged: (value) => setState(() {
+                  _capacity = value;
+                }),
+                onOpenMood: widget.onOpenMood,
+                onOpenTimer: widget.onOpenTimer,
               ),
               const SizedBox(height: AppSpacing.md),
-              _MoodCard(moodState: moodState, onOpenMood: onOpenMood),
+              _MoodCard(moodState: moodState, onOpenMood: widget.onOpenMood),
               const SizedBox(height: AppSpacing.md),
               _DailyReviewCard(
                 taskState: taskState,
@@ -151,6 +172,7 @@ class _NowCard extends StatelessWidget {
     required this.moodState,
     required this.timerState,
     required this.task,
+    required this.insight,
     required this.onOpenTimer,
   });
 
@@ -158,6 +180,7 @@ class _NowCard extends StatelessWidget {
   final MoodState moodState;
   final TimerState timerState;
   final Task? task;
+  final DailyPlanTaskInsight? insight;
   final VoidCallback? onOpenTimer;
 
   @override
@@ -178,7 +201,14 @@ class _NowCard extends StatelessWidget {
         padding: const EdgeInsets.all(AppSpacing.md),
         child: task == null
             ? _emptyState(context)
-            : _taskState(context, task, taskState, moodState, timerState),
+            : _taskState(
+                context,
+                task,
+                taskState,
+                moodState,
+                timerState,
+                insight,
+              ),
       ),
     );
   }
@@ -218,11 +248,13 @@ class _NowCard extends StatelessWidget {
     TaskState taskState,
     MoodState moodState,
     TimerState timerState,
+    DailyPlanTaskInsight? insight,
   ) {
     final dueStr = DateFormat.MMMd().format(task.dueDate);
     final completedSteps = task.subtasks.where((s) => s.isCompleted).length;
     final totalSteps = task.subtasks.length;
     final tinyStep = taskState.tinyStepSuggestionFor(task);
+    final planLine = _nowPlanLine(insight, moodState);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -268,11 +300,16 @@ class _NowCard extends StatelessWidget {
                 icon: Icons.psychology_alt_outlined,
                 label: task.friction!.label,
               ),
+            if (insight != null)
+              _NowMeta(
+                icon: _planReasonIcon(insight),
+                label: insight.reason,
+              ),
           ],
         ),
         const SizedBox(height: AppSpacing.sm),
         Text(
-          moodState.nowTaskGuidance,
+          planLine,
           style: const TextStyle(
             color: Colors.white,
             fontSize: 13,
@@ -314,6 +351,26 @@ class _NowCard extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  String _nowPlanLine(DailyPlanTaskInsight? insight, MoodState moodState) {
+    if (moodState.recommendsRecoveryMode) return moodState.nowTaskGuidance;
+    return insight?.detail ?? moodState.nowTaskGuidance;
+  }
+
+  IconData _planReasonIcon(DailyPlanTaskInsight insight) {
+    switch (insight.action) {
+      case DailyPlanAction.resume:
+        return Icons.history_rounded;
+      case DailyPlanAction.shrinkFirst:
+        return Icons.call_split_rounded;
+      case DailyPlanAction.startTiny:
+        return Icons.bolt_rounded;
+      case DailyPlanAction.startFocus:
+        return Icons.flag_outlined;
+      case DailyPlanAction.moveLater:
+        return Icons.inventory_2_outlined;
+    }
   }
 
   Widget _primaryFocusControls(
@@ -1040,18 +1097,20 @@ class _ReminderStatusLine extends StatelessWidget {
   }
 }
 
-enum _DailyCapacity { low, medium, high }
-
 class _DailyResetCard extends StatefulWidget {
   const _DailyResetCard({
     required this.moodState,
     required this.timerState,
+    required this.capacity,
+    required this.onCapacityChanged,
     required this.onOpenMood,
     required this.onOpenTimer,
   });
 
   final MoodState moodState;
   final TimerState timerState;
+  final DailyCapacity capacity;
+  final ValueChanged<DailyCapacity> onCapacityChanged;
   final VoidCallback? onOpenMood;
   final VoidCallback? onOpenTimer;
 
@@ -1060,13 +1119,12 @@ class _DailyResetCard extends StatefulWidget {
 }
 
 class _DailyResetCardState extends State<_DailyResetCard> {
-  _DailyCapacity _capacity = _DailyCapacity.medium;
   bool _manualRecoveryMode = false;
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final recoverySuggested = _capacity == _DailyCapacity.low ||
+    final recoverySuggested = widget.capacity == DailyCapacity.low ||
         widget.moodState.recommendsRecoveryMode;
     final recoveryActive = recoverySuggested || _manualRecoveryMode;
 
@@ -1094,34 +1152,34 @@ class _DailyResetCardState extends State<_DailyResetCard> {
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: AppSpacing.sm),
-            SegmentedButton<_DailyCapacity>(
+            SegmentedButton<DailyCapacity>(
               key: const Key('daily-capacity-selector'),
               showSelectedIcon: false,
               segments: const [
                 ButtonSegment(
-                  value: _DailyCapacity.low,
+                  value: DailyCapacity.low,
                   label: Text('Low'),
                   icon: Icon(Icons.battery_1_bar_rounded),
                 ),
                 ButtonSegment(
-                  value: _DailyCapacity.medium,
+                  value: DailyCapacity.medium,
                   label: Text('Medium'),
                   icon: Icon(Icons.battery_4_bar_rounded),
                 ),
                 ButtonSegment(
-                  value: _DailyCapacity.high,
+                  value: DailyCapacity.high,
                   label: Text('High'),
                   icon: Icon(Icons.battery_full_rounded),
                 ),
               ],
-              selected: {_capacity},
+              selected: {widget.capacity},
               onSelectionChanged: (selection) {
-                setState(() => _capacity = selection.single);
+                widget.onCapacityChanged(selection.single);
               },
             ),
             const SizedBox(height: AppSpacing.sm),
             Text(
-              _capacityPlan(_capacity),
+              _capacityPlan(widget.capacity),
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             if (widget.moodState.selectedMood.isNotEmpty) ...[
@@ -1159,13 +1217,13 @@ class _DailyResetCardState extends State<_DailyResetCard> {
     );
   }
 
-  String _capacityPlan(_DailyCapacity capacity) {
+  String _capacityPlan(DailyCapacity capacity) {
     switch (capacity) {
-      case _DailyCapacity.low:
+      case DailyCapacity.low:
         return 'One tiny task is enough today. Setup counts.';
-      case _DailyCapacity.medium:
+      case DailyCapacity.medium:
         return 'One task plus one focus session is the plan.';
-      case _DailyCapacity.high:
+      case DailyCapacity.high:
         return 'Pick two or three planned tasks, then protect one focus block.';
     }
   }
@@ -1655,13 +1713,13 @@ class _TimerButton extends StatelessWidget {
 
 class _NextPreview extends StatefulWidget {
   const _NextPreview({
-    required this.taskState,
     required this.timerState,
+    required this.dailyPlan,
     required this.onOpenTimer,
   });
 
-  final TaskState taskState;
   final TimerState timerState;
+  final DailyPlan dailyPlan;
   final VoidCallback? onOpenTimer;
 
   @override
@@ -1673,9 +1731,11 @@ class _NextPreviewState extends State<_NextPreview> {
 
   @override
   Widget build(BuildContext context) {
-    final tasks = widget.taskState.nextTasks;
-    final laterCount = widget.taskState.laterTaskCount;
-    final resumeCandidate = _resumeCandidate();
+    final tasks = widget.dailyPlan.nextTasks;
+    final laterCount = widget.dailyPlan.laterCount;
+    final resumeCandidate = widget.timerState.isActiveFocusSession
+        ? null
+        : widget.dailyPlan.resumeSuggestion;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1732,7 +1792,10 @@ class _NextPreviewState extends State<_NextPreview> {
             ...tasks.map(
               (task) => Padding(
                 padding: const EdgeInsets.only(bottom: AppSpacing.xs),
-                child: _UpcomingTile(task: task),
+                child: _UpcomingTile(
+                  task: task,
+                  insight: widget.dailyPlan.insightFor(task.id),
+                ),
               ),
             ),
         ],
@@ -1744,36 +1807,10 @@ class _NextPreviewState extends State<_NextPreview> {
     );
   }
 
-  _ResumeCandidate? _resumeCandidate() {
-    if (widget.timerState.isActiveFocusSession) return null;
+  void _startResumeFocus(PlannedTask candidate) {
+    final session = candidate.insight.resumeSession;
+    if (session == null) return;
 
-    final pendingTasks = widget.taskState.pendingTaskList;
-    final tasksById = {for (final task in pendingTasks) task.id: task};
-    final session = widget.timerState.latestOpenFocusSessionForTaskIds(
-      tasksById.keys,
-    );
-    if (session == null) return null;
-    if (session.targetType != TimerState.targetTypeTask &&
-        session.targetType != TimerState.targetTypeSubtask) {
-      return null;
-    }
-
-    final task = tasksById[session.taskId];
-    if (task == null) return null;
-
-    if (session.targetType == TimerState.targetTypeSubtask) {
-      final subtaskId = session.subtaskId;
-      final subtaskStillOpen = task.subtasks.any(
-        (subtask) => subtask.id == subtaskId && !subtask.isCompleted,
-      );
-      if (!subtaskStillOpen) return null;
-    }
-
-    return _ResumeCandidate(session: session, task: task);
-  }
-
-  void _startResumeFocus(_ResumeCandidate candidate) {
-    final session = candidate.session;
     final started = widget.timerState.startTargetFocus(
       minutes: 5,
       targetType: session.targetType,
@@ -1781,7 +1818,7 @@ class _NextPreviewState extends State<_NextPreview> {
       subtaskId: session.targetType == TimerState.targetTypeSubtask
           ? session.subtaskId
           : null,
-      title: candidate.targetTitle,
+      title: candidate.insight.targetTitle ?? candidate.task.title,
     );
     if (started) {
       widget.onOpenTimer?.call();
@@ -1796,36 +1833,13 @@ class _NextPreviewState extends State<_NextPreview> {
   }
 }
 
-class _ResumeCandidate {
-  const _ResumeCandidate({
-    required this.session,
-    required this.task,
-  });
-
-  final FocusSession session;
-  final Task task;
-
-  String get targetTitle {
-    final snapshot = session.targetTitleSnapshot?.trim();
-    if (snapshot != null && snapshot.isNotEmpty) return snapshot;
-    if (session.targetType == TimerState.targetTypeSubtask) {
-      for (final subtask in task.subtasks) {
-        if (subtask.id == session.subtaskId) return subtask.title;
-      }
-    }
-    return task.title;
-  }
-
-  bool get isSubtask => session.targetType == TimerState.targetTypeSubtask;
-}
-
 class _ResumeFocusTile extends StatelessWidget {
   const _ResumeFocusTile({
     required this.candidate,
     required this.onStart,
   });
 
-  final _ResumeCandidate candidate;
+  final PlannedTask candidate;
   final VoidCallback onStart;
 
   @override
@@ -1833,8 +1847,11 @@ class _ResumeFocusTile extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final compact = MediaQuery.textScalerOf(context).scale(1) > 1.3 ||
         MediaQuery.sizeOf(context).width < 390;
-    final detail = candidate.isSubtask
-        ? '${candidate.targetTitle} · ${candidate.task.title}'
+    final session = candidate.insight.resumeSession;
+    final targetTitle = candidate.insight.targetTitle ?? candidate.task.title;
+    final isSubtask = session?.targetType == TimerState.targetTypeSubtask;
+    final detail = isSubtask
+        ? '$targetTitle · ${candidate.task.title}'
         : candidate.task.title;
     final button = OutlinedButton.icon(
       key: const Key('dashboard-resume-focus'),
@@ -1876,7 +1893,9 @@ class _ResumeFocusTile extends StatelessWidget {
           style: Theme.of(context).textTheme.bodyMedium,
         ),
         Text(
-          'Left open ${DateFormat.jm().format(candidate.session.endedAt)}',
+          session == null
+              ? candidate.insight.reason
+              : 'Left open ${DateFormat.jm().format(session.endedAt)}',
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: Theme.of(context).textTheme.bodySmall,
@@ -1984,9 +2003,10 @@ class _CountPill extends StatelessWidget {
 }
 
 class _UpcomingTile extends StatelessWidget {
-  const _UpcomingTile({required this.task});
+  const _UpcomingTile({required this.task, this.insight});
 
   final Task task;
+  final DailyPlanTaskInsight? insight;
 
   @override
   Widget build(BuildContext context) {
@@ -2027,7 +2047,7 @@ class _UpcomingTile extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                   Text(
-                    '${DateFormat.MMMd().format(task.dueDate)} - ${_countdown(task.dueDate)}',
+                    _detailLine(),
                     style: TextStyle(
                       fontSize: 12,
                       color: color,
@@ -2041,6 +2061,14 @@ class _UpcomingTile extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _detailLine() {
+    final dueLine =
+        '${DateFormat.MMMd().format(task.dueDate)} - ${_countdown(task.dueDate)}';
+    final reason = insight?.reason;
+    if (reason == null || reason.isEmpty) return dueLine;
+    return '$dueLine - $reason';
   }
 
   int _calendarDayDifference(DateTime date) {
