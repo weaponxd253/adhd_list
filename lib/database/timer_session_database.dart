@@ -14,6 +14,20 @@ class TimerSessionDatabase implements TimerSessionRepository {
   }
 
   @override
+  Future<void> updateSessionOutcome(int sessionId, String outcome) async {
+    final db = await dbHelper.database;
+    final count = await db.update(
+      'timer_sessions',
+      {'outcome': outcome},
+      where: 'id = ?',
+      whereArgs: [sessionId],
+    );
+    if (count == 0) {
+      throw StateError('Updating timer session $sessionId did not match.');
+    }
+  }
+
+  @override
   Future<List<Map<String, Object?>>> fetchSessions({int limit = 60}) async {
     final db = await dbHelper.database;
     return db.query(

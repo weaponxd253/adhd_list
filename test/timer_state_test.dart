@@ -240,6 +240,73 @@ void main() {
       });
     });
 
+    test('linked completion outcomes update recorded sessions', () {
+      fakeAsync((async) {
+        final startedAt = DateTime(2026, 6, 23, 9);
+        var now = startedAt;
+        final repository = FakeTimerSessionRepository();
+        final state = TimerState(
+          now: () => now,
+          sessionRepository: repository,
+        );
+
+        state.startTargetFocus(
+          minutes: 10,
+          targetType: TimerState.targetTypeTask,
+          taskId: 42,
+          title: 'Write report',
+        );
+        now = now.add(const Duration(minutes: 10));
+        state.syncWithClock();
+        async.flushMicrotasks();
+
+        expect(state.pendingCompletionTarget?.sessionId, 1);
+
+        state.resolveLinkedCompletion(TimerState.outcomeLeftOpen);
+        async.flushMicrotasks();
+
+        expect(state.pendingCompletionTarget, isNull);
+        expect(repository.sessionRows.single['outcome'], 'left_open');
+        expect(state.sessionHistory.single.outcome, 'left_open');
+        state.dispose();
+      });
+    });
+
+    test('continue linked focus keeps the same target', () {
+      fakeAsync((async) {
+        final startedAt = DateTime(2026, 6, 23, 9);
+        var now = startedAt;
+        final repository = FakeTimerSessionRepository();
+        final state = TimerState(
+          now: () => now,
+          sessionRepository: repository,
+        );
+
+        state.startTargetFocus(
+          minutes: 10,
+          targetType: TimerState.targetTypeSubtask,
+          taskId: 42,
+          subtaskId: 77,
+          title: 'Find one source',
+        );
+        now = now.add(const Duration(minutes: 10));
+        state.syncWithClock();
+        async.flushMicrotasks();
+
+        state.continueLinkedFocus();
+        async.flushMicrotasks();
+
+        expect(repository.sessionRows.single['outcome'], 'continued');
+        expect(state.isTimerRunning, isTrue);
+        expect(state.timerDisplay, '05:00');
+        expect(state.activeTaskId, 42);
+        expect(state.activeSubtaskId, 77);
+        expect(state.activeTargetType, TimerState.targetTypeSubtask);
+        expect(state.activeTargetTitle, 'Find one source');
+        state.dispose();
+      });
+    });
+
     test('syncs stale running sessions against the clock', () {
       fakeAsync((async) {
         final startedAt = DateTime(2026, 6, 23, 9);

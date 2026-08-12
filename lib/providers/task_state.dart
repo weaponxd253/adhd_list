@@ -193,6 +193,19 @@ class TaskState extends ChangeNotifier {
     });
   }
 
+  Future<void> completeTask(int taskId) async {
+    final task = _requireTask(taskId);
+    if (task.isCompleted) return;
+
+    await _runTaskMutation(taskId, () async {
+      await _repository.updateTaskStatus(taskId, 'completed');
+      task.status = 'completed';
+      task.completedAt = _now();
+      if (_tomorrowStarterTaskId == taskId) _tomorrowStarterTaskId = null;
+      await _cancelReminderForTask(taskId);
+    });
+  }
+
   Future<void> moveTaskToLater(int taskId, {int days = 7}) async {
     final task = _requireTask(taskId);
     final now = _now();
@@ -324,6 +337,17 @@ class TaskState extends ChangeNotifier {
     await _runTaskMutation(taskId, () async {
       await _repository.updateSubtaskStatus(subtaskId, completed);
       subtask.isCompleted = completed;
+    });
+  }
+
+  Future<void> completeSubtask(int taskId, int subtaskId) async {
+    final task = _requireTask(taskId);
+    final subtask = _requireSubtask(task, subtaskId);
+    if (subtask.isCompleted) return;
+
+    await _runTaskMutation(taskId, () async {
+      await _repository.updateSubtaskStatus(subtaskId, true);
+      subtask.isCompleted = true;
     });
   }
 

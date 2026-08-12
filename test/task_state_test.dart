@@ -153,6 +153,33 @@ void main() {
       expect(state.tomorrowStarterTask?.title, 'First task');
     });
 
+    test('explicit completion methods do not toggle completed items open',
+        () async {
+      final repository = FakeTaskRepository(
+        tasks: [taskRow(id: 1, title: 'Task', dueDate: today)],
+        subtasks: {
+          1: [subtaskRow(id: 2, taskId: 1, title: 'Step')],
+        },
+      );
+      final state = TaskState(
+        repository: repository,
+        now: () => today,
+        autoLoad: false,
+      );
+      await state.loadTasks();
+
+      await state.completeTask(1);
+      await state.completeTask(1);
+      await state.completeSubtask(1, 2);
+      await state.completeSubtask(1, 2);
+
+      expect(state.tasks.single.isCompleted, isTrue);
+      expect(state.tasks.single.completedAt, today);
+      expect(state.tasks.single.subtasks.single.isCompleted, isTrue);
+      expect(repository.taskRows.single['is_completed'], 1);
+      expect(repository.subtaskRows[1]!.single['is_completed'], 1);
+    });
+
     test('task completion, later moves, and deletion cancel reminders',
         () async {
       final taskRepository = FakeTaskRepository(
