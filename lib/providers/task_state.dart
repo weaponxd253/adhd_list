@@ -181,16 +181,14 @@ class TaskState extends ChangeNotifier {
 
   Future<void> toggleTaskCompletion(int taskId) async {
     final task = _requireTask(taskId);
-    final status = task.isCompleted ? 'pending' : 'completed';
-    await _runTaskMutation(taskId, () async {
-      await _repository.updateTaskStatus(taskId, status);
-      task.status = status;
-      task.completedAt = status == 'completed' ? _now() : null;
-      if (task.isCompleted && _tomorrowStarterTaskId == taskId) {
-        _tomorrowStarterTaskId = null;
-      }
-      if (task.isCompleted) await _cancelReminderForTask(taskId);
-    });
+    await _setTaskCompletion(task, completed: !task.isCompleted);
+  }
+
+  Future<bool> markTaskCompleted(int taskId) async {
+    final task = _requireTask(taskId);
+    if (task.isCompleted) return false;
+    await _setTaskCompletion(task, completed: true);
+    return true;
   }
 
   Future<void> moveTaskToLater(int taskId, {int days = 7}) async {
@@ -324,6 +322,34 @@ class TaskState extends ChangeNotifier {
     await _runTaskMutation(taskId, () async {
       await _repository.updateSubtaskStatus(subtaskId, completed);
       subtask.isCompleted = completed;
+    });
+  }
+
+  Future<bool> markSubtaskCompleted(int taskId, int subtaskId) async {
+    final task = _requireTask(taskId);
+    final subtask = _requireSubtask(task, subtaskId);
+    if (subtask.isCompleted) return false;
+
+    await _runTaskMutation(taskId, () async {
+      await _repository.updateSubtaskStatus(subtaskId, true);
+      subtask.isCompleted = true;
+    });
+    return true;
+  }
+
+  Future<void> _setTaskCompletion(
+    Task task, {
+    required bool completed,
+  }) async {
+    final status = completed ? 'completed' : 'pending';
+    await _runTaskMutation(task.id, () async {
+      await _repository.updateTaskStatus(task.id, status);
+      task.status = status;
+      task.completedAt = completed ? _now() : null;
+      if (completed && _tomorrowStarterTaskId == task.id) {
+        _tomorrowStarterTaskId = null;
+      }
+      if (completed) await _cancelReminderForTask(task.id);
     });
   }
 

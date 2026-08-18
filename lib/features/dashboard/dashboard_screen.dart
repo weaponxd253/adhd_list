@@ -50,6 +50,7 @@ class DashboardScreen extends StatelessWidget {
               _NowCard(
                 taskState: taskState,
                 moodState: moodState,
+                timerState: timerState,
                 task: nowTask,
                 onOpenTimer: onOpenTimer,
               ),
@@ -142,12 +143,14 @@ class _NowCard extends StatelessWidget {
   const _NowCard({
     required this.taskState,
     required this.moodState,
+    required this.timerState,
     required this.task,
     required this.onOpenTimer,
   });
 
   final TaskState taskState;
   final MoodState moodState;
+  final TimerState timerState;
   final Task? task;
   final VoidCallback? onOpenTimer;
 
@@ -169,7 +172,7 @@ class _NowCard extends StatelessWidget {
         padding: const EdgeInsets.all(AppSpacing.md),
         child: task == null
             ? _emptyState(context)
-            : _taskState(context, task, taskState, moodState),
+            : _taskState(context, task, taskState, moodState, timerState),
       ),
     );
   }
@@ -208,11 +211,13 @@ class _NowCard extends StatelessWidget {
     Task task,
     TaskState taskState,
     MoodState moodState,
+    TimerState timerState,
   ) {
     final dueStr = DateFormat.MMMd().format(task.dueDate);
     final completedSteps = task.subtasks.where((s) => s.isCompleted).length;
     final totalSteps = task.subtasks.length;
     final tinyStep = taskState.tinyStepSuggestionFor(task);
+    final focusMinutes = timerState.focusMinutesForTask(task.id);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -253,10 +258,21 @@ class _NowCard extends StatelessWidget {
               icon: Icons.checklist_rounded,
               label: '$completedSteps/$totalSteps steps',
             ),
+            if (focusMinutes > 0)
+              _NowMeta(
+                icon: Icons.timer_outlined,
+                label: '${focusMinutes}m focus',
+              ),
             if (task.friction != null)
               _NowMeta(
                 icon: Icons.psychology_alt_outlined,
                 label: task.friction!.label,
+                tooltip: task.friction == TaskFriction.tooBig
+                    ? 'Break down ${task.title}'
+                    : null,
+                onTap: task.friction == TaskFriction.tooBig
+                    ? () => showTaskSupportSheet(context: context, task: task)
+                    : null,
               ),
           ],
         ),
@@ -396,14 +412,21 @@ class _NowCard extends StatelessWidget {
 }
 
 class _NowMeta extends StatelessWidget {
-  const _NowMeta({required this.icon, required this.label});
+  const _NowMeta({
+    required this.icon,
+    required this.label,
+    this.tooltip,
+    this.onTap,
+  });
 
   final IconData icon;
   final String label;
+  final String? tooltip;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    final content = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         Icon(icon, color: Colors.white70, size: 14),
@@ -417,6 +440,24 @@ class _NowMeta extends StatelessWidget {
           ),
         ),
       ],
+    );
+    final onTap = this.onTap;
+    if (onTap == null) return content;
+
+    return Tooltip(
+      message: tooltip ?? label,
+      child: Semantics(
+        button: true,
+        label: tooltip ?? label,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppRadii.pill),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            child: content,
+          ),
+        ),
+      ),
     );
   }
 }

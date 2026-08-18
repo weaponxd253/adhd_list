@@ -132,9 +132,11 @@ class _TaskListSectionState extends State<TaskListSection> {
     final busy = widget.taskState.isTaskBusy(task.id);
     final settingsState = context.watch<SettingsState>();
     final reminderState = context.watch<TaskReminderState>();
+    final timerState = context.watch<TimerState>();
     final reminder = reminderState.reminderFor(task.id);
     final colorScheme = Theme.of(context).colorScheme;
     final semantic = Theme.of(context).extension<AppSemanticColors>()!;
+    final focusMinutes = timerState.focusMinutesForTask(task.id);
     final statusColor = task.isCompleted
         ? semantic.success
         : _dayDifference(task.dueDate) < 0
@@ -224,11 +226,27 @@ class _TaskListSectionState extends State<TaskListSection> {
                                     style:
                                         Theme.of(context).textTheme.bodySmall,
                                   ),
+                                if (focusMinutes > 0)
+                                  _StatusBadge(
+                                    label: '${focusMinutes}m focus',
+                                    color: colorScheme.primary,
+                                    icon: Icons.timer_outlined,
+                                  ),
                                 if (task.friction != null)
                                   _StatusBadge(
                                     label: task.friction!.label,
                                     color: colorScheme.secondary,
                                     icon: Icons.psychology_alt_outlined,
+                                    tooltip:
+                                        task.friction == TaskFriction.tooBig
+                                            ? 'Break down ${task.title}'
+                                            : null,
+                                    onTap: task.friction == TaskFriction.tooBig
+                                        ? () => showTaskSupportSheet(
+                                              context: context,
+                                              task: task,
+                                            )
+                                        : null,
                                   ),
                                 if (reminder != null)
                                   _StatusBadge(
@@ -425,6 +443,7 @@ class _TaskListSectionState extends State<TaskListSection> {
 
   Widget _buildSubtasks(Task task, bool busy) {
     final colorScheme = Theme.of(context).colorScheme;
+    final timerState = context.watch<TimerState>();
 
     return Container(
       width: double.infinity,
@@ -446,6 +465,7 @@ class _TaskListSectionState extends State<TaskListSection> {
             _SubtaskRow(
               key: ValueKey('subtask-${subtask.id}'),
               subtask: subtask,
+              focusMinutes: timerState.focusMinutesForSubtask(subtask.id),
               enabled: !busy,
               onToggle: () => _run(
                 () => widget.taskState
@@ -987,6 +1007,7 @@ class _SubtaskRow extends StatelessWidget {
   const _SubtaskRow({
     super.key,
     required this.subtask,
+    required this.focusMinutes,
     required this.enabled,
     required this.onToggle,
     required this.onEdit,
@@ -995,6 +1016,7 @@ class _SubtaskRow extends StatelessWidget {
   });
 
   final Subtask subtask;
+  final int focusMinutes;
   final bool enabled;
   final VoidCallback onToggle;
   final VoidCallback onEdit;
@@ -1019,35 +1041,66 @@ class _SubtaskRow extends StatelessWidget {
                   : 'Mark ${subtask.title} complete',
             ),
             Expanded(
-              child: Text(
-                subtask.title,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  decoration:
-                      subtask.isCompleted ? TextDecoration.lineThrough : null,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    subtask.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      decoration: subtask.isCompleted
+                          ? TextDecoration.lineThrough
+                          : null,
+                    ),
+                  ),
+                  if (subtask.estimatedMinutes != null || focusMinutes > 0)
+                    Padding(
+                      padding: const EdgeInsets.only(top: AppSpacing.xxs),
+                      child: Wrap(
+                        spacing: AppSpacing.xxs,
+                        runSpacing: AppSpacing.xxs,
+                        children: [
+                          _TimeProgressBadge(
+                            estimatedMinutes: subtask.estimatedMinutes,
+                            focusMinutes: focusMinutes,
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
               ),
             ),
-            if (subtask.estimatedMinutes != null)
-              _EstimateBadge(minutes: subtask.estimatedMinutes!),
             IconButton(
               tooltip: 'Start timer for ${subtask.title}',
               onPressed: enabled ? onStartFocus : null,
               icon: const Icon(Icons.play_arrow_rounded, size: 20),
               visualDensity: VisualDensity.compact,
             ),
-            IconButton(
-              tooltip: 'Edit ${subtask.title}',
-              onPressed: enabled ? onEdit : null,
-              icon: const Icon(Icons.edit_outlined, size: 20),
-              visualDensity: VisualDensity.compact,
-            ),
-            IconButton(
-              tooltip: 'Delete ${subtask.title}',
-              onPressed: enabled ? onDelete : null,
-              icon: const Icon(Icons.close_rounded, size: 20),
-              visualDensity: VisualDensity.compact,
+            PopupMenuButton<String>(
+              tooltip: 'Step actions for ${subtask.title}',
+              icon: const Icon(Icons.more_horiz_rounded, size: 20),
+              enabled: enabled,
+              onSelected: (value) {
+                if (value == 'edit') onEdit();
+                if (value == 'delete') onDelete();
+              },
+              itemBuilder: (_) => const [
+                PopupMenuItem(
+                  value: 'edit',
+                  child: ListTile(
+                    leading: Icon(Icons.edit_outlined),
+                    title: Text('Edit'),
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'delete',
+                  child: ListTile(
+                    leading: Icon(Icons.delete_outline_rounded),
+                    title: Text('Delete'),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -1056,50 +1109,23 @@ class _SubtaskRow extends StatelessWidget {
   }
 }
 
-class _EstimateBadge extends StatelessWidget {
-  const _EstimateBadge({required this.minutes});
+class _TimeProgressBadge extends StatelessWidget {
+  const _TimeProgressBadge({
+    required this.estimatedMinutes,
+    required this.focusMinutes,
+  });
 
-  final int minutes;
+  final int? estimatedMinutes;
+  final int focusMinutes;
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final semantic = Theme.of(context).extension<AppSemanticColors>()!;
+    final reachedEstimate =
+        estimatedMinutes != null && focusMinutes >= estimatedMinutes!;
+    final color = reachedEstimate ? semantic.success : cs.secondary;
 
-    return Container(
-      margin: const EdgeInsets.only(left: AppSpacing.xxs),
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.xxs,
-        vertical: AppSpacing.xxs,
-      ),
-      decoration: BoxDecoration(
-        color: cs.primary.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(AppRadii.pill),
-      ),
-      child: Text(
-        '${minutes}m',
-        style: TextStyle(
-          color: cs.primary,
-          fontSize: 12,
-          fontWeight: FontWeight.w800,
-        ),
-      ),
-    );
-  }
-}
-
-class _StatusBadge extends StatelessWidget {
-  const _StatusBadge({
-    required this.label,
-    required this.color,
-    required this.icon,
-  });
-
-  final String label;
-  final Color color;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.xxs,
@@ -1108,6 +1134,65 @@ class _StatusBadge extends StatelessWidget {
       decoration: BoxDecoration(
         color: color.withOpacity(0.12),
         borderRadius: BorderRadius.circular(AppRadii.pill),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.timer_outlined, size: 12, color: color),
+          const SizedBox(width: 2),
+          Flexible(
+            child: Text(
+              _label(),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: color,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _label() {
+    final estimate = estimatedMinutes;
+    if (estimate != null && focusMinutes > 0) {
+      return '${estimate}m planned - ${focusMinutes}m focused';
+    }
+    if (estimate != null) return '${estimate}m planned';
+    return '${focusMinutes}m focused';
+  }
+}
+
+class _StatusBadge extends StatelessWidget {
+  const _StatusBadge({
+    required this.label,
+    required this.color,
+    required this.icon,
+    this.tooltip,
+    this.onTap,
+  });
+
+  final String label;
+  final Color color;
+  final IconData icon;
+  final String? tooltip;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final borderRadius = BorderRadius.circular(AppRadii.pill);
+    final content = Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.xxs,
+        vertical: AppSpacing.xxs,
+      ),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: borderRadius,
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -1127,6 +1212,21 @@ class _StatusBadge extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+    final onTap = this.onTap;
+    if (onTap == null) return content;
+
+    return Tooltip(
+      message: tooltip ?? label,
+      child: Semantics(
+        button: true,
+        label: tooltip ?? label,
+        child: InkWell(
+          borderRadius: borderRadius,
+          onTap: onTap,
+          child: content,
+        ),
       ),
     );
   }

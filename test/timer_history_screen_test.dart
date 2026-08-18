@@ -48,6 +48,9 @@ void main() {
             'ended_at': DateTime(2026, 6, 23, 9, 25).toIso8601String(),
             'duration_seconds': 1500,
             'completed': 1,
+            'task_id': 7,
+            'target_type': TimerState.targetTypeTask,
+            'target_title_snapshot': 'Write report',
           },
           {
             'id': 2,
@@ -65,6 +68,7 @@ void main() {
 
     expect(find.text('Focus'), findsOneWidget);
     expect(find.text('Long Break'), findsOneWidget);
+    expect(find.text('Task: Write report'), findsOneWidget);
     expect(find.textContaining('25 min'), findsOneWidget);
     expect(find.textContaining('15 min'), findsOneWidget);
   });

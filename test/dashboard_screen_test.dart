@@ -287,6 +287,21 @@ void main() {
     expect(find.byKey(const ValueKey('friction-distracted')), findsOneWidget);
   });
 
+  testWidgets('dashboard too big badge opens support sheet', (tester) async {
+    final tooBigTask = taskRow(
+      id: 1,
+      title: 'Huge project',
+      dueDate: today,
+    )..['friction'] = 'tooBig';
+    await _pumpDashboard(tester, tasks: [tooBigTask]);
+
+    await tester.tap(find.byTooltip('Break down Huge project'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('I am stuck'), findsOneWidget);
+    expect(find.text("What's the blocker?"), findsOneWidget);
+  });
+
   testWidgets('dashboard resurfaces a waiting task with gentle actions',
       (tester) async {
     var openedTimer = false;

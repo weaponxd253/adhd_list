@@ -251,7 +251,7 @@ abstract final class AppTheme {
         systemOverlayStyle: systemOverlayStyle(brightness),
         titleTextStyle: textTheme.headlineMedium,
       ),
-      cardTheme: CardThemeData(
+      cardTheme: CardTheme(
         color: surface,
         elevation: 0,
         margin: EdgeInsets.zero,

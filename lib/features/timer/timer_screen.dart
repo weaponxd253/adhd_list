@@ -3,6 +3,10 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../models/focus_session.dart';
+import '../../models/subtask.dart';
+import '../../models/task.dart';
+import '../../providers/task_state.dart';
 import '../../providers/timer_state.dart';
 import '../../theme/app_theme.dart';
 import 'timer_history_screen.dart';
@@ -52,19 +56,24 @@ class _TimerScreenState extends State<TimerScreen>
   @override
   Widget build(BuildContext context) {
     final timerState = context.watch<TimerState>();
+    final taskState = context.watch<TaskState?>();
     final currentModeIndex = _modes.indexOf(timerState.currentMode);
     final modeIndex = currentModeIndex >= 0 ? currentModeIndex : 0;
     final color = _modeColors[modeIndex];
     final completionMessage = timerState.completionMessage;
+    final completedSession = timerState.lastCompletedSession;
+    final activeTask = _taskFor(taskState, timerState.activeTaskId);
+    final activeSubtask = _subtaskFor(activeTask, timerState.activeSubtaskId);
 
     if (completionMessage != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         final timerState = context.read<TimerState>();
         final message = timerState.completionMessage;
+        final session = timerState.lastCompletedSession ?? completedSession;
         if (message == null) return;
         timerState.clearCompletionMessage();
-        _showCompletionPrompt(message);
+        _showCompletionPrompt(message, session);
       });
     }
 
@@ -116,7 +125,18 @@ class _TimerScreenState extends State<TimerScreen>
                 emoji: _modeEmojis[modeIndex],
               ),
               const SizedBox(height: AppSpacing.md),
-              _TimerTargetLabel(timerState: timerState, color: color),
+              if (activeTask != null)
+                _CurrentTargetCard(
+                  timerState: timerState,
+                  task: activeTask,
+                  subtask: activeSubtask,
+                  focusMinutes: timerState.focusMinutesForTask(activeTask.id),
+                  onMarkDone: taskState == null
+                      ? null
+                      : () => _markActiveTargetDone(taskState, timerState),
+                )
+              else
+                _TimerTargetLabel(timerState: timerState, color: color),
               SizedBox(height: compact ? AppSpacing.lg : AppSpacing.xl),
               _TimerControls(timerState: timerState, color: color),
               const SizedBox(height: AppSpacing.sm),
@@ -130,20 +150,162 @@ class _TimerScreenState extends State<TimerScreen>
     );
   }
 
-  void _showCompletionPrompt(String detail) {
+  void _showCompletionPrompt(String detail, FocusSession? completedSession) {
+    final canTakeBreak = completedSession?.mode == 'Focus';
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
+      isScrollControlled: true,
       builder: (sheetContext) => _CompletionPromptSheet(
         detail: detail,
+        countedLine: _countedLineFor(completedSession),
         onKeepGoing: () {
           Navigator.pop(sheetContext);
           if (!mounted) return;
-          context.read<TimerState>().startQuickFocus(5);
+          _startFollowUpFocus(completedSession);
         },
-        onDone: () => Navigator.pop(sheetContext),
+        markDoneLabel: _markDoneLabel(completedSession),
+        onMarkTargetDone: _canMarkDone(completedSession)
+            ? () => _markTargetDone(sheetContext, completedSession!)
+            : null,
+        doneLabel: canTakeBreak ? 'Take break' : 'Done for now',
+        onDone: () {
+          Navigator.pop(sheetContext);
+          if (!mounted || !canTakeBreak) return;
+          context.read<TimerState>().startTimer();
+        },
       ),
     );
+  }
+
+  Task? _taskFor(TaskState? taskState, int? taskId) {
+    if (taskState == null || taskId == null) return null;
+    for (final task in taskState.tasks) {
+      if (task.id == taskId) return task;
+    }
+    return null;
+  }
+
+  Subtask? _subtaskFor(Task? task, int? subtaskId) {
+    if (task == null || subtaskId == null) return null;
+    for (final subtask in task.subtasks) {
+      if (subtask.id == subtaskId) return subtask;
+    }
+    return null;
+  }
+
+  String _countedLineFor(FocusSession? session) {
+    if (session == null) return 'This session counted.';
+
+    final minutes = session.durationMinutes;
+    final target = session.targetTitleSnapshot?.trim();
+    if (session.mode == 'Focus' && target != null && target.isNotEmpty) {
+      return '${minutes}m counted toward $target.';
+    }
+    if (session.mode == 'Focus') return '${minutes}m focus counted.';
+    return '${minutes}m ${session.mode.toLowerCase()} counted.';
+  }
+
+  void _startFollowUpFocus(FocusSession? completedSession) {
+    final timerState = context.read<TimerState>();
+    if (_canResumeTarget(completedSession)) {
+      timerState.startTargetFocus(
+        minutes: 5,
+        targetType: completedSession!.targetType,
+        taskId: completedSession.taskId,
+        subtaskId: completedSession.subtaskId,
+        title: completedSession.targetTitleSnapshot,
+      );
+      return;
+    }
+
+    timerState.startQuickFocus(5);
+  }
+
+  bool _canResumeTarget(FocusSession? session) {
+    if (session == null || session.mode != 'Focus') return false;
+    if (session.targetType == TimerState.targetTypeTask) {
+      return session.taskId != null;
+    }
+    if (session.targetType == TimerState.targetTypeSubtask) {
+      return session.taskId != null && session.subtaskId != null;
+    }
+    return false;
+  }
+
+  bool _canMarkDone(FocusSession? session) => _markDoneLabel(session) != null;
+
+  String? _markDoneLabel(FocusSession? session) {
+    if (!_canResumeTarget(session)) return null;
+    if (session!.targetType == TimerState.targetTypeSubtask) {
+      return 'Mark step done';
+    }
+    return 'Mark task done';
+  }
+
+  Future<void> _markTargetDone(
+    BuildContext sheetContext,
+    FocusSession session,
+  ) async {
+    final isSubtask = session.targetType == TimerState.targetTypeSubtask;
+    try {
+      final taskState = context.read<TaskState>();
+      final changed = isSubtask
+          ? await taskState.markSubtaskCompleted(
+              session.taskId!,
+              session.subtaskId!,
+            )
+          : await taskState.markTaskCompleted(session.taskId!);
+      if (!mounted || !sheetContext.mounted) return;
+      Navigator.pop(sheetContext);
+      _showMessage(
+        changed
+            ? isSubtask
+                ? 'Step marked done'
+                : 'Task marked done'
+            : isSubtask
+                ? 'Step already done'
+                : 'Task already done',
+      );
+    } catch (_) {
+      if (!mounted) return;
+      _showMessage('Could not update the task.');
+    }
+  }
+
+  Future<void> _markActiveTargetDone(
+    TaskState taskState,
+    TimerState timerState,
+  ) async {
+    try {
+      final isSubtask =
+          timerState.activeTargetType == TimerState.targetTypeSubtask;
+      final changed = isSubtask
+          ? await taskState.markSubtaskCompleted(
+              timerState.activeTaskId!,
+              timerState.activeSubtaskId!,
+            )
+          : await taskState.markTaskCompleted(timerState.activeTaskId!);
+      if (!mounted) return;
+      _showMessage(
+        changed
+            ? isSubtask
+                ? 'Step marked done'
+                : 'Task marked done'
+            : isSubtask
+                ? 'Step already done'
+                : 'Task already done',
+      );
+    } catch (_) {
+      if (!mounted) return;
+      _showMessage('Could not update the task.');
+    }
+  }
+
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 }
 
@@ -170,7 +332,7 @@ class _TimerTargetLabel extends StatelessWidget {
           Text(
             label,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: color.withValues(alpha: 0.78),
+                  color: color.withOpacity(0.78),
                   fontWeight: FontWeight.w700,
                 ),
           ),
@@ -187,6 +349,115 @@ class _TimerTargetLabel extends StatelessWidget {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+class _CurrentTargetCard extends StatelessWidget {
+  const _CurrentTargetCard({
+    required this.timerState,
+    required this.task,
+    required this.subtask,
+    required this.focusMinutes,
+    required this.onMarkDone,
+  });
+
+  final TimerState timerState;
+  final Task task;
+  final Subtask? subtask;
+  final int focusMinutes;
+  final VoidCallback? onMarkDone;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final completedSteps =
+        task.subtasks.where((item) => item.isCompleted).length;
+    final totalSteps = task.subtasks.length;
+    final activeStep = subtask;
+    final canMarkDone =
+        onMarkDone != null && !(activeStep?.isCompleted ?? task.isCompleted);
+    final markLabel =
+        timerState.activeTargetType == TimerState.targetTypeSubtask
+            ? 'Mark step done'
+            : 'Mark task done';
+    final meta = <String>[
+      if (totalSteps > 0) '$completedSteps/$totalSteps steps',
+      if (focusMinutes > 0) '${focusMinutes}m focus',
+    ];
+
+    return Semantics(
+      container: true,
+      label: 'Current task ${task.title}',
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: cs.surface,
+          border: Border.all(color: cs.outlineVariant),
+          borderRadius: BorderRadius.circular(AppRadii.card),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.flag_rounded, size: 18, color: cs.primary),
+                  const SizedBox(width: AppSpacing.xs),
+                  Text(
+                    'Current task',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: cs.primary,
+                          fontWeight: FontWeight.w800,
+                        ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                task.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context)
+                    .textTheme
+                    .titleMedium
+                    ?.copyWith(fontWeight: FontWeight.w800),
+              ),
+              if (meta.isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.xxs),
+                Text(
+                  meta.join(' - '),
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+              if (activeStep != null) ...[
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  'Working on: ${activeStep.title}',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: cs.onSurface,
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+              ],
+              if (canMarkDone) ...[
+                const SizedBox(height: AppSpacing.sm),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: OutlinedButton.icon(
+                    key: const Key('timer-current-mark-done'),
+                    onPressed: onMarkDone,
+                    icon: const Icon(Icons.check_rounded),
+                    label: Text(markLabel),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -235,12 +506,20 @@ class _TimerStatusChip extends StatelessWidget {
 class _CompletionPromptSheet extends StatelessWidget {
   const _CompletionPromptSheet({
     required this.detail,
+    required this.countedLine,
     required this.onKeepGoing,
+    required this.markDoneLabel,
+    required this.onMarkTargetDone,
+    required this.doneLabel,
     required this.onDone,
   });
 
   final String detail;
+  final String countedLine;
   final VoidCallback onKeepGoing;
+  final String? markDoneLabel;
+  final Future<void> Function()? onMarkTargetDone;
+  final String doneLabel;
   final VoidCallback onDone;
 
   @override
@@ -248,50 +527,61 @@ class _CompletionPromptSheet extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
 
     return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.md,
-          AppSpacing.xs,
-          AppSpacing.md,
-          AppSpacing.md,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.check_circle_outline_rounded, color: cs.primary),
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              'That counted.',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: AppSpacing.xxs),
-            Text(
-              'Want to keep going or stop here?',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            const SizedBox(height: AppSpacing.xxs),
-            Text(
-              detail,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            const SizedBox(height: AppSpacing.md),
-            FilledButton.icon(
-              key: const Key('completion-keep-going'),
-              onPressed: onKeepGoing,
-              icon: const Icon(Icons.play_arrow_rounded),
-              label: const Text('Keep going'),
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            OutlinedButton(
-              key: const Key('completion-done-for-now'),
-              onPressed: onDone,
-              child: const Text('Done for now'),
-            ),
-          ],
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.md,
+            AppSpacing.xs,
+            AppSpacing.md,
+            AppSpacing.md,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.check_circle_outline_rounded, color: cs.primary),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                'That counted.',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: AppSpacing.xxs),
+              Text(
+                countedLine,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: AppSpacing.xxs),
+              Text(
+                detail,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: AppSpacing.md),
+              FilledButton.icon(
+                key: const Key('completion-keep-going'),
+                onPressed: onKeepGoing,
+                icon: const Icon(Icons.play_arrow_rounded),
+                label: const Text('Keep going 5m'),
+              ),
+              if (markDoneLabel != null && onMarkTargetDone != null) ...[
+                const SizedBox(height: AppSpacing.xs),
+                OutlinedButton.icon(
+                  key: const Key('completion-mark-target-done'),
+                  onPressed: () => onMarkTargetDone!(),
+                  icon: const Icon(Icons.check_rounded),
+                  label: Text(markDoneLabel!),
+                ),
+              ],
+              const SizedBox(height: AppSpacing.xs),
+              OutlinedButton(
+                key: const Key('completion-done-for-now'),
+                onPressed: onDone,
+                child: Text(doneLabel),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -529,13 +819,42 @@ class _TimerControls extends StatelessWidget {
         _CircleButton(
           icon: Icons.skip_next_rounded,
           label: 'Skip to next mode',
-          onTap: timerState.switchToNextMode,
+          onTap: () => _skipToNextMode(context),
           color: cs.onSurface.withOpacity(0.08),
           iconColor: cs.onSurfaceVariant,
           size: 52,
         ),
       ],
     );
+  }
+
+  Future<void> _skipToNextMode(BuildContext context) async {
+    if (!timerState.isTimerRunning) {
+      timerState.switchToNextMode();
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Skip this session?'),
+          content: const Text('Time from this session will not be counted.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Skip'),
+            ),
+          ],
+        );
+      },
+    );
+    if (!context.mounted || confirmed != true) return;
+    timerState.switchToNextMode();
   }
 }
 

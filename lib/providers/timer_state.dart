@@ -41,6 +41,7 @@ class TimerState extends ChangeNotifier {
   final List<FocusSession> _sessions = [];
   String? _completionMessage;
   String? _lastCompletedMode;
+  FocusSession? _lastCompletedSession;
   String? _sessionHistoryError;
   DateTime? _sessionStartedAt;
   DateTime? _sessionEndsAt;
@@ -56,6 +57,7 @@ class TimerState extends ChangeNotifier {
   bool _disposed = false;
 
   String? get completionMessage => _completionMessage;
+  FocusSession? get lastCompletedSession => _lastCompletedSession;
   UnmodifiableListView<FocusSession> get sessionHistory =>
       UnmodifiableListView(_sessions);
   bool get isSessionHistoryLoading => _isSessionHistoryLoading;
@@ -90,6 +92,24 @@ class TimerState extends ChangeNotifier {
       return session.completed &&
           session.mode == 'Focus' &&
           _isSameDay(session.endedAt, today);
+    }).fold<int>(0, (total, session) => total + session.durationSeconds);
+    return seconds ~/ 60;
+  }
+
+  int focusMinutesForTask(int taskId) {
+    final seconds = _sessions.where((session) {
+      return session.completed &&
+          session.mode == 'Focus' &&
+          session.taskId == taskId;
+    }).fold<int>(0, (total, session) => total + session.durationSeconds);
+    return seconds ~/ 60;
+  }
+
+  int focusMinutesForSubtask(int subtaskId) {
+    final seconds = _sessions.where((session) {
+      return session.completed &&
+          session.mode == 'Focus' &&
+          session.subtaskId == subtaskId;
     }).fold<int>(0, (total, session) => total + session.durationSeconds);
     return seconds ~/ 60;
   }
@@ -320,6 +340,7 @@ class TimerState extends ChangeNotifier {
   void clearCompletionMessage() {
     if (_completionMessage == null) return;
     _completionMessage = null;
+    _lastCompletedSession = null;
     notifyListeners();
   }
 
@@ -361,6 +382,17 @@ class TimerState extends ChangeNotifier {
     final subtaskId = _activeSubtaskId;
     final targetType = _activeTargetType;
     final targetTitleSnapshot = _activeTargetTitle;
+    final completedSession = FocusSession(
+      mode: completedMode,
+      startedAt: startedAt,
+      endedAt: endedAt,
+      durationSeconds: durationSeconds,
+      taskId: taskId,
+      subtaskId: subtaskId,
+      targetType: targetType,
+      targetTitleSnapshot: targetTitleSnapshot,
+      outcome: outcomeTimeDoneOnly,
+    );
     _timer?.cancel();
     _timer = null;
     _sessionEndsAt = null;
@@ -368,22 +400,11 @@ class TimerState extends ChangeNotifier {
     isTimerRunning = false;
     currentMode = _nextModeFor(currentMode);
     _lastCompletedMode = completedMode;
+    _lastCompletedSession = completedSession;
     _completionMessage = '$completedMode complete. $currentMode ready.';
     _resetDuration();
     unawaited(_notificationService.cancelTimerCompletion());
-    unawaited(
-      _recordCompletedSession(
-        mode: completedMode,
-        startedAt: startedAt,
-        endedAt: endedAt,
-        durationSeconds: durationSeconds,
-        taskId: taskId,
-        subtaskId: subtaskId,
-        targetType: targetType,
-        targetTitleSnapshot: targetTitleSnapshot,
-        outcome: outcomeTimeDoneOnly,
-      ),
-    );
+    unawaited(_recordCompletedSession(completedSession));
     notifyListeners();
   }
 
@@ -401,6 +422,7 @@ class TimerState extends ChangeNotifier {
   void _clearCompletionState() {
     _completionMessage = null;
     _lastCompletedMode = null;
+    _lastCompletedSession = null;
   }
 
   void _clearSessionTracking() {
@@ -476,48 +498,30 @@ class TimerState extends ChangeNotifier {
     );
   }
 
-  Future<void> _recordCompletedSession({
-    required String mode,
-    required DateTime startedAt,
-    required DateTime endedAt,
-    required int durationSeconds,
-    int? taskId,
-    int? subtaskId,
-    String targetType = targetTypeNone,
-    String? targetTitleSnapshot,
-    String? outcome,
-  }) async {
-    final session = FocusSession(
-      mode: mode,
-      startedAt: startedAt,
-      endedAt: endedAt,
-      durationSeconds: durationSeconds,
-      taskId: taskId,
-      subtaskId: subtaskId,
-      targetType: targetType,
-      targetTitleSnapshot: targetTitleSnapshot,
-      outcome: outcome,
-    );
-
+  Future<void> _recordCompletedSession(FocusSession session) async {
     try {
       final id = await _sessionRepository.insertSession(session.toMap());
       if (_disposed) return;
+      final savedSession = FocusSession(
+        id: id,
+        mode: session.mode,
+        startedAt: session.startedAt,
+        endedAt: session.endedAt,
+        durationSeconds: session.durationSeconds,
+        completed: session.completed,
+        taskId: session.taskId,
+        subtaskId: session.subtaskId,
+        targetType: session.targetType,
+        targetTitleSnapshot: session.targetTitleSnapshot,
+        outcome: session.outcome,
+      );
       _sessions.insert(
         0,
-        FocusSession(
-          id: id,
-          mode: session.mode,
-          startedAt: session.startedAt,
-          endedAt: session.endedAt,
-          durationSeconds: session.durationSeconds,
-          completed: session.completed,
-          taskId: session.taskId,
-          subtaskId: session.subtaskId,
-          targetType: session.targetType,
-          targetTitleSnapshot: session.targetTitleSnapshot,
-          outcome: session.outcome,
-        ),
+        savedSession,
       );
+      if (identical(_lastCompletedSession, session)) {
+        _lastCompletedSession = savedSession;
+      }
       notifyListeners();
     } catch (_) {
       if (_disposed) return;

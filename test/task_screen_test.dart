@@ -270,7 +270,8 @@ void main() {
     await tester.pump();
 
     expect(repository.subtaskRows[1]!.single['estimated_minutes'], 10);
-    expect(find.text('10m'), findsOneWidget);
+    expect(find.text('10m planned'), findsOneWidget);
+    expect(find.byTooltip('Step actions for Write outline'), findsOneWidget);
 
     await tester.tap(find.byTooltip('Start timer for Write outline'));
     await tester.pump();
@@ -283,6 +284,76 @@ void main() {
     expect(timerState.activeTargetTitle, 'Write outline');
     expect(find.text('10 minute focus started'), findsOneWidget);
     timerState.stopTimer();
+  });
+
+  testWidgets('task cards show logged focus time for tasks and subtasks',
+      (tester) async {
+    final repository = FakeTaskRepository(
+      tasks: [taskRow(id: 1, title: 'Timed task', dueDate: today)],
+      subtasks: {
+        1: [
+          subtaskRow(
+            id: 2,
+            taskId: 1,
+            title: 'Timed step',
+            estimatedMinutes: 10,
+          ),
+        ],
+      },
+    );
+    final state = TaskState(
+      repository: repository,
+      autoLoad: false,
+    );
+    final timerState = TimerState(
+      sessionRepository: FakeTimerSessionRepository(
+        sessions: [
+          {
+            'id': 1,
+            'mode': 'Focus',
+            'started_at': DateTime(2026, 6, 23, 9).toIso8601String(),
+            'ended_at': DateTime(2026, 6, 23, 9, 12).toIso8601String(),
+            'duration_seconds': 720,
+            'completed': 1,
+            'task_id': 1,
+            'subtask_id': 2,
+            'target_type': TimerState.targetTypeSubtask,
+            'target_title_snapshot': 'Timed step',
+          },
+        ],
+      ),
+    );
+    addTearDown(timerState.dispose);
+    await state.loadTasks();
+    await timerState.loadSessionHistory();
+    await _pumpTaskScreen(tester, state, timerState: timerState);
+
+    expect(find.text('12m focus'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Expand task'));
+    await tester.pump();
+
+    expect(find.text('10m planned - 12m focused'), findsOneWidget);
+  });
+
+  testWidgets('too big badge opens task support', (tester) async {
+    final tooBigTask = taskRow(
+      id: 1,
+      title: 'Large task',
+      dueDate: today,
+    )..['friction'] = 'tooBig';
+    final state = TaskState(
+      repository: FakeTaskRepository(tasks: [tooBigTask]),
+      autoLoad: false,
+    );
+    await state.loadTasks();
+    await _pumpTaskScreen(tester, state);
+
+    await tester.tap(find.byTooltip('Break down Large task'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('I am stuck'), findsOneWidget);
+    expect(find.text("What's the blocker?"), findsOneWidget);
   });
 
   testWidgets('task actions can schedule a reminder', (tester) async {
@@ -438,6 +509,11 @@ void main() {
       autoLoad: false,
     );
     await state.loadTasks();
+    final timerState = TimerState(
+      notificationService: FakeTimerNotificationService(),
+      sessionRepository: FakeTimerSessionRepository(),
+    );
+    addTearDown(timerState.dispose);
     tester.view.physicalSize = const Size(400, 900);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -449,6 +525,7 @@ void main() {
         child: MultiProvider(
           providers: [
             ChangeNotifierProvider.value(value: state),
+            ChangeNotifierProvider.value(value: timerState),
             ChangeNotifierProvider(
               create: (_) => SettingsState(
                 repository: FakeSettingsRepository(),

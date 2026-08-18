@@ -316,6 +316,52 @@ void main() {
       expect(state.focusMinutesToday, 25);
     });
 
+    test('computes focus minutes for linked tasks and subtasks', () async {
+      final repository = FakeTimerSessionRepository(
+        sessions: [
+          {
+            'id': 1,
+            'mode': 'Focus',
+            'started_at': DateTime(2026, 6, 23, 9).toIso8601String(),
+            'ended_at': DateTime(2026, 6, 23, 9, 10).toIso8601String(),
+            'duration_seconds': 600,
+            'completed': 1,
+            'task_id': 42,
+            'subtask_id': 77,
+            'target_type': TimerState.targetTypeSubtask,
+          },
+          {
+            'id': 2,
+            'mode': 'Focus',
+            'started_at': DateTime(2026, 6, 23, 10).toIso8601String(),
+            'ended_at': DateTime(2026, 6, 23, 10, 5).toIso8601String(),
+            'duration_seconds': 300,
+            'completed': 1,
+            'task_id': 42,
+            'target_type': TimerState.targetTypeTask,
+          },
+          {
+            'id': 3,
+            'mode': 'Short Break',
+            'started_at': DateTime(2026, 6, 23, 10, 5).toIso8601String(),
+            'ended_at': DateTime(2026, 6, 23, 10, 10).toIso8601String(),
+            'duration_seconds': 300,
+            'completed': 1,
+            'task_id': 42,
+            'target_type': TimerState.targetTypeTask,
+          },
+        ],
+      );
+      final state = TimerState(sessionRepository: repository);
+      addTearDown(state.dispose);
+
+      await state.loadSessionHistory();
+
+      expect(state.focusMinutesForTask(42), 15);
+      expect(state.focusMinutesForSubtask(77), 10);
+      expect(state.focusMinutesForTask(99), 0);
+    });
+
     test('notification preference schedules and cancels timer completion', () {
       fakeAsync((async) {
         final startedAt = DateTime(2026, 6, 23, 9);
