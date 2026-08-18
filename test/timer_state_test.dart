@@ -240,6 +240,147 @@ void main() {
       });
     });
 
+    test('linked completion outcomes update recorded sessions', () {
+      fakeAsync((async) {
+        final startedAt = DateTime(2026, 6, 23, 9);
+        var now = startedAt;
+        final repository = FakeTimerSessionRepository();
+        final state = TimerState(
+          now: () => now,
+          sessionRepository: repository,
+        );
+
+        state.startTargetFocus(
+          minutes: 10,
+          targetType: TimerState.targetTypeTask,
+          taskId: 42,
+          title: 'Write report',
+        );
+        now = now.add(const Duration(minutes: 10));
+        state.syncWithClock();
+        async.flushMicrotasks();
+
+        expect(state.pendingCompletionTarget?.sessionId, 1);
+
+        state.resolveLinkedCompletion(TimerState.outcomeLeftOpen);
+        async.flushMicrotasks();
+
+        expect(state.pendingCompletionTarget, isNull);
+        expect(repository.sessionRows.single['outcome'], 'left_open');
+        expect(state.sessionHistory.single.outcome, 'left_open');
+        state.dispose();
+      });
+    });
+
+    test('continue linked focus keeps the same target', () {
+      fakeAsync((async) {
+        final startedAt = DateTime(2026, 6, 23, 9);
+        var now = startedAt;
+        final repository = FakeTimerSessionRepository();
+        final state = TimerState(
+          now: () => now,
+          sessionRepository: repository,
+        );
+
+        state.startTargetFocus(
+          minutes: 10,
+          targetType: TimerState.targetTypeSubtask,
+          taskId: 42,
+          subtaskId: 77,
+          title: 'Find one source',
+        );
+        now = now.add(const Duration(minutes: 10));
+        state.syncWithClock();
+        async.flushMicrotasks();
+
+        state.continueLinkedFocus();
+        async.flushMicrotasks();
+
+        expect(repository.sessionRows.single['outcome'], 'continued');
+        expect(state.isTimerRunning, isTrue);
+        expect(state.timerDisplay, '05:00');
+        expect(state.activeTaskId, 42);
+        expect(state.activeSubtaskId, 77);
+        expect(state.activeTargetType, TimerState.targetTypeSubtask);
+        expect(state.activeTargetTitle, 'Find one source');
+        state.dispose();
+      });
+    });
+
+    test('ending linked focus early records elapsed time', () {
+      fakeAsync((async) {
+        final startedAt = DateTime(2026, 6, 23, 9);
+        var now = startedAt;
+        final repository = FakeTimerSessionRepository();
+        final state = TimerState(
+          now: () => now,
+          sessionRepository: repository,
+        );
+
+        state.startTargetFocus(
+          minutes: 10,
+          targetType: TimerState.targetTypeTask,
+          taskId: 42,
+          title: 'Write report',
+        );
+        now = now.add(const Duration(seconds: 150));
+        state.syncWithClock();
+
+        final ended = state.endCurrentSessionEarly();
+        async.flushMicrotasks();
+
+        expect(ended, isTrue);
+        expect(state.isTimerRunning, isFalse);
+        expect(state.hasActiveSession, isFalse);
+        expect(state.currentMode, 'Short Break');
+        expect(state.completionMessage, 'Focus ended. Short Break ready.');
+        expect(state.pendingCompletionTarget?.taskId, 42);
+        expect(repository.sessionRows.single['duration_seconds'], 150);
+        expect(repository.sessionRows.single['task_id'], 42);
+        expect(repository.sessionRows.single['outcome'], 'time_done_only');
+        state.dispose();
+      });
+    });
+
+    test('paused linked focus cannot be replaced and can end early', () {
+      fakeAsync((async) {
+        final startedAt = DateTime(2026, 6, 23, 9);
+        var now = startedAt;
+        final repository = FakeTimerSessionRepository();
+        final state = TimerState(
+          now: () => now,
+          sessionRepository: repository,
+        );
+
+        state.startTargetFocus(
+          minutes: 5,
+          targetType: TimerState.targetTypeSubtask,
+          taskId: 42,
+          subtaskId: 77,
+          title: 'Find one source',
+        );
+        now = now.add(const Duration(seconds: 60));
+        state.syncWithClock();
+        state.pauseTimer();
+
+        final replaced = state.startTargetFocus(
+          minutes: 2,
+          targetType: TimerState.targetTypeTask,
+          taskId: 99,
+          title: 'Other task',
+        );
+        final ended = state.endCurrentSessionEarly();
+        async.flushMicrotasks();
+
+        expect(replaced, isFalse);
+        expect(ended, isTrue);
+        expect(repository.sessionRows.single['duration_seconds'], 60);
+        expect(repository.sessionRows.single['task_id'], 42);
+        expect(repository.sessionRows.single['subtask_id'], 77);
+        state.dispose();
+      });
+    });
+
     test('syncs stale running sessions against the clock', () {
       fakeAsync((async) {
         final startedAt = DateTime(2026, 6, 23, 9);
@@ -316,38 +457,79 @@ void main() {
       expect(state.focusMinutesToday, 25);
     });
 
+<<<<<<< HEAD
     test('computes focus minutes for linked tasks and subtasks', () async {
+=======
+    test('summarizes focus time by task and subtask', () async {
+>>>>>>> 116293643c717f05e5b4aafac370a2efdd93a2e1
       final repository = FakeTimerSessionRepository(
         sessions: [
           {
             'id': 1,
             'mode': 'Focus',
             'started_at': DateTime(2026, 6, 23, 9).toIso8601String(),
+<<<<<<< HEAD
             'ended_at': DateTime(2026, 6, 23, 9, 10).toIso8601String(),
             'duration_seconds': 600,
             'completed': 1,
             'task_id': 42,
             'subtask_id': 77,
             'target_type': TimerState.targetTypeSubtask,
+=======
+            'ended_at': DateTime(2026, 6, 23, 9, 2).toIso8601String(),
+            'duration_seconds': 120,
+            'completed': 1,
+            'task_id': 42,
+            'subtask_id': 7,
+            'target_type': TimerState.targetTypeSubtask,
+            'target_title_snapshot': 'Find source',
+            'outcome': TimerState.outcomeLeftOpen,
+>>>>>>> 116293643c717f05e5b4aafac370a2efdd93a2e1
           },
           {
             'id': 2,
             'mode': 'Focus',
+<<<<<<< HEAD
             'started_at': DateTime(2026, 6, 23, 10).toIso8601String(),
             'ended_at': DateTime(2026, 6, 23, 10, 5).toIso8601String(),
             'duration_seconds': 300,
             'completed': 1,
             'task_id': 42,
             'target_type': TimerState.targetTypeTask,
+=======
+            'started_at': DateTime(2026, 6, 23, 9, 10).toIso8601String(),
+            'ended_at': DateTime(2026, 6, 23, 9, 15).toIso8601String(),
+            'duration_seconds': 300,
+            'completed': 1,
+            'task_id': 42,
+            'subtask_id': 8,
+            'target_type': TimerState.targetTypeSubtask,
+            'target_title_snapshot': 'Write notes',
+            'outcome': TimerState.outcomeSubtaskCompleted,
+>>>>>>> 116293643c717f05e5b4aafac370a2efdd93a2e1
           },
           {
             'id': 3,
             'mode': 'Short Break',
+<<<<<<< HEAD
             'started_at': DateTime(2026, 6, 23, 10, 5).toIso8601String(),
             'ended_at': DateTime(2026, 6, 23, 10, 10).toIso8601String(),
+=======
+            'started_at': DateTime(2026, 6, 23, 9, 15).toIso8601String(),
+            'ended_at': DateTime(2026, 6, 23, 9, 20).toIso8601String(),
             'duration_seconds': 300,
             'completed': 1,
             'task_id': 42,
+            'target_type': TimerState.targetTypeTask,
+          },
+          {
+            'id': 4,
+            'mode': 'Focus',
+            'started_at': DateTime(2026, 6, 23, 10).toIso8601String(),
+            'ended_at': DateTime(2026, 6, 23, 10, 10).toIso8601String(),
+            'duration_seconds': 600,
+            'completed': 1,
+            'task_id': 99,
             'target_type': TimerState.targetTypeTask,
           },
         ],
@@ -357,9 +539,74 @@ void main() {
 
       await state.loadSessionHistory();
 
+      final summary = state.focusSummaryForTask(42);
+      expect(summary.focusMinutes, 7);
+      expect(summary.sessionCount, 2);
+      expect(summary.subtaskFocusMinutes(7), 2);
+      expect(summary.subtaskFocusMinutes(8), 5);
+    });
+
+    test('finds the latest target that is still left open', () async {
+      final repository = FakeTimerSessionRepository(
+        sessions: [
+          {
+            'id': 1,
+            'mode': 'Focus',
+            'started_at': DateTime(2026, 6, 23, 9).toIso8601String(),
+            'ended_at': DateTime(2026, 6, 23, 9, 5).toIso8601String(),
+>>>>>>> 116293643c717f05e5b4aafac370a2efdd93a2e1
+            'duration_seconds': 300,
+            'completed': 1,
+            'task_id': 42,
+            'target_type': TimerState.targetTypeTask,
+<<<<<<< HEAD
+=======
+            'target_title_snapshot': 'Essay',
+            'outcome': TimerState.outcomeLeftOpen,
+          },
+          {
+            'id': 2,
+            'mode': 'Focus',
+            'started_at': DateTime(2026, 6, 23, 9, 10).toIso8601String(),
+            'ended_at': DateTime(2026, 6, 23, 9, 15).toIso8601String(),
+            'duration_seconds': 300,
+            'completed': 1,
+            'task_id': 42,
+            'target_type': TimerState.targetTypeTask,
+            'target_title_snapshot': 'Essay',
+            'outcome': TimerState.outcomeContinued,
+          },
+          {
+            'id': 3,
+            'mode': 'Focus',
+            'started_at': DateTime(2026, 6, 23, 10).toIso8601String(),
+            'ended_at': DateTime(2026, 6, 23, 10, 5).toIso8601String(),
+            'duration_seconds': 300,
+            'completed': 1,
+            'task_id': 99,
+            'target_type': TimerState.targetTypeTask,
+            'target_title_snapshot': 'Lab',
+            'outcome': TimerState.outcomeLeftOpen,
+>>>>>>> 116293643c717f05e5b4aafac370a2efdd93a2e1
+          },
+        ],
+      );
+      final state = TimerState(sessionRepository: repository);
+      addTearDown(state.dispose);
+
+      await state.loadSessionHistory();
+
+<<<<<<< HEAD
       expect(state.focusMinutesForTask(42), 15);
       expect(state.focusMinutesForSubtask(77), 10);
       expect(state.focusMinutesForTask(99), 0);
+=======
+      expect(state.latestOpenFocusSessionForTaskIds([42]), isNull);
+      expect(
+        state.latestOpenFocusSessionForTaskIds([42, 99])?.targetTitleSnapshot,
+        'Lab',
+      );
+>>>>>>> 116293643c717f05e5b4aafac370a2efdd93a2e1
     });
 
     test('notification preference schedules and cancels timer completion', () {

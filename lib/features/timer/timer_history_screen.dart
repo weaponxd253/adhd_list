@@ -134,6 +134,10 @@ class _SessionTile extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final color = _modeColor(session.mode, cs);
     final targetLabel = _targetLabel(session);
+<<<<<<< HEAD
+=======
+    final outcomeLabel = TimerState.readableOutcomeLabel(session.outcome);
+>>>>>>> 116293643c717f05e5b4aafac370a2efdd93a2e1
 
     return Container(
       padding: const EdgeInsets.symmetric(
@@ -170,12 +174,17 @@ class _SessionTile extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
+<<<<<<< HEAD
                           color: cs.primary,
                           fontWeight: FontWeight.w700,
+=======
+                          fontWeight: FontWeight.w700,
+                          color: cs.onSurface,
+>>>>>>> 116293643c717f05e5b4aafac370a2efdd93a2e1
                         ),
                   ),
                 Text(
-                  '${session.durationMinutes} min • ${DateFormat.jm().format(session.endedAt)}',
+                  '${session.durationMinutes} min • ${DateFormat.jm().format(session.endedAt)} • $outcomeLabel',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],
@@ -190,6 +199,18 @@ class _SessionTile extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  String? _targetLabel(FocusSession session) {
+    final title = session.targetTitleSnapshot?.trim();
+    if (title == null || title.isEmpty) return null;
+    if (session.targetType == TimerState.targetTypeSubtask) {
+      return 'Step: $title';
+    }
+    if (session.targetType == TimerState.targetTypeTask) {
+      return 'Task: $title';
+    }
+    return null;
   }
 
   Color _modeColor(String mode, ColorScheme cs) {

@@ -9,6 +9,7 @@ import '../../models/task.dart';
 import '../../providers/task_state.dart';
 import '../../providers/timer_state.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/timer_completion_prompt.dart';
 import 'timer_history_screen.dart';
 
 class TimerScreen extends StatefulWidget {
@@ -72,8 +73,12 @@ class _TimerScreenState extends State<TimerScreen>
         final message = timerState.completionMessage;
         final session = timerState.lastCompletedSession ?? completedSession;
         if (message == null) return;
+<<<<<<< HEAD
         timerState.clearCompletionMessage();
         _showCompletionPrompt(message, session);
+=======
+        showPendingTimerCompletionPrompt(context);
+>>>>>>> 116293643c717f05e5b4aafac370a2efdd93a2e1
       });
     }
 
@@ -149,6 +154,7 @@ class _TimerScreenState extends State<TimerScreen>
       ),
     );
   }
+<<<<<<< HEAD
 
   void _showCompletionPrompt(String detail, FocusSession? completedSession) {
     final canTakeBreak = completedSession?.mode == 'Focus';
@@ -307,6 +313,8 @@ class _TimerScreenState extends State<TimerScreen>
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(message)));
   }
+=======
+>>>>>>> 116293643c717f05e5b4aafac370a2efdd93a2e1
 }
 
 class _TimerTargetLabel extends StatelessWidget {
@@ -503,6 +511,7 @@ class _TimerStatusChip extends StatelessWidget {
   }
 }
 
+<<<<<<< HEAD
 class _CompletionPromptSheet extends StatelessWidget {
   const _CompletionPromptSheet({
     required this.detail,
@@ -588,6 +597,8 @@ class _CompletionPromptSheet extends StatelessWidget {
   }
 }
 
+=======
+>>>>>>> 116293643c717f05e5b4aafac370a2efdd93a2e1
 class _ModeSelector extends StatelessWidget {
   const _ModeSelector({
     required this.modes,
@@ -768,13 +779,19 @@ class _TimerControls extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final hasActiveSession = timerState.hasActiveSession;
+    final primaryLabel = timerState.isTimerRunning
+        ? 'Pause timer'
+        : hasActiveSession
+            ? 'Resume timer'
+            : 'Start timer';
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         _CircleButton(
-          icon: Icons.refresh_rounded,
-          label: 'Reset timer',
+          icon: Icons.close_rounded,
+          label: 'Cancel timer',
           onTap: timerState.resetTimer,
           color: cs.onSurface.withOpacity(0.08),
           iconColor: cs.onSurfaceVariant,
@@ -782,10 +799,10 @@ class _TimerControls extends StatelessWidget {
         ),
         const SizedBox(width: AppSpacing.lg),
         Tooltip(
-          message: timerState.isTimerRunning ? 'Pause timer' : 'Start timer',
+          message: primaryLabel,
           child: Semantics(
             button: true,
-            label: timerState.isTimerRunning ? 'Pause timer' : 'Start timer',
+            label: primaryLabel,
             child: GestureDetector(
               onTap: timerState.isTimerRunning
                   ? timerState.pauseTimer
@@ -817,9 +834,19 @@ class _TimerControls extends StatelessWidget {
         ),
         const SizedBox(width: AppSpacing.lg),
         _CircleButton(
+<<<<<<< HEAD
           icon: Icons.skip_next_rounded,
           label: 'Skip to next mode',
           onTap: () => _skipToNextMode(context),
+=======
+          icon: hasActiveSession
+              ? Icons.stop_circle_outlined
+              : Icons.skip_next_rounded,
+          label: hasActiveSession ? 'End now' : 'Skip to next mode',
+          onTap: hasActiveSession
+              ? timerState.endCurrentSessionEarly
+              : timerState.switchToNextMode,
+>>>>>>> 116293643c717f05e5b4aafac370a2efdd93a2e1
           color: cs.onSurface.withOpacity(0.08),
           iconColor: cs.onSurfaceVariant,
           size: 52,

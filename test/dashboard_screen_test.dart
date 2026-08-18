@@ -19,6 +19,7 @@ class _DashboardHarness {
     List<Map<String, dynamic>>? tasks,
     Map<int, List<Map<String, dynamic>>>? subtasks,
     List<Map<String, dynamic>>? moods,
+    List<Map<String, Object?>>? timerSessions,
     DateTime Function()? now,
     this.onOpenMood,
     this.onOpenTimer,
@@ -29,7 +30,9 @@ class _DashboardHarness {
         moodRepository = FakeMoodRepository(entries: moods),
         settingsRepository = FakeSettingsRepository(),
         taskReminderRepository = FakeTaskReminderRepository(),
-        timerSessionRepository = FakeTimerSessionRepository(),
+        timerSessionRepository = FakeTimerSessionRepository(
+          sessions: timerSessions,
+        ),
         taskReminderNotificationService = FakeTaskReminderNotificationService(),
         notificationService = FakeTimerNotificationService() {
     taskState = TaskState(
@@ -49,6 +52,7 @@ class _DashboardHarness {
       autoLoad: false,
     );
     timerState = TimerState(
+      now: now,
       notificationService: notificationService,
       sessionRepository: timerSessionRepository,
     );
@@ -84,6 +88,7 @@ Future<_DashboardHarness> _pumpDashboard(
   List<Map<String, dynamic>>? tasks,
   Map<int, List<Map<String, dynamic>>>? subtasks,
   List<Map<String, dynamic>>? moods,
+  List<Map<String, Object?>>? timerSessions,
   DateTime Function()? now,
   VoidCallback? onOpenMood,
   VoidCallback? onOpenTimer,
@@ -101,6 +106,7 @@ Future<_DashboardHarness> _pumpDashboard(
     tasks: tasks,
     subtasks: subtasks,
     moods: moods,
+    timerSessions: timerSessions,
     now: effectiveNow,
     onOpenMood: onOpenMood,
     onOpenTimer: onOpenTimer,
@@ -109,6 +115,9 @@ Future<_DashboardHarness> _pumpDashboard(
 
   await harness.taskState.loadTasks();
   await harness.moodState.load();
+  if (timerSessions != null) {
+    await harness.timerState.loadSessionHistory();
+  }
   if (taskRemindersEnabled) {
     await harness.settingsState.setTaskRemindersEnabled(true);
   }
@@ -171,10 +180,13 @@ void main() {
     expect(find.text('Open notes'), findsOneWidget);
     expect(find.text('Pack backpack'), findsOneWidget);
     expect(find.text('0/2 steps'), findsOneWidget);
+    expect(find.text('Overdue'), findsOneWidget);
+    expect(
+        find.text('One focus block can get it moving again.'), findsOneWidget);
     expect(find.text('Next'), findsOneWidget);
   });
 
-  testWidgets('dashboard quick start begins a five minute focus session',
+  testWidgets('dashboard quick start shows an active focus state',
       (tester) async {
     var openedTimer = false;
     final harness = await _pumpDashboard(
@@ -191,11 +203,14 @@ void main() {
     expect(harness.timerState.activeTaskId, 1);
     expect(harness.timerState.activeTargetType, TimerState.targetTypeTask);
     expect(harness.timerState.activeTargetTitle, 'Do homework');
-    expect(openedTimer, isTrue);
+    expect(openedTimer, isFalse);
+    expect(find.byKey(const Key('dashboard-active-focus')), findsOneWidget);
+    expect(find.text('In progress · 05:00 left'), findsOneWidget);
+    expect(find.byKey(const Key('dashboard-start-5')), findsNothing);
     harness.timerState.stopTimer();
   });
 
-  testWidgets('dashboard tiny start begins a two minute focus session',
+  testWidgets('dashboard tiny start shows an active focus state',
       (tester) async {
     var openedTimer = false;
     final harness = await _pumpDashboard(
@@ -212,13 +227,12 @@ void main() {
     expect(harness.timerState.activeTaskId, 1);
     expect(harness.timerState.activeTargetType, TimerState.targetTypeTask);
     expect(harness.timerState.activeTargetTitle, 'Do homework');
-    expect(openedTimer, isTrue);
-    expect(find.text('2 minute focus started'), findsOneWidget);
+    expect(openedTimer, isFalse);
+    expect(find.text('In progress · 02:00 left'), findsOneWidget);
     harness.timerState.stopTimer();
   });
 
-  testWidgets('dashboard task start does not replace a running task timer',
-      (tester) async {
+  testWidgets('dashboard active focus replaces start actions', (tester) async {
     final harness = await _pumpDashboard(
       tester,
       tasks: [
@@ -232,14 +246,49 @@ void main() {
     final firstTaskId = harness.timerState.activeTaskId;
     final firstTaskTitle = harness.timerState.activeTargetTitle;
 
-    await tester.tap(find.byKey(const Key('dashboard-start-5')));
-    await tester.pump();
-
     expect(harness.timerState.timerDisplay, '02:00');
     expect(harness.timerState.activeTaskId, firstTaskId);
     expect(harness.timerState.activeTargetTitle, firstTaskTitle);
-    expect(find.text('Timer already running'), findsOneWidget);
+    expect(find.byKey(const Key('dashboard-start-5')), findsNothing);
+    expect(find.byKey(const Key('dashboard-end-active-focus')), findsOneWidget);
     harness.timerState.stopTimer();
+  });
+
+  testWidgets('dashboard can end active task focus early', (tester) async {
+    final startedAt = DateTime(2026, 8, 3, 9);
+    var now = startedAt;
+    final harness = await _pumpDashboard(
+      tester,
+      now: () => now,
+      tasks: [taskRow(id: 1, title: 'Do homework', dueDate: today)],
+    );
+
+    await tester.tap(find.byKey(const Key('dashboard-start-5')));
+    await tester.pump();
+    now = startedAt.add(const Duration(seconds: 90));
+    harness.timerState.syncWithClock();
+    await tester.pump();
+
+    expect(find.text('In progress · 03:30 left'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('dashboard-end-active-focus')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 700));
+
+    expect(harness.timerState.isTimerRunning, isFalse);
+    expect(harness.timerState.currentMode, 'Short Break');
+    expect(
+        harness.timerSessionRepository.sessionRows.single['duration_seconds'],
+        90);
+    expect(find.text('Did that get finished?'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('linked-completion-leave-open')));
+    await tester.pump();
+
+    expect(
+      harness.timerSessionRepository.sessionRows.single['outcome'],
+      TimerState.outcomeLeftOpen,
+    );
   });
 
   testWidgets('dashboard tiny step adds a subtask', (tester) async {
@@ -360,6 +409,59 @@ void main() {
       harness.taskRepository.taskRows.first['due_date'] as String,
     );
     expect(dueDate, DateTime(today.year, today.month, today.day + 7));
+  });
+
+  testWidgets('dashboard suggests resuming a task left open after focus',
+      (tester) async {
+    var openedTimer = false;
+    final harness = await _pumpDashboard(
+      tester,
+      now: () => today,
+      onOpenTimer: () => openedTimer = true,
+      tasks: [
+        taskRow(id: 1, title: 'Do homework', dueDate: today),
+        taskRow(
+          id: 2,
+          title: 'Essay',
+          dueDate: today.add(const Duration(days: 1)),
+        ),
+      ],
+      subtasks: {
+        2: [
+          subtaskRow(id: 20, taskId: 2, title: 'Draft outline'),
+        ],
+      },
+      timerSessions: [
+        {
+          'id': 1,
+          'mode': 'Focus',
+          'started_at': DateTime(2026, 8, 3, 8).toIso8601String(),
+          'ended_at': DateTime(2026, 8, 3, 8, 5).toIso8601String(),
+          'duration_seconds': 300,
+          'completed': 1,
+          'task_id': 2,
+          'subtask_id': 20,
+          'target_type': TimerState.targetTypeSubtask,
+          'target_title_snapshot': 'Draft outline',
+          'outcome': TimerState.outcomeLeftOpen,
+        },
+      ],
+    );
+
+    expect(find.text('Still open'), findsOneWidget);
+    expect(find.text('Draft outline · Essay'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('dashboard-resume-focus')));
+    await tester.pump();
+
+    expect(harness.timerState.isTimerRunning, isTrue);
+    expect(harness.timerState.timerDisplay, '05:00');
+    expect(harness.timerState.activeTaskId, 2);
+    expect(harness.timerState.activeSubtaskId, 20);
+    expect(harness.timerState.activeTargetType, TimerState.targetTypeSubtask);
+    expect(harness.timerState.activeTargetTitle, 'Draft outline');
+    expect(openedTimer, isTrue);
+    harness.timerState.stopTimer();
   });
 
   testWidgets('dashboard waiting card can schedule and cancel a reminder',

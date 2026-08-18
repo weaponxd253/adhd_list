@@ -55,6 +55,7 @@ abstract interface class SettingsRepository {
 
 abstract interface class TimerSessionRepository {
   Future<int> insertSession(Map<String, Object?> session);
+  Future<void> updateSessionOutcome(int sessionId, String outcome);
   Future<List<Map<String, Object?>>> fetchSessions({int limit = 60});
   Future<void> clearSessions();
 }

@@ -23,8 +23,13 @@ Future<void> _pumpTimerScreen(
   await tester.pumpWidget(
     MultiProvider(
       providers: [
+<<<<<<< HEAD
         ChangeNotifierProvider.value(value: state),
         if (taskState != null) ChangeNotifierProvider.value(value: taskState),
+=======
+        if (taskState != null) ChangeNotifierProvider.value(value: taskState),
+        ChangeNotifierProvider.value(value: state),
+>>>>>>> 116293643c717f05e5b4aafac370a2efdd93a2e1
       ],
       child: MaterialApp(
         theme: AppTheme.light,
@@ -32,6 +37,18 @@ Future<void> _pumpTimerScreen(
       ),
     ),
   );
+  await tester.pump();
+}
+
+Future<void> _pumpPromptIn(WidgetTester tester) async {
+  await tester.pump();
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 700));
+}
+
+Future<void> _pumpPromptOut(WidgetTester tester) async {
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 500));
   await tester.pump();
 }
 
@@ -96,16 +113,67 @@ void main() {
     state.stopTimer();
   });
 
+<<<<<<< HEAD
   testWidgets('shows current task details for linked focus sessions',
       (tester) async {
     final taskRepository = FakeTaskRepository(
       tasks: [taskRow(id: 1, title: 'Project task', dueDate: DateTime(2026))],
       subtasks: {
         1: [subtaskRow(id: 2, taskId: 1, title: 'Write outline')],
+=======
+  testWidgets('linked task completion prompt can mark task complete',
+      (tester) async {
+    final startedAt = DateTime(2026, 6, 23, 9);
+    var now = startedAt;
+    final taskRepository = FakeTaskRepository(
+      tasks: [taskRow(id: 1, title: 'Write report', dueDate: startedAt)],
+    );
+    final taskState = TaskState(repository: taskRepository, autoLoad: false);
+    await taskState.loadTasks();
+    final timerRepository = FakeTimerSessionRepository();
+    final state = TimerState(
+      now: () => now,
+      sessionRepository: timerRepository,
+    );
+    await _pumpTimerScreen(tester, state, taskState: taskState);
+
+    state.startTargetFocus(
+      minutes: 1,
+      targetType: TimerState.targetTypeTask,
+      taskId: 1,
+      title: 'Write report',
+    );
+    await tester.pump();
+    now = startedAt.add(const Duration(minutes: 1));
+    state.syncWithClock();
+    await _pumpPromptIn(tester);
+
+    expect(find.text('Did that get finished?'), findsOneWidget);
+    expect(find.text('Write report'), findsOneWidget);
+    expect(find.text('Mark task complete'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('linked-completion-mark-complete')));
+    await _pumpPromptOut(tester);
+
+    expect(taskState.tasks.single.isCompleted, isTrue);
+    expect(timerRepository.sessionRows.single['outcome'], 'task_completed');
+    expect(state.pendingCompletionTarget, isNull);
+  });
+
+  testWidgets('linked subtask completion prompt can mark step complete',
+      (tester) async {
+    final startedAt = DateTime(2026, 6, 23, 9);
+    var now = startedAt;
+    final taskRepository = FakeTaskRepository(
+      tasks: [taskRow(id: 1, title: 'Write report', dueDate: startedAt)],
+      subtasks: {
+        1: [subtaskRow(id: 2, taskId: 1, title: 'Find one source')],
+>>>>>>> 116293643c717f05e5b4aafac370a2efdd93a2e1
       },
     );
     final taskState = TaskState(repository: taskRepository, autoLoad: false);
     await taskState.loadTasks();
+<<<<<<< HEAD
     final timerState = TimerState(
       sessionRepository: FakeTimerSessionRepository(
         sessions: [
@@ -147,6 +215,118 @@ void main() {
     expect(taskRepository.subtaskRows[1]!.single['is_completed'], 1);
     expect(find.text('Step marked done'), findsOneWidget);
     timerState.stopTimer();
+=======
+    final timerRepository = FakeTimerSessionRepository();
+    final state = TimerState(
+      now: () => now,
+      sessionRepository: timerRepository,
+    );
+    await _pumpTimerScreen(tester, state, taskState: taskState);
+
+    state.startTargetFocus(
+      minutes: 1,
+      targetType: TimerState.targetTypeSubtask,
+      taskId: 1,
+      subtaskId: 2,
+      title: 'Find one source',
+    );
+    await tester.pump();
+    now = startedAt.add(const Duration(minutes: 1));
+    state.syncWithClock();
+    await _pumpPromptIn(tester);
+
+    expect(find.text('Find one source'), findsOneWidget);
+    expect(find.text('Mark step complete'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('linked-completion-mark-complete')));
+    await _pumpPromptOut(tester);
+
+    expect(taskState.tasks.single.subtasks.single.isCompleted, isTrue);
+    expect(timerRepository.sessionRows.single['outcome'], 'subtask_completed');
+    expect(state.pendingCompletionTarget, isNull);
+  });
+
+  testWidgets('linked completion can continue or leave open', (tester) async {
+    final startedAt = DateTime(2026, 6, 23, 9);
+    var now = startedAt;
+    final taskRepository = FakeTaskRepository(
+      tasks: [taskRow(id: 1, title: 'Write report', dueDate: startedAt)],
+    );
+    final taskState = TaskState(repository: taskRepository, autoLoad: false);
+    await taskState.loadTasks();
+    final timerRepository = FakeTimerSessionRepository();
+    final state = TimerState(
+      now: () => now,
+      sessionRepository: timerRepository,
+    );
+    await _pumpTimerScreen(tester, state, taskState: taskState);
+
+    state.startTargetFocus(
+      minutes: 1,
+      targetType: TimerState.targetTypeTask,
+      taskId: 1,
+      title: 'Write report',
+    );
+    await tester.pump();
+    now = startedAt.add(const Duration(minutes: 1));
+    state.syncWithClock();
+    await _pumpPromptIn(tester);
+
+    await tester.tap(find.byKey(const Key('linked-completion-add-five')));
+    await _pumpPromptOut(tester);
+
+    expect(timerRepository.sessionRows.single['outcome'], 'continued');
+    expect(state.isTimerRunning, isTrue);
+    expect(state.timerDisplay, '05:00');
+    expect(state.activeTaskId, 1);
+    expect(state.activeTargetTitle, 'Write report');
+
+    now = startedAt.add(const Duration(minutes: 6));
+    state.syncWithClock();
+    await _pumpPromptIn(tester);
+
+    await tester.tap(find.byKey(const Key('linked-completion-leave-open')));
+    await _pumpPromptOut(tester);
+
+    expect(taskState.tasks.single.isCompleted, isFalse);
+    expect(timerRepository.sessionRows.first['outcome'], 'left_open');
+    expect(state.pendingCompletionTarget, isNull);
+  });
+
+  testWidgets('linked completion can leave a break ready', (tester) async {
+    final startedAt = DateTime(2026, 6, 23, 9);
+    var now = startedAt;
+    final taskRepository = FakeTaskRepository(
+      tasks: [taskRow(id: 1, title: 'Write report', dueDate: startedAt)],
+    );
+    final taskState = TaskState(repository: taskRepository, autoLoad: false);
+    await taskState.loadTasks();
+    final timerRepository = FakeTimerSessionRepository();
+    final state = TimerState(
+      now: () => now,
+      sessionRepository: timerRepository,
+    );
+    await _pumpTimerScreen(tester, state, taskState: taskState);
+
+    state.startTargetFocus(
+      minutes: 1,
+      targetType: TimerState.targetTypeTask,
+      taskId: 1,
+      title: 'Write report',
+    );
+    await tester.pump();
+    now = startedAt.add(const Duration(minutes: 1));
+    state.syncWithClock();
+    await _pumpPromptIn(tester);
+
+    await tester.tap(find.byKey(const Key('linked-completion-take-break')));
+    await _pumpPromptOut(tester);
+
+    expect(state.currentMode, 'Short Break');
+    expect(state.isTimerRunning, isFalse);
+    expect(timerRepository.sessionRows.single['outcome'], 'break_ready');
+    expect(taskState.tasks.single.isCompleted, isFalse);
+>>>>>>> 116293643c717f05e5b4aafac370a2efdd93a2e1
   });
 
   testWidgets('reconciles completed sessions when the app resumes',

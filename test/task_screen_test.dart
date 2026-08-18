@@ -286,6 +286,7 @@ void main() {
     timerState.stopTimer();
   });
 
+<<<<<<< HEAD
   testWidgets('task cards show logged focus time for tasks and subtasks',
       (tester) async {
     final repository = FakeTaskRepository(
@@ -297,6 +298,43 @@ void main() {
             taskId: 1,
             title: 'Timed step',
             estimatedMinutes: 10,
+=======
+  testWidgets('expanded task shows focus memory from linked sessions',
+      (tester) async {
+    final timerRepository = FakeTimerSessionRepository(
+      sessions: [
+        {
+          'id': 1,
+          'mode': 'Focus',
+          'started_at': DateTime(2026, 6, 23, 9).toIso8601String(),
+          'ended_at': DateTime(2026, 6, 23, 9, 5).toIso8601String(),
+          'duration_seconds': 300,
+          'completed': 1,
+          'task_id': 1,
+          'subtask_id': 200,
+          'target_type': TimerState.targetTypeSubtask,
+          'target_title_snapshot': 'Write outline',
+          'outcome': TimerState.outcomeLeftOpen,
+        },
+      ],
+    );
+    final repository = FakeTaskRepository(
+      tasks: [
+        taskRow(
+          id: 1,
+          title: 'Project task',
+          dueDate: today,
+          estimatedMinutes: 10,
+        ),
+      ],
+      subtasks: {
+        1: [
+          subtaskRow(
+            id: 200,
+            taskId: 1,
+            title: 'Write outline',
+            estimatedMinutes: 5,
+>>>>>>> 116293643c717f05e5b4aafac370a2efdd93a2e1
           ),
         ],
       },
@@ -306,6 +344,7 @@ void main() {
       autoLoad: false,
     );
     final timerState = TimerState(
+<<<<<<< HEAD
       sessionRepository: FakeTimerSessionRepository(
         sessions: [
           {
@@ -322,17 +361,26 @@ void main() {
           },
         ],
       ),
+=======
+      notificationService: FakeTimerNotificationService(),
+      sessionRepository: timerRepository,
+>>>>>>> 116293643c717f05e5b4aafac370a2efdd93a2e1
     );
     addTearDown(timerState.dispose);
     await state.loadTasks();
     await timerState.loadSessionHistory();
     await _pumpTaskScreen(tester, state, timerState: timerState);
 
+<<<<<<< HEAD
     expect(find.text('12m focus'), findsOneWidget);
+=======
+    expect(find.text('Focused 5m'), findsNothing);
+>>>>>>> 116293643c717f05e5b4aafac370a2efdd93a2e1
 
     await tester.tap(find.byTooltip('Expand task'));
     await tester.pump();
 
+<<<<<<< HEAD
     expect(find.text('10m planned - 12m focused'), findsOneWidget);
   });
 
@@ -354,6 +402,69 @@ void main() {
 
     expect(find.text('I am stuck'), findsOneWidget);
     expect(find.text("What's the blocker?"), findsOneWidget);
+=======
+    expect(find.text('Focused 5m'), findsWidgets);
+    expect(find.text('Estimate 10m'), findsOneWidget);
+    expect(find.text('Under estimate'), findsOneWidget);
+    expect(find.text('Resume candidate'), findsOneWidget);
+  });
+
+  testWidgets('active subtask row can end focus early', (tester) async {
+    final startedAt = DateTime(2026, 6, 23, 9);
+    var now = startedAt;
+    final timerRepository = FakeTimerSessionRepository();
+    final repository = FakeTaskRepository(
+      tasks: [taskRow(id: 1, title: 'Project task', dueDate: today)],
+      subtasks: {
+        1: [
+          subtaskRow(
+            id: 200,
+            taskId: 1,
+            title: 'Write outline',
+            estimatedMinutes: 5,
+          ),
+        ],
+      },
+    );
+    final state = TaskState(
+      repository: repository,
+      autoLoad: false,
+    );
+    final timerState = TimerState(
+      now: () => now,
+      notificationService: FakeTimerNotificationService(),
+      sessionRepository: timerRepository,
+    );
+    addTearDown(timerState.dispose);
+    await state.loadTasks();
+    await _pumpTaskScreen(tester, state, timerState: timerState);
+
+    await tester.tap(find.byTooltip('Expand task'));
+    await tester.pump();
+    await tester.tap(find.byTooltip('Start timer for Write outline'));
+    await tester.pump();
+    now = startedAt.add(const Duration(seconds: 65));
+    timerState.syncWithClock();
+    await tester.pump();
+
+    expect(find.byKey(const Key('active-subtask-end-focus')), findsOneWidget);
+    expect(find.text('03:55 · End'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('active-subtask-end-focus')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 700));
+
+    expect(timerRepository.sessionRows.single['duration_seconds'], 65);
+    expect(find.text('Did that get finished?'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('linked-completion-leave-open')));
+    await tester.pump();
+
+    expect(
+      timerRepository.sessionRows.single['outcome'],
+      TimerState.outcomeLeftOpen,
+    );
+>>>>>>> 116293643c717f05e5b4aafac370a2efdd93a2e1
   });
 
   testWidgets('task actions can schedule a reminder', (tester) async {
@@ -537,6 +648,12 @@ void main() {
                 repository: FakeTaskReminderRepository(),
                 notificationService: FakeTaskReminderNotificationService(),
                 autoLoad: false,
+              ),
+            ),
+            ChangeNotifierProvider(
+              create: (_) => TimerState(
+                notificationService: FakeTimerNotificationService(),
+                sessionRepository: FakeTimerSessionRepository(),
               ),
             ),
           ],

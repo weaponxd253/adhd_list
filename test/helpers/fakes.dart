@@ -307,6 +307,18 @@ class FakeTimerSessionRepository implements TimerSessionRepository {
     sessionRows.insert(0, {...session, 'id': id});
     return id;
   }
+
+  @override
+  Future<void> updateSessionOutcome(int sessionId, String outcome) async {
+    if (failWrites) _failure();
+    for (final row in sessionRows) {
+      if (row['id'] == sessionId) {
+        row['outcome'] = outcome;
+        return;
+      }
+    }
+    _failure();
+  }
 }
 
 class FakeTimerNotificationService implements TimerNotificationService {

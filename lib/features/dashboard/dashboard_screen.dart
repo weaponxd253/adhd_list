@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../features/mood_tracker/mood_tracker_screen.dart';
 import '../../features/settings/settings_screen.dart';
+import '../../models/daily_plan.dart';
 import '../../models/task.dart';
 import '../../models/task_reminder.dart';
 import '../../models/task_support.dart';
@@ -12,14 +13,24 @@ import '../../providers/task_state.dart';
 import '../../providers/settings_state.dart';
 import '../../providers/task_reminder_state.dart';
 import '../../providers/timer_state.dart';
+import '../../services/daily_plan_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/task_support_sheet.dart';
+import '../../widgets/timer_completion_prompt.dart';
 
-class DashboardScreen extends StatelessWidget {
+class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key, this.onOpenMood, this.onOpenTimer});
 
   final VoidCallback? onOpenMood;
   final VoidCallback? onOpenTimer;
+
+  @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  final DailyPlanService _dailyPlanService = DailyPlanService();
+  DailyCapacity _capacity = DailyCapacity.medium;
 
   @override
   Widget build(BuildContext context) {
@@ -36,7 +47,13 @@ class DashboardScreen extends StatelessWidget {
           reminderState,
           _,
         ) {
-          final nowTask = taskState.nowTask;
+          final dailyPlan = _dailyPlanService.build(
+            tasks: taskState.tasks,
+            timerState: timerState,
+            capacity: _capacity,
+            mood: moodState.selectedMood,
+          );
+          final nowTask = dailyPlan.nowTask ?? taskState.nowTask;
           final waitingTask = taskState.waitingTask;
 
           return ListView(
@@ -52,7 +69,9 @@ class DashboardScreen extends StatelessWidget {
                 moodState: moodState,
                 timerState: timerState,
                 task: nowTask,
-                onOpenTimer: onOpenTimer,
+                insight:
+                    nowTask == null ? null : dailyPlan.insightFor(nowTask.id),
+                onOpenTimer: widget.onOpenTimer,
               ),
               const SizedBox(height: AppSpacing.md),
               _TodayStrip(
@@ -61,7 +80,11 @@ class DashboardScreen extends StatelessWidget {
                 moodState: moodState,
               ),
               const SizedBox(height: AppSpacing.md),
-              _NextPreview(taskState: taskState),
+              _NextPreview(
+                timerState: timerState,
+                dailyPlan: dailyPlan,
+                onOpenTimer: widget.onOpenTimer,
+              ),
               if (waitingTask != null) ...[
                 const SizedBox(height: AppSpacing.md),
                 _WaitingTaskCard(
@@ -71,18 +94,22 @@ class DashboardScreen extends StatelessWidget {
                   remindersEnabled: settingsState.taskRemindersEnabled,
                   reminderStyle: settingsState.taskReminderStyle,
                   task: waitingTask,
-                  onOpenTimer: onOpenTimer,
+                  onOpenTimer: widget.onOpenTimer,
                 ),
               ],
               const SizedBox(height: AppSpacing.md),
               _DailyResetCard(
                 moodState: moodState,
                 timerState: timerState,
-                onOpenMood: onOpenMood,
-                onOpenTimer: onOpenTimer,
+                capacity: _capacity,
+                onCapacityChanged: (value) => setState(() {
+                  _capacity = value;
+                }),
+                onOpenMood: widget.onOpenMood,
+                onOpenTimer: widget.onOpenTimer,
               ),
               const SizedBox(height: AppSpacing.md),
-              _MoodCard(moodState: moodState, onOpenMood: onOpenMood),
+              _MoodCard(moodState: moodState, onOpenMood: widget.onOpenMood),
               const SizedBox(height: AppSpacing.md),
               _DailyReviewCard(
                 taskState: taskState,
@@ -145,6 +172,7 @@ class _NowCard extends StatelessWidget {
     required this.moodState,
     required this.timerState,
     required this.task,
+    required this.insight,
     required this.onOpenTimer,
   });
 
@@ -152,6 +180,7 @@ class _NowCard extends StatelessWidget {
   final MoodState moodState;
   final TimerState timerState;
   final Task? task;
+  final DailyPlanTaskInsight? insight;
   final VoidCallback? onOpenTimer;
 
   @override
@@ -172,7 +201,18 @@ class _NowCard extends StatelessWidget {
         padding: const EdgeInsets.all(AppSpacing.md),
         child: task == null
             ? _emptyState(context)
+<<<<<<< HEAD
             : _taskState(context, task, taskState, moodState, timerState),
+=======
+            : _taskState(
+                context,
+                task,
+                taskState,
+                moodState,
+                timerState,
+                insight,
+              ),
+>>>>>>> 116293643c717f05e5b4aafac370a2efdd93a2e1
       ),
     );
   }
@@ -212,12 +252,20 @@ class _NowCard extends StatelessWidget {
     TaskState taskState,
     MoodState moodState,
     TimerState timerState,
+<<<<<<< HEAD
+=======
+    DailyPlanTaskInsight? insight,
+>>>>>>> 116293643c717f05e5b4aafac370a2efdd93a2e1
   ) {
     final dueStr = DateFormat.MMMd().format(task.dueDate);
     final completedSteps = task.subtasks.where((s) => s.isCompleted).length;
     final totalSteps = task.subtasks.length;
     final tinyStep = taskState.tinyStepSuggestionFor(task);
+<<<<<<< HEAD
     final focusMinutes = timerState.focusMinutesForTask(task.id);
+=======
+    final planLine = _nowPlanLine(insight, moodState);
+>>>>>>> 116293643c717f05e5b4aafac370a2efdd93a2e1
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -274,11 +322,16 @@ class _NowCard extends StatelessWidget {
                     ? () => showTaskSupportSheet(context: context, task: task)
                     : null,
               ),
+            if (insight != null)
+              _NowMeta(
+                icon: _planReasonIcon(insight),
+                label: insight.reason,
+              ),
           ],
         ),
         const SizedBox(height: AppSpacing.sm),
         Text(
-          moodState.nowTaskGuidance,
+          planLine,
           style: const TextStyle(
             color: Colors.white,
             fontSize: 13,
@@ -295,7 +348,7 @@ class _NowCard extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
         ),
         const SizedBox(height: AppSpacing.md),
-        _startButtons(context, task),
+        _primaryFocusControls(context, task, timerState),
         const SizedBox(height: AppSpacing.xs),
         Row(
           children: [
@@ -322,7 +375,46 @@ class _NowCard extends StatelessWidget {
     );
   }
 
-  Widget _startButtons(BuildContext context, Task task) {
+  String _nowPlanLine(DailyPlanTaskInsight? insight, MoodState moodState) {
+    if (moodState.recommendsRecoveryMode) return moodState.nowTaskGuidance;
+    return insight?.detail ?? moodState.nowTaskGuidance;
+  }
+
+  IconData _planReasonIcon(DailyPlanTaskInsight insight) {
+    switch (insight.action) {
+      case DailyPlanAction.resume:
+        return Icons.history_rounded;
+      case DailyPlanAction.shrinkFirst:
+        return Icons.call_split_rounded;
+      case DailyPlanAction.startTiny:
+        return Icons.bolt_rounded;
+      case DailyPlanAction.startFocus:
+        return Icons.flag_outlined;
+      case DailyPlanAction.moveLater:
+        return Icons.inventory_2_outlined;
+    }
+  }
+
+  Widget _primaryFocusControls(
+    BuildContext context,
+    Task task,
+    TimerState timerState,
+  ) {
+    if (timerState.isActiveForTask(task.id)) {
+      return _NowActiveFocusControls(
+        timerState: timerState,
+        task: task,
+        onEnd: () => _endFocusNow(context),
+      );
+    }
+
+    if (timerState.isActiveFocusSession) {
+      return _NowOtherFocusControls(
+        timerState: timerState,
+        onOpenTimer: onOpenTimer,
+      );
+    }
+
     final style = FilledButton.styleFrom(
       backgroundColor: Colors.white,
       foregroundColor: Theme.of(context).colorScheme.primary,
@@ -398,16 +490,166 @@ class _NowCard extends StatelessWidget {
           taskId: task.id,
           title: task.title,
         );
-    onOpenTimer?.call();
+    if (started) return;
+
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
-        SnackBar(
-          content: Text(
-            started ? '$minutes minute focus started' : 'Timer already running',
-          ),
-        ),
+        const SnackBar(content: Text('A focus session is already running.')),
       );
+  }
+
+  void _endFocusNow(BuildContext context) {
+    final ended = context.read<TimerState>().endCurrentSessionEarly();
+    if (!ended) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('No active focus session to end.')),
+        );
+      return;
+    }
+
+    showPendingTimerCompletionPrompt(context);
+  }
+}
+
+class _NowActiveFocusControls extends StatelessWidget {
+  const _NowActiveFocusControls({
+    required this.timerState,
+    required this.task,
+    required this.onEnd,
+  });
+
+  final TimerState timerState;
+  final Task task;
+  final VoidCallback onEnd;
+
+  @override
+  Widget build(BuildContext context) {
+    final targetTitle = timerState.activeTargetTitle;
+    final detail =
+        targetTitle == null || targetTitle == task.title ? null : targetTitle;
+    final status = timerState.isTimerRunning ? 'In progress' : 'Paused';
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(AppRadii.control),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: AppSpacing.xs,
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.timer_outlined, color: Colors.white, size: 20),
+            const SizedBox(width: AppSpacing.xs),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '$status · ${timerState.timerDisplay} left',
+                    key: const Key('dashboard-active-focus'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  if (detail != null)
+                    Text(
+                      detail,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(width: AppSpacing.xs),
+            OutlinedButton.icon(
+              key: const Key('dashboard-end-active-focus'),
+              onPressed: onEnd,
+              icon: const Icon(Icons.stop_circle_outlined, size: 18),
+              label: const Text('End now'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.white,
+                side: const BorderSide(color: Colors.white70),
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NowOtherFocusControls extends StatelessWidget {
+  const _NowOtherFocusControls({
+    required this.timerState,
+    required this.onOpenTimer,
+  });
+
+  final TimerState timerState;
+  final VoidCallback? onOpenTimer;
+
+  @override
+  Widget build(BuildContext context) {
+    final title = timerState.activeTargetTitle ?? 'Focus session';
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(AppRadii.control),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.20)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: AppSpacing.xs,
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.timer_outlined, color: Colors.white70, size: 20),
+            const SizedBox(width: AppSpacing.xs),
+            Expanded(
+              child: Text(
+                'Timer running · $title',
+                key: const Key('dashboard-other-focus'),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.xs),
+            TextButton(
+              key: const Key('dashboard-open-active-timer'),
+              onPressed: onOpenTimer,
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.white,
+                visualDensity: VisualDensity.compact,
+              ),
+              child: const Text('Timer'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -799,7 +1041,9 @@ class _WaitingTaskCardState extends State<_WaitingTaskCard> {
   void _startTiny() {
     final started = widget.timerState.startQuickFocus(2);
     widget.onOpenTimer?.call();
-    _message(started ? '2 minute focus started' : 'Timer already running');
+    _message(
+      started ? '2 minute focus started' : 'A focus session is already active',
+    );
   }
 
   Future<void> _scheduleReminder(bool tomorrow) async {
@@ -900,18 +1144,20 @@ class _ReminderStatusLine extends StatelessWidget {
   }
 }
 
-enum _DailyCapacity { low, medium, high }
-
 class _DailyResetCard extends StatefulWidget {
   const _DailyResetCard({
     required this.moodState,
     required this.timerState,
+    required this.capacity,
+    required this.onCapacityChanged,
     required this.onOpenMood,
     required this.onOpenTimer,
   });
 
   final MoodState moodState;
   final TimerState timerState;
+  final DailyCapacity capacity;
+  final ValueChanged<DailyCapacity> onCapacityChanged;
   final VoidCallback? onOpenMood;
   final VoidCallback? onOpenTimer;
 
@@ -920,13 +1166,12 @@ class _DailyResetCard extends StatefulWidget {
 }
 
 class _DailyResetCardState extends State<_DailyResetCard> {
-  _DailyCapacity _capacity = _DailyCapacity.medium;
   bool _manualRecoveryMode = false;
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final recoverySuggested = _capacity == _DailyCapacity.low ||
+    final recoverySuggested = widget.capacity == DailyCapacity.low ||
         widget.moodState.recommendsRecoveryMode;
     final recoveryActive = recoverySuggested || _manualRecoveryMode;
 
@@ -954,34 +1199,34 @@ class _DailyResetCardState extends State<_DailyResetCard> {
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: AppSpacing.sm),
-            SegmentedButton<_DailyCapacity>(
+            SegmentedButton<DailyCapacity>(
               key: const Key('daily-capacity-selector'),
               showSelectedIcon: false,
               segments: const [
                 ButtonSegment(
-                  value: _DailyCapacity.low,
+                  value: DailyCapacity.low,
                   label: Text('Low'),
                   icon: Icon(Icons.battery_1_bar_rounded),
                 ),
                 ButtonSegment(
-                  value: _DailyCapacity.medium,
+                  value: DailyCapacity.medium,
                   label: Text('Medium'),
                   icon: Icon(Icons.battery_4_bar_rounded),
                 ),
                 ButtonSegment(
-                  value: _DailyCapacity.high,
+                  value: DailyCapacity.high,
                   label: Text('High'),
                   icon: Icon(Icons.battery_full_rounded),
                 ),
               ],
-              selected: {_capacity},
+              selected: {widget.capacity},
               onSelectionChanged: (selection) {
-                setState(() => _capacity = selection.single);
+                widget.onCapacityChanged(selection.single);
               },
             ),
             const SizedBox(height: AppSpacing.sm),
             Text(
-              _capacityPlan(_capacity),
+              _capacityPlan(widget.capacity),
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             if (widget.moodState.selectedMood.isNotEmpty) ...[
@@ -1019,13 +1264,13 @@ class _DailyResetCardState extends State<_DailyResetCard> {
     );
   }
 
-  String _capacityPlan(_DailyCapacity capacity) {
+  String _capacityPlan(DailyCapacity capacity) {
     switch (capacity) {
-      case _DailyCapacity.low:
+      case DailyCapacity.low:
         return 'One tiny task is enough today. Setup counts.';
-      case _DailyCapacity.medium:
+      case DailyCapacity.medium:
         return 'One task plus one focus session is the plan.';
-      case _DailyCapacity.high:
+      case DailyCapacity.high:
         return 'Pick two or three planned tasks, then protect one focus block.';
     }
   }
@@ -1040,7 +1285,7 @@ class _DailyResetCardState extends State<_DailyResetCard> {
           content: Text(
             started
                 ? '2 minute recovery focus started'
-                : 'Timer already running',
+                : 'A focus session is already active',
           ),
         ),
       );
@@ -1514,9 +1759,15 @@ class _TimerButton extends StatelessWidget {
 }
 
 class _NextPreview extends StatefulWidget {
-  const _NextPreview({required this.taskState});
+  const _NextPreview({
+    required this.timerState,
+    required this.dailyPlan,
+    required this.onOpenTimer,
+  });
 
-  final TaskState taskState;
+  final TimerState timerState;
+  final DailyPlan dailyPlan;
+  final VoidCallback? onOpenTimer;
 
   @override
   State<_NextPreview> createState() => _NextPreviewState();
@@ -1527,8 +1778,11 @@ class _NextPreviewState extends State<_NextPreview> {
 
   @override
   Widget build(BuildContext context) {
-    final tasks = widget.taskState.nextTasks;
-    final laterCount = widget.taskState.laterTaskCount;
+    final tasks = widget.dailyPlan.nextTasks;
+    final laterCount = widget.dailyPlan.laterCount;
+    final resumeCandidate = widget.timerState.isActiveFocusSession
+        ? null
+        : widget.dailyPlan.resumeSuggestion;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1566,7 +1820,14 @@ class _NextPreviewState extends State<_NextPreview> {
           ),
         ),
         if (_expanded) ...[
-          if (tasks.isEmpty)
+          if (resumeCandidate != null) ...[
+            _ResumeFocusTile(
+              candidate: resumeCandidate,
+              onStart: () => _startResumeFocus(resumeCandidate),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+          ],
+          if (tasks.isEmpty && resumeCandidate == null)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
               child: Text(
@@ -1578,7 +1839,10 @@ class _NextPreviewState extends State<_NextPreview> {
             ...tasks.map(
               (task) => Padding(
                 padding: const EdgeInsets.only(bottom: AppSpacing.xs),
-                child: _UpcomingTile(task: task),
+                child: _UpcomingTile(
+                  task: task,
+                  insight: widget.dailyPlan.insightFor(task.id),
+                ),
               ),
             ),
         ],
@@ -1587,6 +1851,133 @@ class _NextPreviewState extends State<_NextPreview> {
           _LaterSummary(count: laterCount),
         ],
       ],
+    );
+  }
+
+  void _startResumeFocus(PlannedTask candidate) {
+    final session = candidate.insight.resumeSession;
+    if (session == null) return;
+
+    final started = widget.timerState.startTargetFocus(
+      minutes: 5,
+      targetType: session.targetType,
+      taskId: candidate.task.id,
+      subtaskId: session.targetType == TimerState.targetTypeSubtask
+          ? session.subtaskId
+          : null,
+      title: candidate.insight.targetTitle ?? candidate.task.title,
+    );
+    if (started) {
+      widget.onOpenTimer?.call();
+      return;
+    }
+
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(content: Text('A focus session is already running.')),
+      );
+  }
+}
+
+class _ResumeFocusTile extends StatelessWidget {
+  const _ResumeFocusTile({
+    required this.candidate,
+    required this.onStart,
+  });
+
+  final PlannedTask candidate;
+  final VoidCallback onStart;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final compact = MediaQuery.textScalerOf(context).scale(1) > 1.3 ||
+        MediaQuery.sizeOf(context).width < 390;
+    final session = candidate.insight.resumeSession;
+    final targetTitle = candidate.insight.targetTitle ?? candidate.task.title;
+    final isSubtask = session?.targetType == TimerState.targetTypeSubtask;
+    final detail = isSubtask
+        ? '$targetTitle · ${candidate.task.title}'
+        : candidate.task.title;
+    final button = OutlinedButton.icon(
+      key: const Key('dashboard-resume-focus'),
+      onPressed: onStart,
+      icon: const Icon(Icons.play_arrow_rounded),
+      label: const Text('Start 5 min'),
+      style: OutlinedButton.styleFrom(
+        visualDensity: VisualDensity.compact,
+      ),
+    );
+
+    final titleRow = Row(
+      children: [
+        Icon(Icons.history_rounded, color: cs.primary, size: 20),
+        const SizedBox(width: AppSpacing.xs),
+        Expanded(
+          child: Text(
+            'Still open',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context)
+                .textTheme
+                .bodyLarge
+                ?.copyWith(fontWeight: FontWeight.w800),
+          ),
+        ),
+      ],
+    );
+
+    final textBlock = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        titleRow,
+        const SizedBox(height: AppSpacing.xxs),
+        Text(
+          detail,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+        Text(
+          session == null
+              ? candidate.insight.reason
+              : 'Left open ${DateFormat.jm().format(session.endedAt)}',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+      ],
+    );
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: cs.surface,
+        borderRadius: BorderRadius.circular(AppRadii.control),
+        border: Border.all(color: cs.primary.withValues(alpha: 0.22)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: AppSpacing.xs,
+        ),
+        child: compact
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  textBlock,
+                  const SizedBox(height: AppSpacing.xs),
+                  Align(alignment: Alignment.centerLeft, child: button),
+                ],
+              )
+            : Row(
+                children: [
+                  Expanded(child: textBlock),
+                  const SizedBox(width: AppSpacing.xs),
+                  button,
+                ],
+              ),
+      ),
     );
   }
 }
@@ -1659,9 +2050,10 @@ class _CountPill extends StatelessWidget {
 }
 
 class _UpcomingTile extends StatelessWidget {
-  const _UpcomingTile({required this.task});
+  const _UpcomingTile({required this.task, this.insight});
 
   final Task task;
+  final DailyPlanTaskInsight? insight;
 
   @override
   Widget build(BuildContext context) {
@@ -1702,7 +2094,7 @@ class _UpcomingTile extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                   Text(
-                    '${DateFormat.MMMd().format(task.dueDate)} - ${_countdown(task.dueDate)}',
+                    _detailLine(),
                     style: TextStyle(
                       fontSize: 12,
                       color: color,
@@ -1716,6 +2108,14 @@ class _UpcomingTile extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _detailLine() {
+    final dueLine =
+        '${DateFormat.MMMd().format(task.dueDate)} - ${_countdown(task.dueDate)}';
+    final reason = insight?.reason;
+    if (reason == null || reason.isEmpty) return dueLine;
+    return '$dueLine - $reason';
   }
 
   int _calendarDayDifference(DateTime date) {

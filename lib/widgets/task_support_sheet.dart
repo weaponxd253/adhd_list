@@ -118,7 +118,9 @@ class _TaskSupportSheetState extends State<_TaskSupportSheet> {
     messenger.showSnackBar(
       SnackBar(
         content: Text(
-          started ? '$minutes minute focus started' : 'Timer already running',
+          started
+              ? '$minutes minute focus started'
+              : 'A focus session is already active',
         ),
       ),
     );

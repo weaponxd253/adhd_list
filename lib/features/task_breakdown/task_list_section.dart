@@ -1,17 +1,21 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/subtask.dart';
 import '../../models/task.dart';
+import '../../models/daily_plan.dart';
 import '../../models/task_support.dart';
 import '../../providers/settings_state.dart';
 import '../../providers/task_reminder_state.dart';
 import '../../providers/task_state.dart';
 import '../../providers/timer_state.dart';
+import '../../services/daily_plan_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/task_support_sheet.dart';
+import '../../widgets/timer_completion_prompt.dart';
 
 const _estimateMinuteOptions = [2, 5, 10, 25];
 
@@ -52,6 +56,13 @@ class _TaskListSectionState extends State<TaskListSection> {
     final nextTasks = widget.taskState.nextTasks;
     final laterTasks = widget.taskState.laterTasks;
     final completed = widget.taskState.completedTaskList;
+    final timerState = context.watch<TimerState>();
+    final dailyPlan = DailyPlanService().build(
+      tasks: widget.taskState.tasks,
+      timerState: timerState,
+      capacity: DailyCapacity.medium,
+      mood: '',
+    );
 
     if (widget.taskState.tasks.isEmpty) {
       return const _EmptyTasks();
@@ -77,7 +88,7 @@ class _TaskListSectionState extends State<TaskListSection> {
             message: "Nothing urgent. Pick one small thing when you're ready.",
           )
         else
-          _buildTaskCard(nowTask),
+          _buildTaskCard(nowTask, timerState, dailyPlan),
         const SizedBox(height: AppSpacing.md),
         _SectionHeader(
           title: 'Next',
@@ -88,7 +99,9 @@ class _TaskListSectionState extends State<TaskListSection> {
         if (nextTasks.isEmpty)
           const _SectionEmpty(message: 'Nothing else waiting right now.')
         else
-          ...nextTasks.map(_buildTaskCard),
+          ...nextTasks.map(
+            (task) => _buildTaskCard(task, timerState, dailyPlan),
+          ),
         if (laterTasks.isNotEmpty) ...[
           const SizedBox(height: AppSpacing.md),
           _SectionHeader(
@@ -100,7 +113,9 @@ class _TaskListSectionState extends State<TaskListSection> {
           ),
           if (_showLater) ...[
             const SizedBox(height: AppSpacing.xs),
-            ...laterTasks.map(_buildTaskCard),
+            ...laterTasks.map(
+              (task) => _buildTaskCard(task, timerState, dailyPlan),
+            ),
           ] else
             _SectionEmpty(
               message: '${laterTasks.length} tasks tucked away.',
@@ -121,15 +136,26 @@ class _TaskListSectionState extends State<TaskListSection> {
               message: 'Completed tasks will show here.',
             )
           else
-            ...completed.map(_buildTaskCard),
+            ...completed.map(
+              (task) => _buildTaskCard(task, timerState, dailyPlan),
+            ),
         ],
       ],
     );
   }
 
-  Widget _buildTaskCard(Task task) {
+  Widget _buildTaskCard(
+    Task task,
+    TimerState timerState,
+    DailyPlan dailyPlan,
+  ) {
     final expanded = _expandedTaskIds.contains(task.id);
     final busy = widget.taskState.isTaskBusy(task.id);
+    final activeForTask = timerState.isActiveForTask(task.id);
+    final anotherFocusActive =
+        timerState.isActiveFocusSession && !activeForTask;
+    final focusSummary = timerState.focusSummaryForTask(task.id);
+    final planInsight = dailyPlan.insightFor(task.id);
     final settingsState = context.watch<SettingsState>();
     final reminderState = context.watch<TaskReminderState>();
     final timerState = context.watch<TimerState>();
@@ -153,9 +179,20 @@ class _TaskListSectionState extends State<TaskListSection> {
       padding: const EdgeInsets.only(bottom: AppSpacing.xs),
       child: Card(
         clipBehavior: Clip.antiAlias,
+        shape: activeForTask
+            ? RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppRadii.card),
+                side: BorderSide(
+                  color: colorScheme.primary.withValues(alpha: 0.42),
+                ),
+              )
+            : null,
         child: Column(
           children: [
-            if (busy) const LinearProgressIndicator(minHeight: 2),
+            if (busy)
+              const LinearProgressIndicator(minHeight: 2)
+            else if (activeForTask)
+              Container(height: 2, color: colorScheme.primary),
             Semantics(
               container: true,
               label:
@@ -254,6 +291,14 @@ class _TaskListSectionState extends State<TaskListSection> {
                                     color: colorScheme.secondary,
                                     icon: Icons.notifications_active_outlined,
                                   ),
+                                if (activeForTask)
+                                  _StatusBadge(
+                                    label: timerState.isTimerRunning
+                                        ? '${timerState.timerDisplay} left'
+                                        : 'Paused',
+                                    color: colorScheme.primary,
+                                    icon: Icons.timer_outlined,
+                                  ),
                               ],
                             ),
                           ],
@@ -268,6 +313,7 @@ class _TaskListSectionState extends State<TaskListSection> {
                       enabled: !busy,
                       onSelected: (value) {
                         if (value == 'startTiny') _startTinyFocus(task);
+                        if (value == 'endFocus') _endFocusNow();
                         if (value == 'stuck') {
                           showTaskSupportSheet(context: context, task: task);
                         }
@@ -294,11 +340,24 @@ class _TaskListSectionState extends State<TaskListSection> {
                         if (value == 'delete') _deleteWithUndo(task);
                       },
                       itemBuilder: (_) => [
-                        const PopupMenuItem(
-                          value: 'startTiny',
+                        PopupMenuItem(
+                          value: activeForTask ? 'endFocus' : 'startTiny',
+                          enabled: !anotherFocusActive,
                           child: ListTile(
-                            leading: Icon(Icons.bolt_rounded),
-                            title: Text('Start 2 min'),
+                            leading: Icon(
+                              activeForTask
+                                  ? Icons.stop_circle_outlined
+                                  : anotherFocusActive
+                                      ? Icons.timer_outlined
+                                      : Icons.bolt_rounded,
+                            ),
+                            title: Text(
+                              activeForTask
+                                  ? 'End now'
+                                  : anotherFocusActive
+                                      ? 'Timer running'
+                                      : 'Start 2 min',
+                            ),
                           ),
                         ),
                         const PopupMenuItem(
@@ -353,10 +412,26 @@ class _TaskListSectionState extends State<TaskListSection> {
                     )
                   else ...[
                     IconButton(
-                      key: ValueKey('start-tiny-${task.id}'),
-                      tooltip: 'Start 2-minute focus for ${task.title}',
-                      onPressed: busy ? null : () => _startTinyFocus(task),
-                      icon: const Icon(Icons.bolt_rounded),
+                      key: ValueKey(
+                        activeForTask
+                            ? 'end-focus-${task.id}'
+                            : 'start-tiny-${task.id}',
+                      ),
+                      tooltip: activeForTask
+                          ? 'End focus for ${task.title}'
+                          : anotherFocusActive
+                              ? 'Timer running'
+                              : 'Start 2-minute focus for ${task.title}',
+                      onPressed: busy || anotherFocusActive
+                          ? null
+                          : activeForTask
+                              ? _endFocusNow
+                              : () => _startTinyFocus(task),
+                      icon: Icon(
+                        activeForTask
+                            ? Icons.stop_circle_outlined
+                            : Icons.bolt_rounded,
+                      ),
                       iconSize: 22,
                       visualDensity: VisualDensity.compact,
                     ),
@@ -434,14 +509,27 @@ class _TaskListSectionState extends State<TaskListSection> {
                 ],
               ),
             ),
-            if (expanded) _buildSubtasks(task, busy),
+            if (expanded)
+              _buildSubtasks(
+                task,
+                busy,
+                timerState,
+                focusSummary,
+                planInsight,
+              ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildSubtasks(Task task, bool busy) {
+  Widget _buildSubtasks(
+    Task task,
+    bool busy,
+    TimerState timerState,
+    TaskFocusSummary focusSummary,
+    DailyPlanTaskInsight? planInsight,
+  ) {
     final colorScheme = Theme.of(context).colorScheme;
     final timerState = context.watch<TimerState>();
 
@@ -461,18 +549,26 @@ class _TaskListSectionState extends State<TaskListSection> {
       ),
       child: Column(
         children: [
+          _TaskFocusProgress(task: task, summary: focusSummary),
+          _TaskPlanInsightBadge(insight: planInsight),
           for (final subtask in task.subtasks)
             _SubtaskRow(
               key: ValueKey('subtask-${subtask.id}'),
               subtask: subtask,
               focusMinutes: timerState.focusMinutesForSubtask(subtask.id),
               enabled: !busy,
+              active: timerState.isActiveForSubtask(subtask.id),
+              focusedMinutes: focusSummary.subtaskFocusMinutes(subtask.id),
+              timerDisplay: timerState.timerDisplay,
+              anotherFocusActive: timerState.isActiveFocusSession &&
+                  !timerState.isActiveForSubtask(subtask.id),
               onToggle: () => _run(
                 () => widget.taskState
                     .toggleSubtaskCompletion(task.id, subtask.id),
               ),
               onEdit: () => _showEditSubtask(task, subtask),
               onStartFocus: () => _startSubtaskFocus(task, subtask),
+              onEndFocus: _endFocusNow,
               onDelete: () => _run(
                 () => widget.taskState.deleteSubtask(task.id, subtask.id),
               ),
@@ -557,7 +653,9 @@ class _TaskListSectionState extends State<TaskListSection> {
           taskId: task.id,
           title: task.title,
         );
-    _message(started ? '2 minute focus started' : 'Timer already running');
+    _message(
+      started ? '2 minute focus started' : 'A focus session is already active',
+    );
   }
 
   void _startSubtaskFocus(Task task, Subtask subtask) {
@@ -570,7 +668,18 @@ class _TaskListSectionState extends State<TaskListSection> {
           title: subtask.title,
         );
     _message(
-        started ? '$minutes minute focus started' : 'Timer already running');
+      started ? '$minutes minute focus started' : 'A focus session is active',
+    );
+  }
+
+  void _endFocusNow() {
+    final ended = context.read<TimerState>().endCurrentSessionEarly();
+    if (!ended) {
+      _message('No active focus session to end.');
+      return;
+    }
+
+    showPendingTimerCompletionPrompt(context);
   }
 
   Future<void> _remindTask(
@@ -726,6 +835,137 @@ class _TaskListSectionState extends State<TaskListSection> {
     if (difference == 1) return 'due tomorrow';
     return 'due ${task.dueDate.month}/${task.dueDate.day}';
   }
+}
+
+class _TaskPlanInsightBadge extends StatelessWidget {
+  const _TaskPlanInsightBadge({required this.insight});
+
+  final DailyPlanTaskInsight? insight;
+
+  @override
+  Widget build(BuildContext context) {
+    final insight = this.insight;
+    if (insight == null || insight.reason == 'Good next step') {
+      return const SizedBox.shrink();
+    }
+
+    final cs = Theme.of(context).colorScheme;
+    final semantic = Theme.of(context).extension<AppSemanticColors>()!;
+    final color = switch (insight.action) {
+      DailyPlanAction.resume => cs.primary,
+      DailyPlanAction.shrinkFirst => semantic.warning,
+      DailyPlanAction.startTiny => semantic.success,
+      DailyPlanAction.startFocus => cs.secondary,
+      DailyPlanAction.moveLater => cs.onSurfaceVariant,
+    };
+    final icon = switch (insight.action) {
+      DailyPlanAction.resume => Icons.history_rounded,
+      DailyPlanAction.shrinkFirst => Icons.call_split_rounded,
+      DailyPlanAction.startTiny => Icons.bolt_rounded,
+      DailyPlanAction.startFocus => Icons.flag_outlined,
+      DailyPlanAction.moveLater => Icons.inventory_2_outlined,
+    };
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: _StatusBadge(
+          label: insight.badgeLabel,
+          color: color,
+          icon: icon,
+        ),
+      ),
+    );
+  }
+}
+
+class _TaskFocusProgress extends StatelessWidget {
+  const _TaskFocusProgress({
+    required this.task,
+    required this.summary,
+  });
+
+  final Task task;
+  final TaskFocusSummary summary;
+
+  @override
+  Widget build(BuildContext context) {
+    final estimate = task.estimatedMinutes;
+    if (!summary.hasFocus && estimate == null) {
+      return const SizedBox.shrink();
+    }
+
+    final cs = Theme.of(context).colorScheme;
+    final semantic = Theme.of(context).extension<AppSemanticColors>()!;
+    final comparison = estimate == null || !summary.hasFocus
+        ? null
+        : _estimateComparison(
+            focusedMinutes: summary.focusMinutes,
+            estimatedMinutes: estimate,
+          );
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Wrap(
+          spacing: AppSpacing.xs,
+          runSpacing: AppSpacing.xxs,
+          children: [
+            if (summary.hasFocus)
+              _StatusBadge(
+                label: 'Focused ${summary.focusMinutes}m',
+                color: cs.primary,
+                icon: Icons.timer_outlined,
+              ),
+            if (estimate != null)
+              _StatusBadge(
+                label: 'Estimate ${estimate}m',
+                color: cs.secondary,
+                icon: Icons.schedule_rounded,
+              ),
+            if (comparison != null)
+              _StatusBadge(
+                label: comparison.label,
+                color: comparison.isOver ? semantic.warning : semantic.success,
+                icon: comparison.isOver
+                    ? Icons.trending_up_rounded
+                    : Icons.done_rounded,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  _EstimateComparison _estimateComparison({
+    required int focusedMinutes,
+    required int estimatedMinutes,
+  }) {
+    final difference = focusedMinutes - estimatedMinutes;
+    final tolerance = math.max(2, (estimatedMinutes * 0.2).round());
+    if (difference.abs() <= tolerance) {
+      return const _EstimateComparison(label: 'Close estimate');
+    }
+    if (difference < 0) {
+      return const _EstimateComparison(label: 'Under estimate');
+    }
+    return const _EstimateComparison(
+      label: 'Needed more time',
+      isOver: true,
+    );
+  }
+}
+
+class _EstimateComparison {
+  const _EstimateComparison({
+    required this.label,
+    this.isOver = false,
+  });
+
+  final String label;
+  final bool isOver;
 }
 
 class _EditTaskDialog extends StatefulWidget {
@@ -1009,27 +1249,40 @@ class _SubtaskRow extends StatelessWidget {
     required this.subtask,
     required this.focusMinutes,
     required this.enabled,
+    required this.active,
+    required this.focusedMinutes,
+    required this.timerDisplay,
+    required this.anotherFocusActive,
     required this.onToggle,
     required this.onEdit,
     required this.onStartFocus,
+    required this.onEndFocus,
     required this.onDelete,
   });
 
   final Subtask subtask;
   final int focusMinutes;
   final bool enabled;
+  final bool active;
+  final int focusedMinutes;
+  final String timerDisplay;
+  final bool anotherFocusActive;
   final VoidCallback onToggle;
   final VoidCallback onEdit;
   final VoidCallback onStartFocus;
+  final VoidCallback onEndFocus;
   final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return Semantics(
       label:
-          '${subtask.title}, ${subtask.isCompleted ? "completed" : "not completed"}',
+          '${subtask.title}, ${subtask.isCompleted ? "completed" : "not completed"}${focusedMinutes > 0 ? ", focused $focusedMinutes minutes" : ""}${active ? ", timer active" : ""}',
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxs),
+<<<<<<< HEAD
         child: Row(
           children: [
             const SizedBox(width: AppSpacing.xs),
@@ -1103,6 +1356,119 @@ class _SubtaskRow extends StatelessWidget {
               ],
             ),
           ],
+=======
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: active
+                ? cs.primary.withValues(alpha: 0.08)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(AppRadii.control),
+            border: active
+                ? Border.all(color: cs.primary.withValues(alpha: 0.18))
+                : null,
+          ),
+          child: Row(
+            children: [
+              const SizedBox(width: AppSpacing.xs),
+              Checkbox(
+                value: subtask.isCompleted,
+                onChanged: enabled ? (_) => onToggle() : null,
+                semanticLabel: subtask.isCompleted
+                    ? 'Mark ${subtask.title} incomplete'
+                    : 'Mark ${subtask.title} complete',
+              ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      subtask.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontWeight: active ? FontWeight.w700 : null,
+                        decoration: subtask.isCompleted
+                            ? TextDecoration.lineThrough
+                            : null,
+                      ),
+                    ),
+                    if (focusedMinutes > 0 && !active)
+                      Text(
+                        'Focused ${focusedMinutes}m',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: cs.primary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              if (subtask.estimatedMinutes != null && !active)
+                _EstimateBadge(minutes: subtask.estimatedMinutes!),
+              if (active)
+                _ActiveSubtaskTimerChip(
+                  timerDisplay: timerDisplay,
+                  onEnd: onEndFocus,
+                )
+              else
+                IconButton(
+                  tooltip: anotherFocusActive
+                      ? 'Timer running'
+                      : 'Start timer for ${subtask.title}',
+                  onPressed:
+                      enabled && !anotherFocusActive ? onStartFocus : null,
+                  icon: const Icon(Icons.play_arrow_rounded, size: 20),
+                  visualDensity: VisualDensity.compact,
+                ),
+              IconButton(
+                tooltip: 'Edit ${subtask.title}',
+                onPressed: enabled ? onEdit : null,
+                icon: const Icon(Icons.edit_outlined, size: 20),
+                visualDensity: VisualDensity.compact,
+              ),
+              IconButton(
+                tooltip: 'Delete ${subtask.title}',
+                onPressed: enabled ? onDelete : null,
+                icon: const Icon(Icons.close_rounded, size: 20),
+                visualDensity: VisualDensity.compact,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ActiveSubtaskTimerChip extends StatelessWidget {
+  const _ActiveSubtaskTimerChip({
+    required this.timerDisplay,
+    required this.onEnd,
+  });
+
+  final String timerDisplay;
+  final VoidCallback onEnd;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.only(left: AppSpacing.xxs),
+      child: OutlinedButton.icon(
+        key: const Key('active-subtask-end-focus'),
+        onPressed: onEnd,
+        icon: const Icon(Icons.stop_circle_outlined, size: 16),
+        label: Text('$timerDisplay · End'),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: cs.primary,
+          side: BorderSide(color: cs.primary.withValues(alpha: 0.35)),
+          visualDensity: VisualDensity.compact,
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+>>>>>>> 116293643c717f05e5b4aafac370a2efdd93a2e1
         ),
       ),
     );
