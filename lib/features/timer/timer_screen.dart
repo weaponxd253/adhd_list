@@ -3,7 +3,6 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../models/focus_session.dart';
 import '../../models/subtask.dart';
 import '../../models/task.dart';
 import '../../providers/task_state.dart';
@@ -62,7 +61,6 @@ class _TimerScreenState extends State<TimerScreen>
     final modeIndex = currentModeIndex >= 0 ? currentModeIndex : 0;
     final color = _modeColors[modeIndex];
     final completionMessage = timerState.completionMessage;
-    final completedSession = timerState.lastCompletedSession;
     final activeTask = _taskFor(taskState, timerState.activeTaskId);
     final activeSubtask = _subtaskFor(activeTask, timerState.activeSubtaskId);
 
@@ -71,14 +69,8 @@ class _TimerScreenState extends State<TimerScreen>
         if (!mounted) return;
         final timerState = context.read<TimerState>();
         final message = timerState.completionMessage;
-        final session = timerState.lastCompletedSession ?? completedSession;
         if (message == null) return;
-<<<<<<< HEAD
-        timerState.clearCompletionMessage();
-        _showCompletionPrompt(message, session);
-=======
         showPendingTimerCompletionPrompt(context);
->>>>>>> 116293643c717f05e5b4aafac370a2efdd93a2e1
       });
     }
 
@@ -154,35 +146,6 @@ class _TimerScreenState extends State<TimerScreen>
       ),
     );
   }
-<<<<<<< HEAD
-
-  void _showCompletionPrompt(String detail, FocusSession? completedSession) {
-    final canTakeBreak = completedSession?.mode == 'Focus';
-    showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (sheetContext) => _CompletionPromptSheet(
-        detail: detail,
-        countedLine: _countedLineFor(completedSession),
-        onKeepGoing: () {
-          Navigator.pop(sheetContext);
-          if (!mounted) return;
-          _startFollowUpFocus(completedSession);
-        },
-        markDoneLabel: _markDoneLabel(completedSession),
-        onMarkTargetDone: _canMarkDone(completedSession)
-            ? () => _markTargetDone(sheetContext, completedSession!)
-            : null,
-        doneLabel: canTakeBreak ? 'Take break' : 'Done for now',
-        onDone: () {
-          Navigator.pop(sheetContext);
-          if (!mounted || !canTakeBreak) return;
-          context.read<TimerState>().startTimer();
-        },
-      ),
-    );
-  }
 
   Task? _taskFor(TaskState? taskState, int? taskId) {
     if (taskState == null || taskId == null) return null;
@@ -198,85 +161,6 @@ class _TimerScreenState extends State<TimerScreen>
       if (subtask.id == subtaskId) return subtask;
     }
     return null;
-  }
-
-  String _countedLineFor(FocusSession? session) {
-    if (session == null) return 'This session counted.';
-
-    final minutes = session.durationMinutes;
-    final target = session.targetTitleSnapshot?.trim();
-    if (session.mode == 'Focus' && target != null && target.isNotEmpty) {
-      return '${minutes}m counted toward $target.';
-    }
-    if (session.mode == 'Focus') return '${minutes}m focus counted.';
-    return '${minutes}m ${session.mode.toLowerCase()} counted.';
-  }
-
-  void _startFollowUpFocus(FocusSession? completedSession) {
-    final timerState = context.read<TimerState>();
-    if (_canResumeTarget(completedSession)) {
-      timerState.startTargetFocus(
-        minutes: 5,
-        targetType: completedSession!.targetType,
-        taskId: completedSession.taskId,
-        subtaskId: completedSession.subtaskId,
-        title: completedSession.targetTitleSnapshot,
-      );
-      return;
-    }
-
-    timerState.startQuickFocus(5);
-  }
-
-  bool _canResumeTarget(FocusSession? session) {
-    if (session == null || session.mode != 'Focus') return false;
-    if (session.targetType == TimerState.targetTypeTask) {
-      return session.taskId != null;
-    }
-    if (session.targetType == TimerState.targetTypeSubtask) {
-      return session.taskId != null && session.subtaskId != null;
-    }
-    return false;
-  }
-
-  bool _canMarkDone(FocusSession? session) => _markDoneLabel(session) != null;
-
-  String? _markDoneLabel(FocusSession? session) {
-    if (!_canResumeTarget(session)) return null;
-    if (session!.targetType == TimerState.targetTypeSubtask) {
-      return 'Mark step done';
-    }
-    return 'Mark task done';
-  }
-
-  Future<void> _markTargetDone(
-    BuildContext sheetContext,
-    FocusSession session,
-  ) async {
-    final isSubtask = session.targetType == TimerState.targetTypeSubtask;
-    try {
-      final taskState = context.read<TaskState>();
-      final changed = isSubtask
-          ? await taskState.markSubtaskCompleted(
-              session.taskId!,
-              session.subtaskId!,
-            )
-          : await taskState.markTaskCompleted(session.taskId!);
-      if (!mounted || !sheetContext.mounted) return;
-      Navigator.pop(sheetContext);
-      _showMessage(
-        changed
-            ? isSubtask
-                ? 'Step marked done'
-                : 'Task marked done'
-            : isSubtask
-                ? 'Step already done'
-                : 'Task already done',
-      );
-    } catch (_) {
-      if (!mounted) return;
-      _showMessage('Could not update the task.');
-    }
   }
 
   Future<void> _markActiveTargetDone(
@@ -313,8 +197,6 @@ class _TimerScreenState extends State<TimerScreen>
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(message)));
   }
-=======
->>>>>>> 116293643c717f05e5b4aafac370a2efdd93a2e1
 }
 
 class _TimerTargetLabel extends StatelessWidget {
@@ -511,94 +393,6 @@ class _TimerStatusChip extends StatelessWidget {
   }
 }
 
-<<<<<<< HEAD
-class _CompletionPromptSheet extends StatelessWidget {
-  const _CompletionPromptSheet({
-    required this.detail,
-    required this.countedLine,
-    required this.onKeepGoing,
-    required this.markDoneLabel,
-    required this.onMarkTargetDone,
-    required this.doneLabel,
-    required this.onDone,
-  });
-
-  final String detail;
-  final String countedLine;
-  final VoidCallback onKeepGoing;
-  final String? markDoneLabel;
-  final Future<void> Function()? onMarkTargetDone;
-  final String doneLabel;
-  final VoidCallback onDone;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
-    return SafeArea(
-      child: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.md,
-            AppSpacing.xs,
-            AppSpacing.md,
-            AppSpacing.md,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.check_circle_outline_rounded, color: cs.primary),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                'That counted.',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: AppSpacing.xxs),
-              Text(
-                countedLine,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-              const SizedBox(height: AppSpacing.xxs),
-              Text(
-                detail,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              const SizedBox(height: AppSpacing.md),
-              FilledButton.icon(
-                key: const Key('completion-keep-going'),
-                onPressed: onKeepGoing,
-                icon: const Icon(Icons.play_arrow_rounded),
-                label: const Text('Keep going 5m'),
-              ),
-              if (markDoneLabel != null && onMarkTargetDone != null) ...[
-                const SizedBox(height: AppSpacing.xs),
-                OutlinedButton.icon(
-                  key: const Key('completion-mark-target-done'),
-                  onPressed: () => onMarkTargetDone!(),
-                  icon: const Icon(Icons.check_rounded),
-                  label: Text(markDoneLabel!),
-                ),
-              ],
-              const SizedBox(height: AppSpacing.xs),
-              OutlinedButton(
-                key: const Key('completion-done-for-now'),
-                onPressed: onDone,
-                child: Text(doneLabel),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-=======
->>>>>>> 116293643c717f05e5b4aafac370a2efdd93a2e1
 class _ModeSelector extends StatelessWidget {
   const _ModeSelector({
     required this.modes,
@@ -834,11 +628,6 @@ class _TimerControls extends StatelessWidget {
         ),
         const SizedBox(width: AppSpacing.lg),
         _CircleButton(
-<<<<<<< HEAD
-          icon: Icons.skip_next_rounded,
-          label: 'Skip to next mode',
-          onTap: () => _skipToNextMode(context),
-=======
           icon: hasActiveSession
               ? Icons.stop_circle_outlined
               : Icons.skip_next_rounded,
@@ -846,42 +635,12 @@ class _TimerControls extends StatelessWidget {
           onTap: hasActiveSession
               ? timerState.endCurrentSessionEarly
               : timerState.switchToNextMode,
->>>>>>> 116293643c717f05e5b4aafac370a2efdd93a2e1
           color: cs.onSurface.withOpacity(0.08),
           iconColor: cs.onSurfaceVariant,
           size: 52,
         ),
       ],
     );
-  }
-
-  Future<void> _skipToNextMode(BuildContext context) async {
-    if (!timerState.isTimerRunning) {
-      timerState.switchToNextMode();
-      return;
-    }
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Skip this session?'),
-          content: const Text('Time from this session will not be counted.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(dialogContext, true),
-              child: const Text('Skip'),
-            ),
-          ],
-        );
-      },
-    );
-    if (!context.mounted || confirmed != true) return;
-    timerState.switchToNextMode();
   }
 }
 

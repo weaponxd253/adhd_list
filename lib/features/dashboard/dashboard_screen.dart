@@ -201,9 +201,6 @@ class _NowCard extends StatelessWidget {
         padding: const EdgeInsets.all(AppSpacing.md),
         child: task == null
             ? _emptyState(context)
-<<<<<<< HEAD
-            : _taskState(context, task, taskState, moodState, timerState),
-=======
             : _taskState(
                 context,
                 task,
@@ -212,7 +209,6 @@ class _NowCard extends StatelessWidget {
                 timerState,
                 insight,
               ),
->>>>>>> 116293643c717f05e5b4aafac370a2efdd93a2e1
       ),
     );
   }
@@ -252,20 +248,14 @@ class _NowCard extends StatelessWidget {
     TaskState taskState,
     MoodState moodState,
     TimerState timerState,
-<<<<<<< HEAD
-=======
     DailyPlanTaskInsight? insight,
->>>>>>> 116293643c717f05e5b4aafac370a2efdd93a2e1
   ) {
     final dueStr = DateFormat.MMMd().format(task.dueDate);
     final completedSteps = task.subtasks.where((s) => s.isCompleted).length;
     final totalSteps = task.subtasks.length;
     final tinyStep = taskState.tinyStepSuggestionFor(task);
-<<<<<<< HEAD
     final focusMinutes = timerState.focusMinutesForTask(task.id);
-=======
     final planLine = _nowPlanLine(insight, moodState);
->>>>>>> 116293643c717f05e5b4aafac370a2efdd93a2e1
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -534,9 +524,9 @@ class _NowActiveFocusControls extends StatelessWidget {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.14),
+        color: Colors.white.withOpacity(0.14),
         borderRadius: BorderRadius.circular(AppRadii.control),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
+        border: Border.all(color: Colors.white.withOpacity(0.28)),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(
@@ -610,9 +600,9 @@ class _NowOtherFocusControls extends StatelessWidget {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.10),
+        color: Colors.white.withOpacity(0.10),
         borderRadius: BorderRadius.circular(AppRadii.control),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.20)),
+        border: Border.all(color: Colors.white.withOpacity(0.20)),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(
@@ -1954,7 +1944,7 @@ class _ResumeFocusTile extends StatelessWidget {
       decoration: BoxDecoration(
         color: cs.surface,
         borderRadius: BorderRadius.circular(AppRadii.control),
-        border: Border.all(color: cs.primary.withValues(alpha: 0.22)),
+        border: Border.all(color: cs.primary.withOpacity(0.22)),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(

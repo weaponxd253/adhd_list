@@ -158,7 +158,6 @@ class _TaskListSectionState extends State<TaskListSection> {
     final planInsight = dailyPlan.insightFor(task.id);
     final settingsState = context.watch<SettingsState>();
     final reminderState = context.watch<TaskReminderState>();
-    final timerState = context.watch<TimerState>();
     final reminder = reminderState.reminderFor(task.id);
     final colorScheme = Theme.of(context).colorScheme;
     final semantic = Theme.of(context).extension<AppSemanticColors>()!;
@@ -183,7 +182,7 @@ class _TaskListSectionState extends State<TaskListSection> {
             ? RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(AppRadii.card),
                 side: BorderSide(
-                  color: colorScheme.primary.withValues(alpha: 0.42),
+                  color: colorScheme.primary.withOpacity(0.42),
                 ),
               )
             : null,
@@ -531,7 +530,6 @@ class _TaskListSectionState extends State<TaskListSection> {
     DailyPlanTaskInsight? planInsight,
   ) {
     final colorScheme = Theme.of(context).colorScheme;
-    final timerState = context.watch<TimerState>();
 
     return Container(
       width: double.infinity,
@@ -555,7 +553,6 @@ class _TaskListSectionState extends State<TaskListSection> {
             _SubtaskRow(
               key: ValueKey('subtask-${subtask.id}'),
               subtask: subtask,
-              focusMinutes: timerState.focusMinutesForSubtask(subtask.id),
               enabled: !busy,
               active: timerState.isActiveForSubtask(subtask.id),
               focusedMinutes: focusSummary.subtaskFocusMinutes(subtask.id),
@@ -1247,7 +1244,6 @@ class _SubtaskRow extends StatelessWidget {
   const _SubtaskRow({
     super.key,
     required this.subtask,
-    required this.focusMinutes,
     required this.enabled,
     required this.active,
     required this.focusedMinutes,
@@ -1261,7 +1257,6 @@ class _SubtaskRow extends StatelessWidget {
   });
 
   final Subtask subtask;
-  final int focusMinutes;
   final bool enabled;
   final bool active;
   final int focusedMinutes;
@@ -1282,90 +1277,12 @@ class _SubtaskRow extends StatelessWidget {
           '${subtask.title}, ${subtask.isCompleted ? "completed" : "not completed"}${focusedMinutes > 0 ? ", focused $focusedMinutes minutes" : ""}${active ? ", timer active" : ""}',
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxs),
-<<<<<<< HEAD
-        child: Row(
-          children: [
-            const SizedBox(width: AppSpacing.xs),
-            Checkbox(
-              value: subtask.isCompleted,
-              onChanged: enabled ? (_) => onToggle() : null,
-              semanticLabel: subtask.isCompleted
-                  ? 'Mark ${subtask.title} incomplete'
-                  : 'Mark ${subtask.title} complete',
-            ),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    subtask.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      decoration: subtask.isCompleted
-                          ? TextDecoration.lineThrough
-                          : null,
-                    ),
-                  ),
-                  if (subtask.estimatedMinutes != null || focusMinutes > 0)
-                    Padding(
-                      padding: const EdgeInsets.only(top: AppSpacing.xxs),
-                      child: Wrap(
-                        spacing: AppSpacing.xxs,
-                        runSpacing: AppSpacing.xxs,
-                        children: [
-                          _TimeProgressBadge(
-                            estimatedMinutes: subtask.estimatedMinutes,
-                            focusMinutes: focusMinutes,
-                          ),
-                        ],
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            IconButton(
-              tooltip: 'Start timer for ${subtask.title}',
-              onPressed: enabled ? onStartFocus : null,
-              icon: const Icon(Icons.play_arrow_rounded, size: 20),
-              visualDensity: VisualDensity.compact,
-            ),
-            PopupMenuButton<String>(
-              tooltip: 'Step actions for ${subtask.title}',
-              icon: const Icon(Icons.more_horiz_rounded, size: 20),
-              enabled: enabled,
-              onSelected: (value) {
-                if (value == 'edit') onEdit();
-                if (value == 'delete') onDelete();
-              },
-              itemBuilder: (_) => const [
-                PopupMenuItem(
-                  value: 'edit',
-                  child: ListTile(
-                    leading: Icon(Icons.edit_outlined),
-                    title: Text('Edit'),
-                  ),
-                ),
-                PopupMenuItem(
-                  value: 'delete',
-                  child: ListTile(
-                    leading: Icon(Icons.delete_outline_rounded),
-                    title: Text('Delete'),
-                  ),
-                ),
-              ],
-            ),
-          ],
-=======
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: active
-                ? cs.primary.withValues(alpha: 0.08)
-                : Colors.transparent,
+            color: active ? cs.primary.withOpacity(0.08) : Colors.transparent,
             borderRadius: BorderRadius.circular(AppRadii.control),
-            border: active
-                ? Border.all(color: cs.primary.withValues(alpha: 0.18))
-                : null,
+            border:
+                active ? Border.all(color: cs.primary.withOpacity(0.18)) : null,
           ),
           child: Row(
             children: [
@@ -1407,7 +1324,11 @@ class _SubtaskRow extends StatelessWidget {
                 ),
               ),
               if (subtask.estimatedMinutes != null && !active)
-                _EstimateBadge(minutes: subtask.estimatedMinutes!),
+                _StatusBadge(
+                  label: '${subtask.estimatedMinutes}m',
+                  color: cs.secondary,
+                  icon: Icons.schedule_rounded,
+                ),
               if (active)
                 _ActiveSubtaskTimerChip(
                   timerDisplay: timerDisplay,
@@ -1465,71 +1386,12 @@ class _ActiveSubtaskTimerChip extends StatelessWidget {
         label: Text('$timerDisplay · End'),
         style: OutlinedButton.styleFrom(
           foregroundColor: cs.primary,
-          side: BorderSide(color: cs.primary.withValues(alpha: 0.35)),
+          side: BorderSide(color: cs.primary.withOpacity(0.35)),
           visualDensity: VisualDensity.compact,
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
->>>>>>> 116293643c717f05e5b4aafac370a2efdd93a2e1
         ),
       ),
     );
-  }
-}
-
-class _TimeProgressBadge extends StatelessWidget {
-  const _TimeProgressBadge({
-    required this.estimatedMinutes,
-    required this.focusMinutes,
-  });
-
-  final int? estimatedMinutes;
-  final int focusMinutes;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final semantic = Theme.of(context).extension<AppSemanticColors>()!;
-    final reachedEstimate =
-        estimatedMinutes != null && focusMinutes >= estimatedMinutes!;
-    final color = reachedEstimate ? semantic.success : cs.secondary;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.xxs,
-        vertical: AppSpacing.xxs,
-      ),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
-        borderRadius: BorderRadius.circular(AppRadii.pill),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.timer_outlined, size: 12, color: color),
-          const SizedBox(width: 2),
-          Flexible(
-            child: Text(
-              _label(),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: color,
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _label() {
-    final estimate = estimatedMinutes;
-    if (estimate != null && focusMinutes > 0) {
-      return '${estimate}m planned - ${focusMinutes}m focused';
-    }
-    if (estimate != null) return '${estimate}m planned';
-    return '${focusMinutes}m focused';
   }
 }
 
